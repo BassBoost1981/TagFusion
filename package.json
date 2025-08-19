@@ -1,0 +1,33 @@
+{
+  "name": "tagfusion",
+  "version": "1.0.0",
+  "description": "TagFusion - Portable Media Tagger with Hierarchical Tags",
+  "author": "BassBoost1981",
+  "license": "MIT",
+  "homepage": "https://github.com/BassBoost1981/TagFusion",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron . --dev",
+    "build": "electron-builder --config electron-builder.config.js --win --x64 && rm -rf release/win-unpacked"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "autoprefixer": "^10.4.21",
+    "electron": "^25.9.8",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.12"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "exifr": "^7.1.3",
+    "lucide-react": "^0.539.0",
+    "piexifjs": "^1.0.6",
+    "react-resizable-panels": "^3.0.4",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7"
+  }
+}

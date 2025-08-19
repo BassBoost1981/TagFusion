@@ -1,0 +1,306 @@
+.toolbar {
+  height: 48px;
+  background-color: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-md);
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.toolbar-section.navigation {
+  flex: 0 0 auto;
+  min-width: 300px;
+}
+
+.toolbar-section.search {
+  flex: 1;
+  justify-content: center;
+  max-width: 600px;
+  position: relative;
+}
+
+.toolbar-section.actions {
+  flex: 0 0 auto;
+}
+
+.toolbar-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  background-color: var(--toolbar-button-bg);
+  transition: var(--transition-colors), transform var(--transition-fast);
+  height: 32px;
+  min-width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background-color: var(--toolbar-button-hover);
+  border-color: var(--accent-color);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  background-color: var(--toolbar-button-active);
+  transform: translateY(1px);
+}
+
+.toolbar-btn:disabled,
+.toolbar-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: var(--bg-secondary);
+}
+
+.toolbar-btn:disabled:hover,
+.toolbar-btn.disabled:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+  transform: none;
+}
+
+/* Path Breadcrumb */
+.path-breadcrumb {
+  flex: 1;
+  min-width: 0;
+}
+
+.path-input {
+  width: 100%;
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 13px;
+  color: var(--text-secondary);
+  height: 32px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: var(--transition-colors);
+}
+
+.path-input:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow);
+  color: var(--text-primary);
+}
+
+/* Search Container */
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-container.focused .search-input {
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow);
+}
+
+.search-input {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  padding-right: 32px; /* Space for clear button */
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 280px;
+  height: 32px;
+  transition: var(--transition-colors);
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Quick Filters */
+.quick-filters {
+  display: flex;
+  align-items: center;
+}
+
+.filter-select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--input-border);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  height: 32px;
+  cursor: pointer;
+  min-width: 120px;
+  transition: var(--transition-colors);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow);
+}
+
+/* Filter Controls */
+.filter-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.filter-btn {
+  background-color: var(--bg-primary);
+  border-color: var(--border-color);
+  position: relative;
+}
+
+.filter-btn:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.filter-btn.active {
+  background-color: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.filter-btn.active:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.filter-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background-color: var(--danger-color);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 8px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.clear-filters-btn {
+  background-color: var(--warning-color);
+  color: white;
+  border-color: var(--warning-color);
+}
+
+.clear-filters-btn:hover {
+  background-color: #e0a800;
+  border-color: #e0a800;
+}
+
+.theme-toggle {
+  font-size: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .toolbar-section.navigation {
+    min-width: 250px;
+  }
+  
+  .search-input {
+    width: 220px;
+  }
+  
+  .filter-select {
+    min-width: 100px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    padding: 0 var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+  
+  .toolbar-section.navigation {
+    min-width: 200px;
+  }
+  
+  .search-input {
+    width: 180px;
+  }
+  
+  .filter-select {
+    min-width: 80px;
+  }
+  
+  .path-input {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    height: 44px;
+  }
+  
+  .toolbar-btn {
+    height: 28px;
+    min-width: 28px;
+    font-size: 12px;
+  }
+  
+  .search-input,
+  .filter-select,
+  .path-input {
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .search-input {
+    width: 150px;
+  }
+}

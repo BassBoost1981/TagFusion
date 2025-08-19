@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TagFusion Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .status {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+        }
+        .error {
+            background: rgba(244, 67, 54, 0.3);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #output {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 TagFusion Test</h1>
+        
+        <div class="status success">
+            <h2>✅ HTML lädt erfolgreich!</h2>
+            <p>Wenn Sie das sehen, funktioniert die EXE grundsätzlich.</p>
+        </div>
+
+        <div class="status">
+            <h3>🔧 Tests:</h3>
+            <button onclick="testElectronAPI()">Test Electron API</button>
+            <button onclick="testFileSystem()">Test Dateisystem</button>
+            <button onclick="testDrives()">Test Laufwerke</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            output.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        }
+
+        // Test if Electron API is available
+        function testElectronAPI() {
+            log('Testing Electron API...');
+            if (window.electronAPI) {
+                log('✅ Electron API verfügbar!');
+                log('API Methoden: ' + Object.keys(window.electronAPI).join(', '));
+            } else {
+                log('❌ Electron API nicht verfügbar!');
+            }
+        }
+
+        // Test file system
+        async function testFileSystem() {
+            log('Testing File System...');
+            try {
+                if (window.electronAPI && window.electronAPI.fileSystem) {
+                    const drives = await window.electronAPI.fileSystem.getDrives();
+                    log('✅ Laufwerke gefunden: ' + drives.length);
+                    drives.forEach(drive => {
+                        log('  - ' + drive.name + ' (' + drive.path + ')');
+                    });
+                } else {
+                    log('❌ FileSystem API nicht verfügbar!');
+                }
+            } catch (error) {
+                log('❌ Fehler: ' + error.message);
+            }
+        }
+
+        // Test drives
+        async function testDrives() {
+            log('Testing Drives...');
+            try {
+                if (window.electronAPI && window.electronAPI.fileSystem) {
+                    const contents = await window.electronAPI.fileSystem.getDirectoryContents('C:\\');
+                    log('✅ C:\\ Inhalt: ' + contents.folders.length + ' Ordner, ' + contents.files.length + ' Dateien');
+                } else {
+                    log('❌ FileSystem API nicht verfügbar!');
+                }
+            } catch (error) {
+                log('❌ Fehler: ' + error.message);
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            log('🚀 TagFusion Test gestartet');
+            log('User Agent: ' + navigator.userAgent);
+            log('Location: ' + window.location.href);
+            testElectronAPI();
+        });
+    </script>
+</body>
+</html>

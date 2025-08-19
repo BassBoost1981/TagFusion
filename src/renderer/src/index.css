@@ -1,0 +1,325 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: var(--transition-colors);
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* CSS Custom Properties for Theming */
+:root {
+  /* shadcn/ui CSS Variables */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+
+  /* Legacy TagFusion Colors (for compatibility) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-quaternary: #f1f3f4;
+  --bg-hover: #f5f5f5;
+  --bg-active: #e9ecef;
+  --bg-selected: #e3f2fd;
+  --bg-overlay: rgba(255, 255, 255, 0.95);
+  
+  /* Text Colors */
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-tertiary: #adb5bd;
+  --text-muted: #868e96;
+  --text-inverse: #ffffff;
+  --text-link: #007bff;
+  --text-link-hover: #0056b3;
+  
+  /* Border Colors */
+  --border-color: #dee2e6;
+  --border-light: #f1f3f4;
+  --border-medium: #ced4da;
+  --border-dark: #adb5bd;
+  --border-focus: #80bdff;
+  
+  /* Accent Colors */
+  --accent-color: #007bff;
+  --accent-color-rgb: 0, 123, 255;
+  --accent-hover: #0056b3;
+  --accent-active: #004085;
+  --accent-light: #cce7ff;
+  --accent-lighter: #e3f2fd;
+  
+  /* Status Colors */
+  --success-color: #28a745;
+  --success-hover: #218838;
+  --success-light: #d4edda;
+  --warning-color: #ffc107;
+  --warning-hover: #e0a800;
+  --warning-light: #fff3cd;
+  --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --danger-light: #f8d7da;
+  --info-color: #17a2b8;
+  --info-hover: #138496;
+  --info-light: #d1ecf1;
+  
+  /* Panel Colors */
+  --panel-bg: #ffffff;
+  --panel-border: #dee2e6;
+  --panel-header-bg: #f8f9fa;
+  --panel-header-border: #dee2e6;
+  
+  /* Toolbar Colors */
+  --toolbar-bg: #f8f9fa;
+  --toolbar-border: #dee2e6;
+  --toolbar-button-bg: #ffffff;
+  --toolbar-button-hover: #e9ecef;
+  --toolbar-button-active: #dee2e6;
+  
+  /* Input Colors */
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --input-focus-border: #80bdff;
+  --input-focus-shadow: rgba(0, 123, 255, 0.25);
+  --input-placeholder: #6c757d;
+  
+  /* Dropdown Colors */
+  --dropdown-bg: #ffffff;
+  --dropdown-border: #ced4da;
+  --dropdown-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
+  --dropdown-item-hover: #f8f9fa;
+  
+  /* Scrollbar Colors */
+  --scrollbar-track: #f1f1f1;
+  --scrollbar-thumb: #c1c1c1;
+  --scrollbar-thumb-hover: #a8a8a8;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  
+  /* Border Radius */
+  --border-radius-xs: 2px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-round: 50%;
+  
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+  
+  /* Z-Index */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-colors: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  /* shadcn/ui Dark Theme Variables */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 84% 4.9%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.3% 94.1%;
+  --sidebar-background: 240 5.9% 10%;
+  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-primary: 224.3 76.3% 94.1%;
+  --sidebar-primary-foreground: 240 5.9% 10%;
+  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+
+  /* Legacy TagFusion Dark Colors (for compatibility) */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #404040;
+  --bg-quaternary: #333333;
+  --bg-hover: #363636;
+  --bg-active: #404040;
+  --bg-selected: #1e3a5f;
+  --bg-overlay: rgba(26, 26, 26, 0.95);
+  
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #8a8a8a;
+  --text-muted: #6a6a6a;
+  --text-inverse: #000000;
+  --text-link: #4dabf7;
+  --text-link-hover: #74c0fc;
+  
+  /* Border Colors */
+  --border-color: #404040;
+  --border-light: #333333;
+  --border-medium: #555555;
+  --border-dark: #666666;
+  --border-focus: #4dabf7;
+  
+  /* Accent Colors */
+  --accent-color: #4dabf7;
+  --accent-color-rgb: 77, 171, 247;
+  --accent-hover: #74c0fc;
+  --accent-active: #339af0;
+  --accent-light: #1e3a5f;
+  --accent-lighter: #1a2332;
+  
+  /* Status Colors */
+  --success-color: #51cf66;
+  --success-hover: #69db7c;
+  --success-light: #2b8a3e;
+  --warning-color: #ffd43b;
+  --warning-hover: #ffec99;
+  --warning-light: #fab005;
+  --danger-color: #ff6b6b;
+  --danger-hover: #ff8787;
+  --danger-light: #e03131;
+  --info-color: #4dabf7;
+  --info-hover: #74c0fc;
+  --info-light: #1971c2;
+  
+  /* Panel Colors */
+  --panel-bg: #2d2d2d;
+  --panel-border: #404040;
+  --panel-header-bg: #333333;
+  --panel-header-border: #404040;
+  
+  /* Toolbar Colors */
+  --toolbar-bg: #2d2d2d;
+  --toolbar-border: #404040;
+  --toolbar-button-bg: #404040;
+  --toolbar-button-hover: #4a4a4a;
+  --toolbar-button-active: #555555;
+  
+  /* Input Colors */
+  --input-bg: #404040;
+  --input-border: #555555;
+  --input-focus-border: #4dabf7;
+  --input-focus-shadow: rgba(77, 171, 247, 0.25);
+  --input-placeholder: #8a8a8a;
+  
+  /* Dropdown Colors */
+  --dropdown-bg: #2d2d2d;
+  --dropdown-border: #404040;
+  --dropdown-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5);
+  --dropdown-item-hover: #404040;
+  
+  /* Scrollbar Colors */
+  --scrollbar-track: #2d2d2d;
+  --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #666666;
+  
+  /* Shadows (adjusted for dark theme) */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--border-radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}

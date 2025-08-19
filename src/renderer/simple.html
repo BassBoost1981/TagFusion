@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TagFusion</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f5f5f5;
+    }
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+    .sidebar {
+      width: 250px;
+      background: #2c3e50;
+      color: white;
+      padding: 20px;
+    }
+    .main-content {
+      flex: 1;
+      padding: 20px;
+    }
+    .header {
+      background: white;
+      padding: 15px 20px;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 15px;
+    }
+    .file-item {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .file-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    .status {
+      background: #e8f5e8;
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <h2>🎯 TagFusion</h2>
+      <div class="status" id="status">
+        ✅ Anwendung gestartet
+      </div>
+      
+      <h3>Laufwerke</h3>
+      <div id="drives">
+        <button onclick="loadDrives()">Laufwerke laden</button>
+      </div>
+      
+      <h3>Aktionen</h3>
+      <button onclick="testAPI()">API Test</button>
+      <button onclick="showInfo()">System Info</button>
+    </div>
+    
+    <div class="main-content">
+      <div class="header">
+        <h1>Portable Image Manager</h1>
+        <p>Einfache funktionsfähige Version - kein React erforderlich!</p>
+      </div>
+      
+      <div id="content">
+        <div class="file-grid">
+          <div class="file-item">
+            <div class="file-icon">📁</div>
+            <div>Ordner 1</div>
+          </div>
+          <div class="file-item">
+            <div class="file-icon">🖼️</div>
+            <div>Bild 1.jpg</div>
+          </div>
+          <div class="file-item">
+            <div class="file-icon">🖼️</div>
+            <div>Bild 2.png</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log('🚀 TagFusion Simple gestartet');
+    
+    function updateStatus(message) {
+      document.getElementById('status').innerHTML = message;
+    }
+    
+    async function loadDrives() {
+      updateStatus('🔄 Lade Laufwerke...');
+      
+      try {
+        if (window.electronAPI && window.electronAPI.fileSystem) {
+          const drives = await window.electronAPI.fileSystem.getDrives();
+          
+          const drivesDiv = document.getElementById('drives');
+          drivesDiv.innerHTML = '<h3>Laufwerke</h3>';
+          
+          drives.forEach(drive => {
+            const button = document.createElement('button');
+            button.textContent = `${drive.letter} (${drive.label || 'Lokal'})`;
+            button.onclick = () => loadFolder(drive.letter);
+            drivesDiv.appendChild(button);
+          });
+          
+          updateStatus(`✅ ${drives.length} Laufwerke gefunden`);
+        } else {
+          updateStatus('❌ Electron API nicht verfügbar');
+        }
+      } catch (error) {
+        updateStatus('❌ Fehler: ' + error.message);
+        console.error('Fehler beim Laden der Laufwerke:', error);
+      }
+    }
+    
+    async function loadFolder(path) {
+      updateStatus(`🔄 Lade Ordner: ${path}`);
+      
+      try {
+        if (window.electronAPI && window.electronAPI.fileSystem) {
+          const items = await window.electronAPI.fileSystem.getDirectoryContents(path);
+          
+          const content = document.getElementById('content');
+          content.innerHTML = `
+            <div class="header">
+              <h2>📁 ${path}</h2>
+              <button onclick="loadDrives()">← Zurück zu Laufwerken</button>
+            </div>
+            <div class="file-grid" id="file-grid"></div>
+          `;
+          
+          const grid = document.getElementById('file-grid');
+          
+          items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            div.innerHTML = `
+              <div class="file-icon">${item.isDirectory ? '📁' : '📄'}</div>
+              <div>${item.name}</div>
+            `;
+            if (item.isDirectory) {
+              div.onclick = () => loadFolder(item.path);
+              div.style.cursor = 'pointer';
+            }
+            grid.appendChild(div);
+          });
+          
+          updateStatus(`✅ ${items.length} Elemente geladen`);
+        }
+      } catch (error) {
+        updateStatus('❌ Fehler: ' + error.message);
+        console.error('Fehler beim Laden des Ordners:', error);
+      }
+    }
+    
+    function testAPI() {
+      updateStatus('🔧 Teste APIs...');
+      
+      const tests = [];
+      
+      if (window.electronAPI) {
+        tests.push('✅ Electron API');
+        
+        if (window.electronAPI.fileSystem) tests.push('✅ FileSystem API');
+        if (window.electronAPI.metadata) tests.push('✅ Metadata API');
+        if (window.electronAPI.thumbnails) tests.push('✅ Thumbnails API');
+      } else {
+        tests.push('❌ Electron API nicht verfügbar');
+      }
+      
+      updateStatus(tests.join('<br>'));
+    }
+    
+    function showInfo() {
+      const info = [
+        `🖥️ User Agent: ${navigator.userAgent}`,
+        `🌐 Location: ${window.location.href}`,
+        `📜 Scripts: ${document.scripts.length}`,
+        `🎨 Stylesheets: ${document.styleSheets.length}`,
+        `⚡ Electron: ${window.electronAPI ? 'Verfügbar' : 'Nicht verfügbar'}`
+      ];
+      
+      updateStatus(info.join('<br>'));
+    }
+    
+    // Auto-load drives on start
+    setTimeout(loadDrives, 1000);
+  </script>
+</body>
+</html>

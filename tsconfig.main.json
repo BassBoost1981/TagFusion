@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": false,
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "include": [
+    "src/main/main-simple.ts",
+    "src/main/main-test.ts",
+    "src/main/preload-simple.ts",
+    "src/main/utils/environment.ts",
+    "src/main/services/FileSystemService.ts",
+    "src/main/services/ThumbnailService.ts",
+    "src/main/services/VideoThumbnailService.ts",
+    "src/main/workers/thumbnailWorker.ts"
+  ],
+  "exclude": [
+    "src/renderer/**/*"
+  ]
+}

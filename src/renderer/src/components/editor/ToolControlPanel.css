@@ -1,0 +1,221 @@
+.tool-control-panel {
+  padding: 16px;
+  background-color: var(--bg-secondary, #fff);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.tool-controls h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  border-bottom: 1px solid var(--border-color, #ddd);
+  padding-bottom: 8px;
+}
+
+.slider-control {
+  margin-bottom: 16px;
+}
+
+.slider-control label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+}
+
+.slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-primary, #f5f5f5);
+  outline: none;
+  margin-bottom: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color, #007acc);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color, #007acc);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.control-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.apply-button,
+.reset-button {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.apply-button {
+  background-color: var(--success-color, #28a745);
+  color: white;
+  border-color: var(--success-color, #28a745);
+}
+
+.apply-button:hover {
+  background-color: var(--success-hover, #218838);
+}
+
+.reset-button {
+  background-color: var(--bg-primary, #f5f5f5);
+  color: var(--text-primary, #333);
+}
+
+.reset-button:hover {
+  background-color: var(--bg-hover, #e5e5e5);
+}
+
+.rotate-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rotate-button {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  background-color: var(--bg-primary, #f5f5f5);
+  color: var(--text-primary, #333);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.rotate-button:hover {
+  background-color: var(--bg-hover, #e5e5e5);
+  border-color: var(--border-hover, #bbb);
+}
+
+.crop-instructions {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: var(--info-bg, #e3f2fd);
+  border: 1px solid var(--info-border, #bbdefb);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--info-text, #1565c0);
+}
+
+.crop-instructions p {
+  margin: 0 0 8px 0;
+}
+
+.crop-instructions p:last-child {
+  margin-bottom: 0;
+}
+
+.crop-presets h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+}
+
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-button {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #ddd);
+  background-color: var(--bg-primary, #f5f5f5);
+  color: var(--text-primary, #333);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+.preset-button:hover {
+  background-color: var(--bg-hover, #e5e5e5);
+  border-color: var(--border-hover, #bbb);
+}
+
+.resize-control {
+  margin-bottom: 16px;
+}
+
+.resize-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .tool-control-panel {
+    background-color: var(--bg-secondary, #3d3d3d);
+  }
+
+  .tool-controls h3 {
+    color: var(--text-primary, #fff);
+    border-color: var(--border-color, #555);
+  }
+
+  .slider-control label {
+    color: var(--text-primary, #fff);
+  }
+
+  .slider {
+    background: var(--bg-primary, #2d2d2d);
+  }
+
+  .reset-button,
+  .rotate-button,
+  .preset-button {
+    background-color: var(--bg-primary, #2d2d2d);
+    color: var(--text-primary, #fff);
+    border-color: var(--border-color, #555);
+  }
+
+  .reset-button:hover,
+  .rotate-button:hover,
+  .preset-button:hover {
+    background-color: var(--bg-hover, #404040);
+    border-color: var(--border-hover, #666);
+  }
+
+  .crop-instructions {
+    background-color: var(--info-bg, #1a237e);
+    border-color: var(--info-border, #3949ab);
+    color: var(--info-text, #e3f2fd);
+  }
+
+  .crop-presets h4 {
+    color: var(--text-primary, #fff);
+  }
+}

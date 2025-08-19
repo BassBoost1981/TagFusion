@@ -1,0 +1,255 @@
+/* Drag and Drop Global Styles */
+
+/* Global drag state */
+body.dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+body.dragging * {
+  cursor: grabbing !important;
+}
+
+/* Drag preview styles */
+.drag-preview {
+  position: fixed;
+  background: var(--color-primary, #007acc);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  z-index: 10000;
+  white-space: nowrap;
+  opacity: 0.9;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+/* Drop zone visual feedback */
+.drag-over {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px dashed transparent;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.drag-valid {
+  background-color: rgba(0, 122, 204, 0.1);
+}
+
+.drag-valid::before {
+  border-color: var(--color-primary, #007acc);
+  background-color: rgba(0, 122, 204, 0.05);
+}
+
+.drag-invalid {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.drag-invalid::before {
+  border-color: var(--color-danger, #dc3545);
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+/* Drop indicator line for reordering */
+.drop-indicator {
+  position: relative;
+}
+
+.drop-indicator::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--color-primary, #007acc);
+  border-radius: 1px;
+  z-index: 10;
+}
+
+.drop-indicator.top::after {
+  top: -1px;
+}
+
+.drop-indicator.bottom::after {
+  bottom: -1px;
+}
+
+/* Draggable item states */
+.draggable-item {
+  cursor: grab;
+  transition: opacity 0.2s ease;
+}
+
+.draggable-item:hover {
+  cursor: grab;
+}
+
+.draggable-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Specific component styles */
+
+/* Content Grid drag styles */
+.content-grid .grid-item.draggable-item,
+.content-grid .list-item.draggable-item {
+  cursor: grab;
+}
+
+.content-grid .grid-item.dragging,
+.content-grid .list-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+/* Favorites drag styles */
+.favorites-list .favorite-item.draggable-item {
+  cursor: grab;
+}
+
+.favorites-list .favorite-item.dragging {
+  opacity: 0.5;
+}
+
+.favorites-list.drag-over {
+  background-color: rgba(0, 122, 204, 0.05);
+  border: 2px dashed var(--color-primary, #007acc);
+  border-radius: 4px;
+}
+
+/* Tag system drag styles */
+.tag-system-panel .tag-item.draggable-item {
+  cursor: grab;
+}
+
+.tag-system-panel .tag-item.dragging {
+  opacity: 0.5;
+}
+
+.tag-system-panel .tag-item.drag-over {
+  background-color: rgba(0, 122, 204, 0.1);
+  border-radius: 4px;
+}
+
+/* Drop zone highlights for different target types */
+.drop-zone-folder {
+  border: 2px dashed var(--color-primary, #007acc);
+  background-color: rgba(0, 122, 204, 0.05);
+}
+
+.drop-zone-favorite {
+  border: 2px dashed var(--color-success, #28a745);
+  background-color: rgba(40, 167, 69, 0.05);
+}
+
+.drop-zone-tag {
+  border: 2px dashed var(--color-warning, #ffc107);
+  background-color: rgba(255, 193, 7, 0.05);
+}
+
+.drop-zone-invalid {
+  border: 2px dashed var(--color-danger, #dc3545);
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+/* Animation for drop feedback */
+@keyframes dropSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.drop-success {
+  animation: dropSuccess 0.3s ease;
+}
+
+/* Drag ghost image (hidden) */
+.drag-ghost {
+  position: absolute;
+  top: -1000px;
+  left: -1000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Multi-selection drag preview */
+.drag-preview.multi-selection {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drag-preview.multi-selection::before {
+  content: '📁';
+  font-size: 14px;
+}
+
+.drag-preview.files::before {
+  content: '🖼️';
+}
+
+.drag-preview.folders::before {
+  content: '📁';
+}
+
+.drag-preview.tags::before {
+  content: '🏷️';
+}
+
+.drag-preview.favorites::before {
+  content: '⭐';
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .drag-preview {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  
+  .drag-over::before {
+    border-width: 1px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .drag-valid::before {
+    border-width: 3px;
+  }
+  
+  .drag-invalid::before {
+    border-width: 3px;
+  }
+  
+  .drag-preview {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .drag-over,
+  .draggable-item,
+  .drop-success {
+    transition: none;
+    animation: none;
+  }
+}

@@ -1,0 +1,389 @@
+.video-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.video-viewer {
+  position: relative;
+  width: 90vw;
+  height: 90vh;
+  max-width: 1200px;
+  max-height: 800px;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.video-viewer-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 100;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.video-viewer-header.hidden {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.video-viewer-header.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.header-left {
+  flex: 1;
+}
+
+.video-title {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.video-info {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.header-right {
+  display: flex;
+  gap: 8px;
+}
+
+.control-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background-color 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.control-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.control-button:focus {
+  outline: 2px solid #4a9eff;
+  outline-offset: 2px;
+}
+
+.video-player-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.fullscreen-video-player {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.video-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+  font-size: 16px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.video-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+  text-align: center;
+  padding: 40px;
+}
+
+.error-icon {
+  font-size: 48px;
+  opacity: 0.7;
+}
+
+.video-error h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.video-error p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.8;
+  max-width: 400px;
+}
+
+.retry-button {
+  background: #4a9eff;
+  border: none;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.retry-button:hover {
+  background: #357abd;
+}
+
+.video-navigation {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  z-index: 100;
+  transition: opacity 0.3s ease;
+}
+
+.nav-button {
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+.nav-button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.nav-button:focus {
+  outline: 2px solid #4a9eff;
+  outline-offset: 2px;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.video-metadata-panel {
+  position: absolute;
+  top: 80px;
+  right: 24px;
+  width: 280px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  transition: opacity 0.3s ease;
+}
+
+.metadata-section h4 {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metadata-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.metadata-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.metadata-item .label {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.metadata-item .value {
+  color: #fff;
+  font-weight: 400;
+  text-align: right;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .video-viewer {
+    width: 95vw;
+    height: 95vh;
+    border-radius: 8px;
+  }
+  
+  .video-viewer-header {
+    padding: 16px 20px;
+  }
+  
+  .video-title {
+    font-size: 16px;
+  }
+  
+  .video-info {
+    font-size: 12px;
+  }
+  
+  .video-metadata-panel {
+    position: static;
+    width: auto;
+    margin: 16px;
+    order: -1;
+  }
+  
+  .video-navigation {
+    bottom: 60px;
+  }
+  
+  .nav-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-viewer-header {
+    padding: 12px 16px;
+  }
+  
+  .video-title {
+    font-size: 14px;
+  }
+  
+  .video-info {
+    font-size: 11px;
+    flex-wrap: wrap;
+  }
+  
+  .control-button {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  
+  .video-navigation {
+    bottom: 40px;
+    gap: 12px;
+  }
+  
+  .nav-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .nav-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .video-viewer {
+    border: 2px solid #fff;
+  }
+  
+  .control-button,
+  .nav-button {
+    border: 1px solid #fff;
+  }
+  
+  .video-metadata-panel {
+    border: 1px solid #fff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .video-viewer-header {
+    transition: none;
+  }
+  
+  .control-button,
+  .nav-button,
+  .retry-button {
+    transition: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+  }
+}
+
+/* Focus management */
+.video-viewer-overlay:focus-within .video-viewer-header.hidden {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Ensure video controls are accessible */
+.video-viewer .video-controls {
+  z-index: 101;
+}

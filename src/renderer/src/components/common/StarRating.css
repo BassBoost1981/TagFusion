@@ -1,0 +1,159 @@
+.star-rating {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.star-rating .stars-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.star-rating .star {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border-radius: 2px;
+}
+
+.star-rating .star.interactive {
+  cursor: pointer;
+}
+
+.star-rating .star.interactive:hover {
+  transform: scale(1.1);
+  background-color: var(--color-hover, rgba(255, 255, 255, 0.1));
+}
+
+.star-rating .star.interactive:active {
+  transform: scale(0.95);
+}
+
+.star-rating .star:focus {
+  outline: 2px solid var(--color-primary, #007acc);
+  outline-offset: 2px;
+}
+
+.star-rating .star-icon {
+  display: block;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Star states */
+.star-rating .star.filled .star-icon {
+  color: var(--color-star-filled, #ffd700);
+  filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.3));
+}
+
+.star-rating .star.empty .star-icon {
+  color: var(--color-star-empty, #666);
+  opacity: 0.5;
+}
+
+.star-rating .star.interactive.empty:hover .star-icon {
+  color: var(--color-star-hover, #ffed4e);
+  opacity: 0.8;
+}
+
+/* Sizes */
+.star-rating.small .star-icon {
+  font-size: 12px;
+}
+
+.star-rating.small .star {
+  padding: 2px;
+}
+
+.star-rating.medium .star-icon {
+  font-size: 16px;
+}
+
+.star-rating.medium .star {
+  padding: 4px;
+}
+
+.star-rating.large .star-icon {
+  font-size: 20px;
+}
+
+.star-rating.large .star {
+  padding: 6px;
+}
+
+/* Rating label */
+.star-rating .rating-label {
+  font-size: 0.9em;
+  color: var(--color-text-secondary, #666);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .star-rating .star.empty .star-icon {
+    color: var(--color-star-empty-dark, #999);
+  }
+  
+  .star-rating .rating-label {
+    color: var(--color-text-secondary-dark, #ccc);
+  }
+  
+  .star-rating .star.interactive:hover {
+    background-color: var(--color-hover-dark, rgba(255, 255, 255, 0.1));
+  }
+}
+
+/* Accessibility improvements */
+.star-rating .star:focus-visible {
+  outline: 2px solid var(--color-primary, #007acc);
+  outline-offset: 2px;
+}
+
+/* Animation for rating changes */
+.star-rating .star.filled .star-icon {
+  animation: starFill 0.2s ease-out;
+}
+
+@keyframes starFill {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hover effect for interactive stars */
+.star-rating .star.interactive:hover ~ .star .star-icon {
+  color: var(--color-star-empty, #666);
+  opacity: 0.3;
+}
+
+.star-rating .stars-container:hover .star:hover .star-icon,
+.star-rating .stars-container:hover .star:hover ~ .star.filled .star-icon {
+  color: var(--color-star-hover, #ffed4e);
+  opacity: 1;
+}
+
+/* Ensure proper spacing in different contexts */
+.star-rating.inline {
+  display: inline-flex;
+}
+
+.star-rating.block {
+  display: flex;
+  width: 100%;
+}

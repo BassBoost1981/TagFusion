@@ -1,0 +1,443 @@
+.tag-system-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--bg-primary);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm) var(--spacing-md);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.section-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.add-tag-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+}
+
+.add-tag-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.tags-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.tag-tree {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tag-node {
+  margin-bottom: 2px;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  user-select: none;
+  position: relative;
+  min-height: 24px;
+}
+
+.tag-item:hover {
+  background-color: var(--bg-secondary);
+}
+
+.tag-item.drop-target {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.tag-item.level-0 {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tag-item.level-1 {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.tag-item.level-2 {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 8px;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.expand-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.tag-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tag-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+}
+
+.tag-name:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.tag-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tag-item:hover .tag-actions {
+  opacity: 1;
+}
+
+.tag-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-secondary);
+  padding: 2px;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.tag-action-btn.assign-btn:hover:not(:disabled) {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.tag-action-btn.filter-btn:hover {
+  background-color: var(--info-color, #3498db);
+  color: white;
+}
+
+.tag-children {
+  margin-left: var(--spacing-sm);
+}
+
+.tag-edit-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-color);
+  border-radius: var(--border-radius-sm);
+  padding: 2px 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.tag-edit-input:focus {
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 0 2px rgba(var(--accent-color-rgb), 0.2);
+}
+
+.new-tag-input-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px var(--spacing-xs);
+  margin-bottom: 2px;
+}
+
+.selected-files-info {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.info-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.info-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.context-menu {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: var(--spacing-xs);
+  min-width: 120px;
+  z-index: 1000;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+}
+
+.context-menu-item:hover {
+  background-color: var(--bg-secondary);
+}
+
+.context-menu-item.delete {
+  color: var(--error-color, #e74c3c);
+}
+
+.context-menu-item.delete:hover {
+  background-color: var(--error-color, #e74c3c);
+  color: white;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: var(--spacing-xs) 0;
+}
+
+/* Drag and drop styles */
+.tag-item[draggable="true"] {
+  cursor: grab;
+}
+
+.tag-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.tag-item.dragging {
+  opacity: 0.5;
+}
+
+/* Scrollbar styling */
+.tags-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tags-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tags-content::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.tags-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .section-header {
+    padding: var(--spacing-sm);
+  }
+  
+  .tags-content {
+    padding: var(--spacing-xs);
+  }
+  
+  .tag-item {
+    font-size: 12px;
+    padding: 2px var(--spacing-xs);
+  }
+  
+  .tag-edit-input {
+    font-size: 12px;
+  }
+  
+  .selected-files-info {
+    padding: var(--spacing-xs);
+  }
+  
+  .info-header {
+    font-size: 11px;
+  }
+  
+  .info-text {
+    font-size: 10px;
+  }
+}
+
+/* Animation for expanding/collapsing */
+.tag-children {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Focus styles for accessibility */
+.add-tag-btn:focus,
+.expand-btn:focus,
+.tag-action-btn:focus,
+.tag-edit-input:focus,
+.context-menu-item:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .tag-item {
+    border: 1px solid transparent;
+  }
+  
+  .tag-item:hover,
+  .tag-item:focus {
+    border-color: var(--text-primary);
+  }
+  
+  .tag-item.drop-target {
+    border-color: var(--accent-color);
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .tag-item,
+  .tag-action-btn,
+  .expand-btn,
+  .tag-name,
+  .context-menu-item {
+    transition: none;
+  }
+  
+  .tag-children {
+    animation: none;
+  }
+}
+
+/* Dark theme specific adjustments */
+[data-theme="dark"] .context-menu {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .tag-edit-input {
+  background: var(--bg-secondary);
+}
+
+/* Loading state */
+.tag-tree.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tag-tree.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Empty state */
+.tag-tree:empty::before {
+  content: 'No tags created yet. Click + to add your first tag category.';
+  display: block;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 12px;
+  padding: var(--spacing-lg);
+}

@@ -1,0 +1,154 @@
+.rating-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rating-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rating-filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.clear-rating-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.clear-rating-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.rating-filter-stars {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.rating-star-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rating-star-btn:hover {
+  background-color: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+.rating-star-btn:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.rating-star-btn .star-icon {
+  font-size: 16px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.rating-star-btn.active .star-icon {
+  color: var(--color-star-filled, #ffd700);
+  opacity: 1;
+  filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.3));
+}
+
+.rating-star-btn:hover .star-icon {
+  color: var(--color-star-hover, #ffed4e);
+  opacity: 0.8;
+}
+
+.rating-filter-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+}
+
+/* Hover effect for consecutive stars */
+.rating-filter-stars:hover .rating-star-btn:hover ~ .rating-star-btn .star-icon {
+  color: var(--text-secondary);
+  opacity: 0.3;
+}
+
+.rating-filter-stars:hover .rating-star-btn:hover .star-icon,
+.rating-filter-stars:hover .rating-star-btn:hover ~ .rating-star-btn.active .star-icon {
+  color: var(--color-star-hover, #ffed4e);
+  opacity: 1;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .rating-star-btn .star-icon {
+    color: var(--text-secondary-dark, #999);
+  }
+  
+  .rating-star-btn.active .star-icon {
+    color: var(--color-star-filled-dark, #ffd700);
+  }
+  
+  .clear-rating-btn:hover {
+    background-color: var(--bg-tertiary-dark, rgba(255, 255, 255, 0.1));
+  }
+}
+
+/* Animation for rating changes */
+.rating-star-btn.active .star-icon {
+  animation: starActivate 0.2s ease-out;
+}
+
+@keyframes starActivate {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Compact variant */
+.rating-filter.compact {
+  gap: 4px;
+}
+
+.rating-filter.compact .rating-filter-stars {
+  gap: 2px;
+}
+
+.rating-filter.compact .rating-star-btn {
+  padding: 2px;
+}
+
+.rating-filter.compact .rating-star-btn .star-icon {
+  font-size: 14px;
+}
+
+.rating-filter.compact .rating-filter-text {
+  font-size: 10px;
+}

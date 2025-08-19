@@ -1,0 +1,198 @@
+.export-progress-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.export-progress-dialog {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 450px;
+  max-width: 90vw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.export-progress-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.export-progress-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.export-progress-content {
+  padding: 20px;
+}
+
+.export-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.error-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-message {
+  flex: 1;
+}
+
+.error-message strong {
+  color: var(--error-color, #e74c3c);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.error-message p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.progress-text {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.progress-percentage {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.current-file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.current-file-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.current-file-name {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: monospace;
+  background: var(--bg-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.export-progress-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.close-button,
+.cancel-button {
+  padding: 10px 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover,
+.cancel-button:hover {
+  background: var(--bg-hover);
+}
+
+.cancel-button {
+  background: var(--error-color, #e74c3c);
+  color: white;
+  border-color: var(--error-color, #e74c3c);
+}
+
+.cancel-button:hover {
+  background: var(--error-hover, #c0392b);
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .export-progress-dialog {
+  --bg-primary: #2d2d2d;
+  --bg-secondary: #3d3d3d;
+  --bg-hover: #4d4d4d;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --border-color: #555;
+  --accent-color: #007acc;
+  --error-color: #e74c3c;
+  --error-hover: #c0392b;
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .export-progress-dialog {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-hover: #e5e5e5;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --border-color: #ddd;
+  --accent-color: #007acc;
+  --error-color: #e74c3c;
+  --error-hover: #c0392b;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .export-progress-dialog {
+    width: 95vw;
+    margin: 20px;
+  }
+  
+  .progress-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

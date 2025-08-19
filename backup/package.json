@@ -1,0 +1,165 @@
+{
+  "name": "portable-image-manager",
+  "version": "1.0.0",
+  "description": "A portable image management application similar to Google Picasa",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+    "dev:main": "tsc -p tsconfig.main.json && electron dist/main-simple.js",
+    "dev:test": "tsc -p tsconfig.main.json && electron dist/main-test.js",
+    "dev:renderer": "vite",
+    "build": "npm run build:main && npm run build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build && node scripts/fix-html.js",
+    "clean": "rimraf dist release",
+    "package": "electron-builder --config electron-builder.config.js",
+    "package:portable": "node scripts/build-portable.js",
+    "package:portable:all": "npm run build && electron-builder --config electron-builder.config.js --win --mac --linux",
+    "package:win": "rm -f release/*.exe release/*.blockmap && npm run build && electron-builder --config electron-builder.config.js --win && rm -rf release/win-unpacked release/win-ia32-unpacked",
+    "package:mac": "npm run build && electron-builder --config electron-builder.config.js --mac",
+    "package:linux": "npm run build && electron-builder --config electron-builder.config.js --linux",
+    "package:debug": "npm run build && electron-builder --config electron-builder.debug.config.js --win",
+    "package:test": "npm run build:test && electron-builder --config electron-builder.debug.config.js --win",
+    "build:test": "node scripts/build-test.js",
+    "dist": "npm run build && electron-builder --config electron-builder.config.js --publish=never",
+    "test": "vitest --run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "electron",
+    "image",
+    "management",
+    "portable",
+    "picasa"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.7.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.2.0",
+    "electron": "^25.0.0",
+    "electron-builder": "^24.0.0",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react": "^7.32.0",
+    "jsdom": "^26.1.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.1.0",
+    "vite": "^4.4.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "@ffmpeg/util": "^0.12.2",
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "exifreader": "^4.14.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "i18next": "^23.0.0",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "piexifjs": "^1.0.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^13.0.0",
+    "sharp": "^0.34.3"
+  },
+  "build": {
+    "appId": "com.yourcompany.portable-image-manager",
+    "productName": "Portable Image Manager",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/*.d.ts",
+      "!node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+    ],
+    "extraResources": [
+      {
+        "from": "Assets/",
+        "to": "assets/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
+      "icon": "Assets/Logo.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}",
+      "publisherName": "Portable Image Manager",
+      "verifyUpdateCodeSignature": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "Assets/Logo.icns",
+      "category": "public.app-category.photography",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "Assets/Logo.png",
+      "category": "Graphics",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}",
+      "requestExecutionLevel": "asInvoker",
+      "unpackDirName": "${productName}",
+      "splashImage": "Assets/Logo.ico"
+    },
+    "compression": "maximum",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "runAfterFinish": false,
+      "allowElevation": false
+    },
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@ffmpeg/**/*"
+    ]
+  }
+}

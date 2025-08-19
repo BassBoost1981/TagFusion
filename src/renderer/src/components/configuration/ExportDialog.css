@@ -1,0 +1,226 @@
+.export-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.export-dialog {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  width: 500px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.export-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.export-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-dialog-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.export-dialog-close:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.export-dialog-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-dialog-content {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.export-dialog-description {
+  margin: 0 0 24px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.export-options {
+  margin-bottom: 24px;
+}
+
+.export-options h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 8px;
+}
+
+.export-option:hover {
+  background: var(--bg-hover);
+}
+
+.export-option input[type="checkbox"] {
+  margin-right: 12px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.export-option span {
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-option small {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-left: 24px;
+}
+
+.export-info {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.export-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.export-info-item:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+
+.export-info-item strong {
+  color: var(--text-primary);
+}
+
+.export-dialog-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
+}
+
+.export-dialog-button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-dialog-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-dialog-button-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.export-dialog-button-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.export-dialog-button-primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+.export-dialog-button-primary:hover:not(:disabled) {
+  background: var(--accent-color-hover);
+}
+
+.export-dialog-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .export-dialog {
+  --bg-primary: #2d2d2d;
+  --bg-secondary: #3a3a3a;
+  --bg-hover: #404040;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --border-color: #4a4a4a;
+  --accent-color: #007acc;
+  --accent-color-hover: #005a9e;
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .export-dialog {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-hover: #f0f0f0;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --border-color: #e0e0e0;
+  --accent-color: #007acc;
+  --accent-color-hover: #005a9e;
+}

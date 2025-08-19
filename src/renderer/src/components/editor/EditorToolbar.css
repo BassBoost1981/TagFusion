@@ -1,0 +1,136 @@
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--bg-secondary, #fff);
+  border-bottom: 1px solid var(--border-color, #ddd);
+  gap: 8px;
+  min-height: 48px;
+}
+
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 32px;
+  background-color: var(--border-color, #ddd);
+  margin: 0 8px;
+}
+
+.toolbar-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  background-color: var(--bg-primary, #f5f5f5);
+  color: var(--text-primary, #333);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toolbar-button:hover:not(.disabled) {
+  background-color: var(--bg-hover, #e5e5e5);
+  border-color: var(--border-hover, #bbb);
+}
+
+.toolbar-button:active:not(.disabled) {
+  background-color: var(--bg-active, #d5d5d5);
+  transform: translateY(1px);
+}
+
+.toolbar-button.active {
+  background-color: var(--accent-color, #007acc);
+  color: white;
+  border-color: var(--accent-color, #007acc);
+}
+
+.toolbar-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-button.save {
+  background-color: var(--success-color, #28a745);
+  color: white;
+  border-color: var(--success-color, #28a745);
+}
+
+.toolbar-button.save:hover {
+  background-color: var(--success-hover, #218838);
+}
+
+.toolbar-button.cancel {
+  background-color: var(--danger-color, #dc3545);
+  color: white;
+  border-color: var(--danger-color, #dc3545);
+}
+
+.toolbar-button.cancel:hover {
+  background-color: var(--danger-hover, #c82333);
+}
+
+.toolbar-button.reset {
+  background-color: var(--warning-color, #ffc107);
+  color: var(--text-primary, #333);
+  border-color: var(--warning-color, #ffc107);
+}
+
+.toolbar-button.reset:hover {
+  background-color: var(--warning-hover, #e0a800);
+}
+
+.tool-icon {
+  font-size: 14px;
+}
+
+.tool-name {
+  font-size: 11px;
+}
+
+.tools .toolbar-button {
+  flex-direction: column;
+  padding: 8px 6px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.tools .tool-icon {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .editor-toolbar {
+    background-color: var(--bg-secondary, #3d3d3d);
+    border-color: var(--border-color, #555);
+  }
+
+  .toolbar-separator {
+    background-color: var(--border-color, #555);
+  }
+
+  .toolbar-button {
+    background-color: var(--bg-primary, #2d2d2d);
+    color: var(--text-primary, #fff);
+    border-color: var(--border-color, #555);
+  }
+
+  .toolbar-button:hover:not(.disabled) {
+    background-color: var(--bg-hover, #404040);
+    border-color: var(--border-hover, #666);
+  }
+
+  .toolbar-button:active:not(.disabled) {
+    background-color: var(--bg-active, #1a1a1a);
+  }
+}

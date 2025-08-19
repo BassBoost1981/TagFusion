@@ -1,0 +1,157 @@
+.lazy-image-container {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  background: var(--surface-color);
+  border-radius: 4px;
+}
+
+.lazy-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.lazy-image.loaded {
+  opacity: 1;
+}
+
+.lazy-image.error {
+  display: none;
+}
+
+.lazy-image-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-color);
+  color: var(--text-secondary);
+}
+
+.lazy-image-placeholder-icon {
+  font-size: 24px;
+  opacity: 0.5;
+}
+
+.lazy-image-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-color);
+  color: var(--text-secondary);
+  gap: 4px;
+}
+
+.lazy-image-error-icon {
+  font-size: 20px;
+  opacity: 0.7;
+}
+
+.lazy-image-error-text {
+  font-size: 10px;
+  text-align: center;
+}
+
+/* Loading animation */
+.lazy-image-placeholder::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .lazy-image-placeholder::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .lazy-image-placeholder {
+    border: 1px solid var(--border-color);
+  }
+  
+  .lazy-image-error {
+    border: 1px solid var(--error-color, #f44336);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .lazy-image {
+    transition: none;
+  }
+  
+  .lazy-image-placeholder::before {
+    animation: none;
+  }
+}
+
+/* Performance optimizations */
+.lazy-image-container {
+  contain: layout style paint;
+}
+
+.lazy-image {
+  will-change: opacity;
+}
+
+/* Responsive sizing */
+.lazy-image-container.responsive {
+  width: 100%;
+  height: auto;
+}
+
+.lazy-image-container.responsive .lazy-image {
+  width: 100%;
+  height: auto;
+}
+
+/* Aspect ratio variants */
+.lazy-image-container.square {
+  aspect-ratio: 1;
+}
+
+.lazy-image-container.landscape {
+  aspect-ratio: 16/9;
+}
+
+.lazy-image-container.portrait {
+  aspect-ratio: 3/4;
+}
