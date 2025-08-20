@@ -7,13 +7,15 @@
   "homepage": "https://github.com/BassBoost1981/TagFusion",
   "main": "main.js",
   "scripts": {
+    "start": "electron .",
+    "start-legacy": "electron .",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5173 && electron .",
     "build": "npm run build:renderer && npm run build:main && electron-builder",
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
-    "start": "electron .",
+    "build-legacy": "electron-builder --config electron-builder.config.js --win --x64",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest"

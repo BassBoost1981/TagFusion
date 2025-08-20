@@ -6,6 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
   <title>TagFusion</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./src/components/modern-components.css">
 </head>
 <body>
   <!-- Header -->
@@ -476,6 +477,87 @@
 
 
 
+  <!-- React and Babel for modern components -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Main App Script -->
   <script src="./app.js"></script>
+
+  <!-- Modern React Components (loaded after React) -->
+  <script type="text/babel">
+    // Modern Toast System
+    window.ModernToast = {
+      show: function(title, message, type = 'info', duration = 5000) {
+        const toastContainer = document.getElementById('toast-container') || this.createContainer();
+        const toastElement = document.createElement('div');
+        toastElement.className = `modern-toast ${type}`;
+        toastElement.innerHTML = `
+          <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            ${message ? `<div class="toast-message">${message}</div>` : ''}
+          </div>
+        `;
+
+        toastContainer.appendChild(toastElement);
+
+        // Auto remove
+        setTimeout(() => {
+          toastElement.style.transform = 'translateX(100%)';
+          toastElement.style.opacity = '0';
+          setTimeout(() => {
+            if (toastContainer.contains(toastElement)) {
+              toastContainer.removeChild(toastElement);
+            }
+          }, 300);
+        }, duration);
+
+        // Click to close
+        toastElement.addEventListener('click', () => {
+          toastElement.style.transform = 'translateX(100%)';
+          toastElement.style.opacity = '0';
+          setTimeout(() => {
+            if (toastContainer.contains(toastElement)) {
+              toastContainer.removeChild(toastElement);
+            }
+          }, 300);
+        });
+      },
+
+      createContainer: function() {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 10000;
+          pointer-events: none;
+        `;
+        document.body.appendChild(container);
+        return container;
+      },
+
+      success: function(title, message, duration) {
+        this.show(title, message, 'success', duration);
+      },
+
+      error: function(title, message, duration) {
+        this.show(title, message, 'error', duration);
+      },
+
+      warning: function(title, message, duration) {
+        this.show(title, message, 'warning', duration);
+      },
+
+      info: function(title, message, duration) {
+        this.show(title, message, 'info', duration);
+      }
+    };
+
+    // Make it globally available
+    window.toast = window.ModernToast;
+  </script>
 </body>
 </html>

@@ -267,6 +267,9 @@ async function loadDirectory(dirPath) {
     updateStatus(`Lade ${dirPath}...`);
     console.log(`📁 Lade Verzeichnis: ${dirPath}`);
 
+    // Show loading notification
+    showInfoNotification('Verzeichnis laden', `Lade Dateien aus ${dirPath}...`);
+
     // Speichere aktuellen Pfad
     currentDirectory = dirPath;
 
@@ -339,6 +342,9 @@ async function loadDirectory(dirPath) {
 
       updateBreadcrumb(dirPath);
       updateStatus(`${allFiles.length} Elemente geladen (${folderCount} Ordner, ${imageCount} Bilder, ${videoCount} Videos)`);
+
+      // Show success notification
+      showSuccessNotification('Verzeichnis geladen', `${allFiles.length} Elemente erfolgreich geladen`);
 
       // Synchronisiere Baumstruktur mit aktuellem Pfad
       console.log(`🔄 STARTE Baum-Synchronisation für: ${dirPath}`);
@@ -6252,10 +6258,18 @@ function showFavoritesImportExportMenu() {
 
     if (action === 'export-favorites') {
       const result = await importExportService.exportFavorites();
-      showNotification(result.success ? '✅ Export erfolgreich' : '❌ Export fehlgeschlagen', result.message);
+      if (result.success) {
+        showSuccessNotification('Export erfolgreich', result.message);
+      } else {
+        showErrorNotification('Export fehlgeschlagen', result.message);
+      }
     } else if (action === 'import-favorites') {
       const result = await importExportService.importFavorites();
-      showNotification(result.success ? '✅ Import erfolgreich' : '❌ Import fehlgeschlagen', result.message);
+      if (result.success) {
+        showSuccessNotification('Import erfolgreich', result.message);
+      } else {
+        showErrorNotification('Import fehlgeschlagen', result.message);
+      }
     }
   });
 
@@ -6299,10 +6313,18 @@ function showTagHierarchyImportExportMenu() {
 
     if (action === 'export-tags') {
       const result = await importExportService.exportTagHierarchy();
-      showNotification(result.success ? '✅ Export erfolgreich' : '❌ Export fehlgeschlagen', result.message);
+      if (result.success) {
+        showSuccessNotification('Export erfolgreich', result.message);
+      } else {
+        showErrorNotification('Export fehlgeschlagen', result.message);
+      }
     } else if (action === 'import-tags') {
       const result = await importExportService.importTagHierarchy();
-      showNotification(result.success ? '✅ Import erfolgreich' : '❌ Import fehlgeschlagen', result.message);
+      if (result.success) {
+        showSuccessNotification('Import erfolgreich', result.message);
+      } else {
+        showErrorNotification('Import fehlgeschlagen', result.message);
+      }
     }
   });
 
@@ -6318,47 +6340,31 @@ function showTagHierarchyImportExportMenu() {
   setTimeout(() => document.addEventListener('click', closeMenu), 100);
 }
 
-// Show notification
-function showNotification(title, message) {
-  const notification = document.createElement('div');
-  notification.className = 'notification';
-  notification.innerHTML = `
-    <div class="notification-content">
-      <h4>${title}</h4>
-      <p>${message}</p>
-    </div>
-  `;
+// Modern notification system (uses the new toast system)
+function showNotification(title, message, type = 'info') {
+  if (window.toast) {
+    window.toast.show(title, message, type);
+  } else {
+    // Fallback to console if toast system not loaded
+    console.log(`${type.toUpperCase()}: ${title} - ${message}`);
+  }
+}
 
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 10001;
-    max-width: 400px;
-    animation: slideIn 0.3s ease-out;
-  `;
+// Enhanced notification functions
+function showSuccessNotification(title, message) {
+  showNotification(title, message, 'success');
+}
 
-  document.body.appendChild(notification);
+function showErrorNotification(title, message) {
+  showNotification(title, message, 'error');
+}
 
-  // Auto-remove after 5 seconds
-  setTimeout(() => {
-    if (document.body.contains(notification)) {
-      notification.style.animation = 'slideOut 0.3s ease-in';
-      setTimeout(() => document.body.removeChild(notification), 300);
-    }
-  }, 5000);
+function showWarningNotification(title, message) {
+  showNotification(title, message, 'warning');
+}
 
-  // Click to close
-  notification.addEventListener('click', () => {
-    if (document.body.contains(notification)) {
-      document.body.removeChild(notification);
-    }
-  });
+function showInfoNotification(title, message) {
+  showNotification(title, message, 'info');
 }
 
 // Enhanced file loading with metadata
