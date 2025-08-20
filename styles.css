@@ -588,8 +588,53 @@ body {
   background: white;
   border-right: 1px solid #e0e0e0;
   padding: 16px;
-  overflow-y: auto;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Favoriten-Sektion - immer sichtbar */
+.sidebar-section.favorites-section {
+  flex-shrink: 0; /* Verhindert Schrumpfen */
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 16px;
+}
+
+/* Laufwerke-Sektion - scrollbar */
+.sidebar-section.drives-section {
+  flex: 1; /* Nimmt verfügbaren Platz */
+  overflow-y: auto; /* Scrollbar nur hier */
+  min-height: 0; /* Wichtig für Flexbox-Scrolling */
+  padding-right: 8px; /* Platz für Scrollbar */
+}
+
+/* Scrollbar-Styling für Laufwerke */
+.sidebar-section.drives-section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-section.drives-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-section.drives-section::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.sidebar-section.drives-section::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Dark Mode Scrollbar */
+body.dark-mode .sidebar-section.drives-section::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+body.dark-mode .sidebar-section.drives-section::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }
 
 .sidebar-section {
@@ -609,6 +654,35 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 200px; /* Maximale Höhe für Favoriten */
+  overflow-y: auto; /* Scrollbar falls nötig */
+}
+
+/* Scrollbar für Favoriten-Liste */
+.favorites-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.favorites-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.favorites-list::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 2px;
+}
+
+.favorites-list::-webkit-scrollbar-thumb:hover {
+  background: #bbb;
+}
+
+/* Dark Mode für Favoriten-Scrollbar */
+body.dark-mode .favorites-list::-webkit-scrollbar-thumb {
+  background: #444;
+}
+
+body.dark-mode .favorites-list::-webkit-scrollbar-thumb:hover {
+  background: #666;
 }
 
 .favorite-item {
@@ -1246,6 +1320,11 @@ body.dark-mode .sidebar,
 body.dark-mode .properties-panel {
   background: #252525;
   border-color: #404040;
+}
+
+/* Dark Mode für Favoriten-Sektion */
+body.dark-mode .sidebar-section.favorites-section {
+  border-bottom-color: #404040;
 }
 
 body.dark-mode .content-area {
