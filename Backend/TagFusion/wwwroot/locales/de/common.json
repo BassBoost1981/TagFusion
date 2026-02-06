@@ -1,0 +1,87 @@
+{
+    "toolbar": {
+        "search": "Bilder oder Tags suchen...",
+        "home": "Startseite",
+        "sort": {
+            "name": "Name",
+            "date": "Datum",
+            "size": "Größe",
+            "rating": "Bewertung"
+        },
+        "rating": "Bewertung",
+        "clearFilters": "Alle Filter zurücksetzen",
+        "resetFilter": "Filter zurücksetzen",
+        "rotate90Left": "90° links drehen",
+        "rotate90Right": "90° rechts drehen",
+        "rotate180": "180° drehen",
+        "flipHorizontal": "Horizontal spiegeln",
+        "flipVertical": "Vertikal spiegeln",
+        "selected": "ausgewählt",
+        "file": "Datei",
+        "tag": "Tag",
+        "noSuggestions": "Keine Vorschläge gefunden"
+    },
+    "sidebar": {
+        "openFile": "Datei öffnen",
+        "selectFolder": "Ordner auswählen",
+        "recentFolders": "Zuletzt geöffnet",
+        "favorites": "Favoriten",
+        "noFavorites": "Keine Favoriten",
+        "noRecentFolders": "Keine Ordner"
+    },
+    "tagPanel": {
+        "title": "Tags",
+        "addTag": "Tag hinzufügen",
+        "noTags": "Keine Tags",
+        "folderTags": "Tags im Ordner",
+        "imageTags": "Bild-Tags",
+        "selectImage": "Bild auswählen"
+    },
+    "settings": {
+        "title": "Einstellungen",
+        "language": "Sprache",
+        "theme": "Design",
+        "themeLight": "Hell",
+        "themeDark": "Dunkel",
+        "performanceMode": "Leistungsmodus",
+        "performanceModeDesc": "Reduziert Glaseffekte"
+    },
+    "common": {
+        "loading": "Laden...",
+        "error": "Fehler",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "delete": "Löschen",
+        "edit": "Bearbeiten",
+        "close": "Schließen",
+        "parentFolder": "Übergeordneter Ordner"
+    },
+    "emptyState": {
+        "folderEmpty": "Ordner ist leer",
+        "noImages": "Dieser Ordner enthält keine Unterordner oder unterstützten Bilddateien."
+    },
+    "statusBar": {
+        "images": "Bilder",
+        "folders": "Ordner",
+        "selected": "ausgewählt"
+    },
+    "tagManager": {
+        "title": "Tag Manager",
+        "newCategory": "Neue Kategorie hinzufügen...",
+        "newSubcategory": "Neue Unterkategorie...",
+        "newTag": "Neuer Tag...",
+        "import": "Importieren",
+        "export": "Exportieren"
+    },
+    "hero": {
+        "title": "Willkommen bei TagFusion",
+        "subtitle": "Organisiere deine Bildersammlung mit modernem Tagging, blitzschneller Suche und intuitiver Bedienung.",
+        "drives": "Geräte und Laufwerke",
+        "savedTags": "Gespeicherte Tags",
+        "imagesIndexed": "Bilder Indexiert",
+        "collections": "Sammlungen",
+        "popularTags": "Beliebte Tags",
+        "noTagsFound": "Keine Tags gefunden",
+        "freeOf": "frei von"
+    }
+}

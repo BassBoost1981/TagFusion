@@ -1,0 +1,84 @@
+﻿<Window x:Class="TagFusion.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:local="clr-namespace:TagFusion"
+        mc:Ignorable="d"
+        Title="TagFusion"
+        Height="900"
+        Width="1400"
+        MinHeight="600"
+        MinWidth="900"
+        WindowStartupLocation="CenterScreen"
+        Background="#0f172a"
+        Icon="pack://application:,,,/Logo.ico">
+    <Window.Resources>
+        <!-- Pulsing animation for logo -->
+        <Storyboard x:Key="PulseAnimation" RepeatBehavior="Forever">
+            <DoubleAnimation 
+                Storyboard.TargetName="SplashLogo"
+                Storyboard.TargetProperty="Opacity"
+                From="0.7" To="1.0" Duration="0:0:0.8"
+                AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <!-- Fade out animation for splash -->
+        <Storyboard x:Key="FadeOutAnimation">
+            <DoubleAnimation 
+                Storyboard.TargetName="SplashOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="1" To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+    
+    <Grid>
+        <!-- WebView2 (behind splash) -->
+        <wv2:WebView2 x:Name="webView"
+                      DefaultBackgroundColor="#0f172a"/>
+        
+        <!-- Splash Screen Overlay -->
+        <Grid x:Name="SplashOverlay" 
+              Background="#0f172a"
+              Panel.ZIndex="100">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <!-- Logo -->
+                <Image x:Name="SplashLogo"
+                       Source="pack://application:,,,/Logo.png"
+                       Width="128"
+                       Height="128"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                
+                <!-- App Name -->
+                <TextBlock Text="TagFusion"
+                           FontSize="32"
+                           FontWeight="SemiBold"
+                           Foreground="#06b6d4"
+                           HorizontalAlignment="Center"
+                           Margin="0,20,0,0"/>
+                
+                <!-- Loading Text -->
+                <TextBlock Text="Wird geladen..."
+                           FontSize="14"
+                           Foreground="#64748b"
+                           HorizontalAlignment="Center"
+                           Margin="0,12,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+    
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard Storyboard="{StaticResource PulseAnimation}"/>
+        </EventTrigger>
+    </Window.Triggers>
+</Window>
+

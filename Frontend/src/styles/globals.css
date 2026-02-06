@@ -1,0 +1,555 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   CSS DESIGN SYSTEM - Dark Mode Only
+   Consolidated Variables for TagFusion
+   ============================================ */
+:root {
+  /* === COLORS === */
+  /* Base Background Colors */
+  --color-bg-primary: #0c0f1a;
+  --color-bg-secondary: #111827;
+  --color-bg-tertiary: #1e293b;
+
+  /* Text Colors */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #64748b;
+
+  /* Accent Colors */
+  --color-cyan: rgb(6, 182, 212);
+  --color-cyan-glow: rgba(6, 182, 212, 0.3);
+  --color-cyan-subtle: rgba(6, 182, 212, 0.15);
+  --color-purple: rgb(139, 92, 246);
+  --color-purple-glow: rgba(139, 92, 246, 0.3);
+  --color-blue: rgb(59, 130, 246);
+  --color-pink: rgb(236, 72, 153);
+
+  /* === GLASS MORPHISM === */
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-bg-hover: rgba(15, 23, 42, 0.7);
+  --glass-bg-active: rgba(15, 23, 42, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
+  --glass-specular: rgba(255, 255, 255, 0.15);
+  --glass-shadow: rgba(0, 0, 0, 0.35);
+  --glass-blur: 16px;
+  --glass-blur-heavy: 30px;
+
+  /* === SPACING & SIZING === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+
+  /* === SIDEBAR === */
+  --sidebar-indent-base: 0.5rem;
+  --sidebar-indent-step: 1rem;
+}
+
+/* ============================================
+   NOISE TEXTURE OVERLAY
+   Subtle film grain effect for premium aesthetic
+   Using static noise pattern for better performance
+   ============================================ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.04;
+  /* Static noise pattern - more performant than SVG feTurbulence */
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAElBMVEUAAAAAAAAAAAAAAAAAAAAAAADgKxmiAAAABnRSTlMFBgcICQoLNvWdAAAARElEQVQ4y2NgGLTAH4qYQAiKmOGIGYZYoIgFhlihiJWBgYGJCYaYYIgZhphgiAWGWGCIFYZYGRgYmJhgiBmGmGAIAACGxAOjzM3xsAAAAABJRU5ErkJggg==");
+  background-repeat: repeat;
+  mix-blend-mode: overlay;
+}
+
+/* ============================================
+   FONTS
+   ============================================ */
+@font-face {
+  font-family: 'Lexend';
+  src: url('/fonts/Lexend-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-017F, U+0180-024F, U+0250-02AF,
+    U+1E00-1EFF, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215;
+}
+
+@font-face {
+  font-family: 'Orbitron';
+  src: url('/fonts/Orbitron-VariableFont_wght.ttf') format('truetype');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-017F, U+20AC;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Lexend', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg-primary);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, var(--color-cyan-subtle) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 100% 50%, rgba(236, 72, 153, 0.06) 0%, transparent 40%),
+    linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 50%, var(--color-bg-tertiary) 100%);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   SCROLLBAR STYLING - Premium Glassmorphism
+   ============================================ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.35) 0%,
+      rgba(6, 182, 212, 0.15) 100%);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 12px rgba(6, 182, 212, 0.2);
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.5) 0%,
+      rgba(6, 182, 212, 0.25) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 20px rgba(6, 182, 212, 0.4);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.6) 0%,
+      rgba(6, 182, 212, 0.3) 100%);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================
+   GLASSMORPHISM COMPONENTS
+   ============================================ */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      0 8px 32px var(--glass-shadow),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transform: translateZ(0);
+  }
+
+  .glass-light {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  .glass-hover:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+  }
+
+  .glass-card {
+    background: var(--glass-bg-hover);
+    backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(0, 0, 0, 0.1);
+    transition: all var(--transition-normal);
+  }
+
+  .glass-card:hover {
+    background: var(--glass-bg-active);
+    border-color: rgba(6, 182, 212, 0.2);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(6, 182, 212, 0.1),
+      0 0 40px rgba(6, 182, 212, 0.05);
+  }
+
+  .glass-footer {
+    background: var(--glass-bg);
+    border-top: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+  }
+
+  .glass-specular {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.15) 50%, transparent 100%);
+  }
+
+  .glass-sidebar {
+    background: var(--glass-bg);
+    border-right: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .glass-tagpanel {
+    background: var(--glass-bg);
+    border-left: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .glass-toolbar {
+    background: var(--glass-bg);
+    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur));
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-section {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(6, 182, 212, 0.04) 100%);
+    border: 1px solid rgba(6, 182, 212, 0.20);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    @apply rounded-xl relative overflow-hidden;
+  }
+}
+
+/* ============================================
+   UTILITIES
+   ============================================ */
+@layer utilities {
+
+  /* Gradient Utilities */
+  .gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .gradient-secondary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+
+  .gradient-cyan {
+    background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-blue) 100%);
+  }
+
+  /* Glow Utilities */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  }
+
+  .glow-secondary {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.3);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 30px var(--color-cyan-glow);
+  }
+
+  /* 3D Transform Utilities */
+  .transform-3d {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+
+  /* 3D Elevation Layers */
+  .layer-base {
+    transform: translateZ(0px);
+  }
+
+  .layer-1 {
+    transform: translateZ(10px);
+  }
+
+  .layer-2 {
+    transform: translateZ(20px);
+  }
+
+  .layer-3 {
+    transform: translateZ(30px);
+  }
+
+  /* Isometric Utilities */
+  .isometric {
+    transform: rotateX(45deg) rotateZ(45deg);
+    transform-style: preserve-3d;
+  }
+
+  .isometric-folder {
+    transform: rotateX(60deg) rotateY(-30deg) rotateZ(0deg);
+    transform-style: preserve-3d;
+  }
+
+  /* GPU Acceleration */
+  .gpu-accelerated {
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* Perspective Utilities */
+  .perspective-near {
+    perspective: 500px;
+  }
+
+  .perspective-mid {
+    perspective: 1000px;
+  }
+
+  .perspective-far {
+    perspective: 2000px;
+  }
+
+  /* Accessibility & Performance */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900;
+  }
+}
+
+/* ============================================
+   LIGHT MODE THEME
+   ============================================ */
+html.light-mode {
+  /* Colors */
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #f1f5f9;
+  --color-bg-tertiary: #e2e8f0;
+
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+
+  /* Glass morphism - lighter for light mode */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-hover: rgba(255, 255, 255, 0.85);
+  --glass-bg-active: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-border-hover: rgba(0, 0, 0, 0.12);
+  --glass-specular: rgba(0, 0, 0, 0.05);
+  --glass-shadow: rgba(0, 0, 0, 0.1);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+
+  /* Adjust cyan for better contrast on light backgrounds */
+  --color-cyan: rgb(8, 145, 178);
+  --color-cyan-glow: rgba(8, 145, 178, 0.2);
+  --color-cyan-subtle: rgba(8, 145, 178, 0.1);
+}
+
+.light-mode body {
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(8, 145, 178, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+    radial-gradient(ellipse at 100% 50%, rgba(236, 72, 153, 0.04) 0%, transparent 40%),
+    linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 50%, var(--color-bg-tertiary) 100%);
+}
+
+.light-mode ::selection {
+  background-color: rgba(8, 145, 178, 0.3);
+  color: var(--color-text-primary);
+}
+
+/* Scrollbar for light mode */
+.light-mode ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(8, 145, 178, 0.4) 0%,
+      rgba(8, 145, 178, 0.2) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 12px rgba(8, 145, 178, 0.15);
+}
+
+.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(8, 145, 178, 0.55) 0%,
+      rgba(8, 145, 178, 0.3) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 0 20px rgba(8, 145, 178, 0.3);
+}
+
+/* Glass components in light mode */
+.light-mode .glass-toolbar {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Popups, Dropdowns, and Combobox in light mode */
+.light-mode [data-popup-open] .bg-slate-900\/90,
+.light-mode [role="dialog"] .bg-slate-900\/90,
+.light-mode .ComboboxPopup,
+.light-mode [data-radix-popper-content-wrapper] .bg-slate-900\/90 {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Light mode dark background overrides */
+.light-mode .bg-slate-900,
+.light-mode .bg-slate-900\/80,
+.light-mode .bg-slate-900\/90 {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.light-mode .bg-slate-800,
+.light-mode .bg-slate-800\/50,
+.light-mode .bg-slate-800\/90 {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+
+.light-mode .bg-slate-700,
+.light-mode .bg-slate-700\/50 {
+  background-color: rgba(226, 232, 240, 0.9) !important;
+}
+
+/* Light mode text colors for all components */
+.light-mode .text-slate-200,
+.light-mode [data-popup-open] .text-slate-200,
+.light-mode .text-slate-300 {
+  color: var(--color-text-primary) !important;
+}
+
+.light-mode .text-slate-400,
+.light-mode .text-slate-500 {
+  color: var(--color-text-secondary) !important;
+}
+
+.light-mode .placeholder-slate-500::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+/* Light mode inputs */
+.light-mode input,
+.light-mode textarea {
+  color: var(--color-text-primary);
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+.light-mode input::placeholder,
+.light-mode textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Light mode buttons */
+.light-mode button:not([data-state]) {
+  color: var(--color-text-primary);
+}
+
+/* Light mode sidebar and tagpanel */
+.light-mode .glass-sidebar,
+.light-mode .glass-tagpanel {
+  border-color: var(--glass-border);
+}
+
+/* Light mode hover states */
+.light-mode .hover\:text-white:hover,
+.light-mode .hover\:text-slate-200:hover {
+  color: var(--color-text-primary) !important;
+}
+
+/* Light mode focus rings */
+.light-mode .focus\:border-cyan-500\/50:focus,
+.light-mode .focus\:ring-cyan-500\/20:focus {
+  border-color: rgba(8, 145, 178, 0.5) !important;
+  --tw-ring-color: rgba(8, 145, 178, 0.2) !important;
+}
+
+/* Light mode accent colors */
+.light-mode .text-cyan-400 {
+  color: rgb(8, 145, 178) !important;
+}
+
+.light-mode .bg-cyan-500\/20 {
+  background-color: rgba(8, 145, 178, 0.15) !important;
+}
+
+.light-mode .border-cyan-500\/30 {
+  border-color: rgba(8, 145, 178, 0.25) !important;
+}
+
+/* Performance Mode - reduces blur effects */
+.performance-mode * {
+  backdrop-filter: none !important;
+}
+
+.performance-mode .glass,
+.performance-mode .glass-card,
+.performance-mode .glass-toolbar,
+.performance-mode .glass-sidebar,
+.performance-mode .glass-tagpanel {
+  background: var(--glass-bg-active);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  ::before,
+  ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: initial !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}
+
+/* Selection styling */
+::selection {
+  background-color: var(--color-cyan-glow);
+  color: var(--color-text-primary);
+}
+
+/* GPU acceleration for card animations */
+.group {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
