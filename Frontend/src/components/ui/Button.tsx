@@ -25,7 +25,8 @@ export function Button({
   type = 'button',
   onClick,
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98] hover:shadow-lg hover:brightness-110';
+  const baseStyles =
+    'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98] hover:shadow-lg hover:brightness-110';
 
   const variants = {
     primary: 'gradient-primary text-white hover:opacity-95 focus-visible:ring-indigo-500 glow-primary',
@@ -47,11 +48,8 @@ export function Button({
       type={type}
       onClick={onClick}
     >
-      {isLoading ? (
-        <Spinner size="sm" color="current" />
-      ) : icon}
+      {isLoading ? <Spinner size="sm" color="current" /> : icon}
       {children}
     </BaseButton>
   );
 }
-

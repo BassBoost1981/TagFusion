@@ -75,9 +75,7 @@ export function GlassDropdown({
         <span className="flex items-center gap-2 truncate">
           {icon && <span className="text-slate-400">{icon}</span>}
           {selectedOption?.icon}
-          <span className={!selectedOption ? 'text-slate-500' : ''}>
-            {selectedOption?.label || placeholder}
-          </span>
+          <span className={!selectedOption ? 'text-slate-500' : ''}>{selectedOption?.label || placeholder}</span>
         </span>
         <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />
       </Menu.Trigger>
@@ -85,15 +83,8 @@ export function GlassDropdown({
       <Menu.Portal>
         <Menu.Positioner sideOffset={4}>
           <AnimatePresence>
-            <Menu.Popup
-              className="z-50 min-w-[140px] p-1 rounded-xl backdrop-blur-glass-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-glass-lg overflow-hidden"
-            >
-              <motion.div
-                variants={fadeInScale}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-              >
+            <Menu.Popup className="z-50 min-w-[140px] p-1 rounded-xl backdrop-blur-glass-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-glass-lg overflow-hidden">
+              <motion.div variants={fadeInScale} initial="initial" animate="animate" exit="exit">
                 {options.map((option) => (
                   <Menu.Item
                     key={option.value}
@@ -102,11 +93,12 @@ export function GlassDropdown({
                       flex items-center gap-2 px-3 py-2 rounded-lg
                       text-sm cursor-pointer
                       transition-colors duration-100
-                      ${option.disabled 
-                        ? 'opacity-50 cursor-not-allowed text-slate-500' 
-                        : option.value === value
-                          ? 'bg-cyan-500/20 text-cyan-300'
-                          : 'text-slate-200 hover:bg-[var(--glass-bg-hover)]'
+                      ${
+                        option.disabled
+                          ? 'opacity-50 cursor-not-allowed text-slate-500'
+                          : option.value === value
+                            ? 'bg-cyan-500/20 text-cyan-300'
+                            : 'text-slate-200 hover:bg-[var(--glass-bg-hover)]'
                       }
                     `}
                   >
@@ -122,4 +114,3 @@ export function GlassDropdown({
     </Menu.Root>
   );
 }
-

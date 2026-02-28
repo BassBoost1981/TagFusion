@@ -20,10 +20,7 @@ export function StarRating({ rating, isSaving, onRate, onClear }: StarRatingProp
   };
 
   return (
-    <div
-      className="flex items-center justify-center gap-0.5 flex-shrink-0"
-      onMouseLeave={() => setHoverRating(0)}
-    >
+    <div className="flex items-center justify-center gap-0.5 flex-shrink-0" onMouseLeave={() => setHoverRating(0)}>
       {[0, 1, 2, 3, 4].map((starIndex) => {
         const isFilled = starIndex < (hoverRating || rating);
         const isSparkle = sparkleIndex === starIndex;
@@ -62,8 +59,8 @@ export function StarRating({ rating, isSaving, onRate, onClear }: StarRatingProp
                     animate={{
                       opacity: 0,
                       scale: 0,
-                      x: [0, (i === 0 ? -12 : i === 1 ? 12 : i === 2 ? 0 : 0)],
-                      y: [0, (i === 0 ? -6 : i === 1 ? -6 : i === 2 ? -12 : 8)],
+                      x: [0, i === 0 ? -12 : i === 1 ? 12 : i === 2 ? 0 : 0],
+                      y: [0, i === 0 ? -6 : i === 1 ? -6 : i === 2 ? -12 : 8],
                     }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                     style={{
@@ -94,4 +91,3 @@ export function StarRating({ rating, isSaving, onRate, onClear }: StarRatingProp
     </div>
   );
 }
-

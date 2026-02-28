@@ -1,2 +1,1 @@
 export { Lightbox } from './Lightbox';
-

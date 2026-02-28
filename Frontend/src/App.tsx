@@ -9,11 +9,17 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAppInit } from './hooks/useAppInit';
 
 // Lazy-loaded modals — nur geladen wenn geöffnet
-const Lightbox = lazy(() => import('./components/lightbox/Lightbox').then(m => ({ default: m.Lightbox })));
-const TagManagerModal = lazy(() => import('./components/tags/TagManagerModal').then(m => ({ default: m.TagManagerModal })));
-const RenameModal = lazy(() => import('./components/ui/RenameModal').then(m => ({ default: m.RenameModal })));
-const DeleteConfirmModal = lazy(() => import('./components/ui/DeleteConfirmModal').then(m => ({ default: m.DeleteConfirmModal })));
-const PropertiesModal = lazy(() => import('./components/ui/PropertiesModal').then(m => ({ default: m.PropertiesModal })));
+const Lightbox = lazy(() => import('./components/lightbox/Lightbox').then((m) => ({ default: m.Lightbox })));
+const TagManagerModal = lazy(() =>
+  import('./components/tags/TagManagerModal').then((m) => ({ default: m.TagManagerModal }))
+);
+const RenameModal = lazy(() => import('./components/ui/RenameModal').then((m) => ({ default: m.RenameModal })));
+const DeleteConfirmModal = lazy(() =>
+  import('./components/ui/DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
+);
+const PropertiesModal = lazy(() =>
+  import('./components/ui/PropertiesModal').then((m) => ({ default: m.PropertiesModal }))
+);
 
 function App() {
   // Selective subscriptions — only re-render when error changes

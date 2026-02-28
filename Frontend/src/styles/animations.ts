@@ -1,7 +1,7 @@
 /**
  * Liquid Glass Spring Animation Presets
  * Based on iOS 26 / WWDC 2025 Design Guidelines
- * 
+ *
  * Spring physics create the "gel-like" feel of Liquid Glass
  */
 
@@ -161,4 +161,3 @@ export const staggerItem: Variants = {
     },
   },
 };
-

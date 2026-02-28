@@ -15,10 +15,10 @@ const loadTagLibrary = (): TagCategory[] => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const library: TagLibrary = JSON.parse(saved);
-      return library.categories.map(cat => ({
+      return library.categories.map((cat) => ({
         ...cat,
         id: cat.id || generateId(),
-        subcategories: cat.subcategories.map(sub => ({
+        subcategories: cat.subcategories.map((sub) => ({
           ...sub,
           id: sub.id || generateId(),
         })),
@@ -39,7 +39,7 @@ const saveTagLibrary = (categories: TagCategory[]) => {
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
   // Save to backend (fire and forget)
-  bridge.saveTagLibrary(library).catch(err => {
+  bridge.saveTagLibrary(library).catch((err) => {
     useAppStore.getState().setError((err as Error).message);
   });
 };
@@ -117,35 +117,29 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   renameCategory: (id, name) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
-      cat.id === id ? { ...cat, name } : cat
-    );
+    const updated = categories.map((cat) => (cat.id === id ? { ...cat, name } : cat));
     saveTagLibrary(updated);
     set({ categories: updated });
   },
 
   deleteCategory: (id) => {
     const { categories } = get();
-    const updated = categories.filter(cat => cat.id !== id);
+    const updated = categories.filter((cat) => cat.id !== id);
     saveTagLibrary(updated);
     set({ categories: updated });
   },
 
   toggleCategoryExpand: (id) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
-      cat.id === id ? { ...cat, isExpanded: !cat.isExpanded } : cat
-    );
+    const updated = categories.map((cat) => (cat.id === id ? { ...cat, isExpanded: !cat.isExpanded } : cat));
     set({ categories: updated });
   },
 
   addSubcategory: (categoryId, name) => {
     const { categories } = get();
     const newSub: TagSubcategory = { id: generateId(), name, tags: [] };
-    const updated = categories.map(cat =>
-      cat.id === categoryId
-        ? { ...cat, subcategories: [...cat.subcategories, newSub] }
-        : cat
+    const updated = categories.map((cat) =>
+      cat.id === categoryId ? { ...cat, subcategories: [...cat.subcategories, newSub] } : cat
     );
     saveTagLibrary(updated);
     set({ categories: updated });
@@ -153,14 +147,12 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   renameSubcategory: (categoryId, subId, name) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
+    const updated = categories.map((cat) =>
       cat.id === categoryId
         ? {
-          ...cat,
-          subcategories: cat.subcategories.map(sub =>
-            sub.id === subId ? { ...sub, name } : sub
-          ),
-        }
+            ...cat,
+            subcategories: cat.subcategories.map((sub) => (sub.id === subId ? { ...sub, name } : sub)),
+          }
         : cat
     );
     saveTagLibrary(updated);
@@ -169,10 +161,8 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   deleteSubcategory: (categoryId, subId) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
-      cat.id === categoryId
-        ? { ...cat, subcategories: cat.subcategories.filter(sub => sub.id !== subId) }
-        : cat
+    const updated = categories.map((cat) =>
+      cat.id === categoryId ? { ...cat, subcategories: cat.subcategories.filter((sub) => sub.id !== subId) } : cat
     );
     saveTagLibrary(updated);
     set({ categories: updated });
@@ -180,16 +170,14 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   addTag: (categoryId, subId, tag) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
+    const updated = categories.map((cat) =>
       cat.id === categoryId
         ? {
-          ...cat,
-          subcategories: cat.subcategories.map(sub =>
-            sub.id === subId && !sub.tags.includes(tag)
-              ? { ...sub, tags: [...sub.tags, tag] }
-              : sub
-          ),
-        }
+            ...cat,
+            subcategories: cat.subcategories.map((sub) =>
+              sub.id === subId && !sub.tags.includes(tag) ? { ...sub, tags: [...sub.tags, tag] } : sub
+            ),
+          }
         : cat
     );
     saveTagLibrary(updated);
@@ -198,16 +186,14 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   removeTag: (categoryId, subId, tag) => {
     const { categories } = get();
-    const updated = categories.map(cat =>
+    const updated = categories.map((cat) =>
       cat.id === categoryId
         ? {
-          ...cat,
-          subcategories: cat.subcategories.map(sub =>
-            sub.id === subId
-              ? { ...sub, tags: sub.tags.filter(t => t !== tag) }
-              : sub
-          ),
-        }
+            ...cat,
+            subcategories: cat.subcategories.map((sub) =>
+              sub.id === subId ? { ...sub, tags: sub.tags.filter((t) => t !== tag) } : sub
+            ),
+          }
         : cat
     );
     saveTagLibrary(updated);
@@ -225,7 +211,7 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   reorderSubcategories: (categoryId, startIndex, endIndex) => {
     const { categories } = get();
-    const updated = categories.map(cat => {
+    const updated = categories.map((cat) => {
       if (cat.id !== categoryId) return cat;
       const subs = Array.from(cat.subcategories);
       const [removed] = subs.splice(startIndex, 1);
@@ -238,11 +224,11 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   reorderTags: (categoryId, subId, startIndex, endIndex) => {
     const { categories } = get();
-    const updated = categories.map(cat => {
+    const updated = categories.map((cat) => {
       if (cat.id !== categoryId) return cat;
       return {
         ...cat,
-        subcategories: cat.subcategories.map(sub => {
+        subcategories: cat.subcategories.map((sub) => {
           if (sub.id !== subId) return sub;
           const tags = Array.from(sub.tags);
           const [removed] = tags.splice(startIndex, 1);
@@ -296,4 +282,3 @@ export const useTagStore = create<TagStore>((set, get) => ({
     return JSON.stringify(library, null, 2);
   },
 }));
-

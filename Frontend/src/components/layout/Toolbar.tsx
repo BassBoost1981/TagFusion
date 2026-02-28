@@ -3,9 +3,33 @@ import { Combobox } from '@base-ui-components/react/combobox';
 import { Menu } from '@base-ui-components/react/menu';
 import { Popover } from '@base-ui-components/react/popover';
 import { motion } from 'framer-motion';
-import { Search, SortAsc, SortDesc, Star, X, ChevronDown, FileImage, Tag, Home, RotateCcw, RotateCw, FlipHorizontal, FlipVertical, RefreshCw } from 'lucide-react';
+import {
+  Search,
+  SortAsc,
+  SortDesc,
+  Star,
+  X,
+  ChevronDown,
+  FileImage,
+  Tag,
+  Home,
+  RotateCcw,
+  RotateCw,
+  FlipHorizontal,
+  FlipVertical,
+  RefreshCw,
+} from 'lucide-react';
 import { Spinner } from '@heroui/react';
-import { useFilterSort, useImages, useTags, useSelectedImages, useClearSelection, useSetCurrentFolder, useRefreshImages, useSetError } from '../../stores/appStore';
+import {
+  useFilterSort,
+  useImages,
+  useTags,
+  useSelectedImages,
+  useClearSelection,
+  useSetCurrentFolder,
+  useRefreshImages,
+  useSetError,
+} from '../../stores/appStore';
 import { bridge } from '../../services/bridge';
 import { GlassIconButton } from '../ui/glass';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -28,7 +52,17 @@ export function Toolbar() {
     { value: 'rating', label: t('toolbar.sort.rating') },
   ] as const;
 
-  const { searchQuery, setSearchQuery, sortBy, setSortBy, sortOrder, toggleSortOrder, filterRating, setFilterRating, clearFilters } = useFilterSort();
+  const {
+    searchQuery,
+    setSearchQuery,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    toggleSortOrder,
+    filterRating,
+    setFilterRating,
+    clearFilters,
+  } = useFilterSort();
   const images = useImages();
   const tags = useTags();
   const selectedImages = useSelectedImages();
@@ -36,8 +70,6 @@ export function Toolbar() {
   const setCurrentFolder = useSetCurrentFolder();
   const refreshImages = useRefreshImages();
   const setError = useSetError();
-
-
 
   const [isEditing, setIsEditing] = useState(false);
   const hasSelection = selectedImages.size > 0;
@@ -86,7 +118,7 @@ export function Toolbar() {
 
     // Add matching filenames
     const seenFiles = new Set<string>();
-    images.forEach(img => {
+    images.forEach((img) => {
       const fileName = img.fileName.toLowerCase();
       if (fileName.includes(query) && !seenFiles.has(img.fileName)) {
         seenFiles.add(img.fileName);
@@ -96,7 +128,7 @@ export function Toolbar() {
 
     // Add matching tags
     const seenTags = new Set<string>();
-    tags.forEach(tag => {
+    tags.forEach((tag) => {
       if (tag.name.toLowerCase().includes(query) && !seenTags.has(tag.name)) {
         seenTags.add(tag.name);
         results.push({ value: tag.name, label: tag.name, type: 'tag' });
@@ -104,8 +136,8 @@ export function Toolbar() {
     });
 
     // Also check tags from images
-    images.forEach(img => {
-      img.tags?.forEach(tagName => {
+    images.forEach((img) => {
+      img.tags?.forEach((tagName) => {
         if (tagName.toLowerCase().includes(query) && !seenTags.has(tagName)) {
           seenTags.add(tagName);
           results.push({ value: tagName, label: tagName, type: 'tag' });
@@ -150,12 +182,7 @@ export function Toolbar() {
       <div className="h-6 w-px bg-[var(--glass-border)]" />
 
       {/* Home Button */}
-      <GlassIconButton
-        onClick={handleGoHome}
-        title={t('toolbar.home')}
-        variant="ghost"
-        size="md"
-      >
+      <GlassIconButton onClick={handleGoHome} title={t('toolbar.home')} variant="ghost" size="md">
         <Home size={18} />
       </GlassIconButton>
 
@@ -181,9 +208,7 @@ export function Toolbar() {
               className="w-full h-8 pl-9 pr-8 rounded-lg backdrop-blur-glass-xs bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
             />
             {searchQuery && (
-              <Combobox.Clear
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--glass-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              >
+              <Combobox.Clear className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--glass-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
                 <X size={14} />
               </Combobox.Clear>
             )}
@@ -225,7 +250,7 @@ export function Toolbar() {
         <Menu.Root>
           <Menu.Trigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg backdrop-blur-glass-xs bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] transition-colors data-[popup-open]:bg-[var(--glass-bg-hover)]">
             {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
-            <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+            <span>{SORT_OPTIONS.find((o) => o.value === sortBy)?.label}</span>
             <ChevronDown size={14} className="transition-transform data-[popup-open]:rotate-180" />
           </Menu.Trigger>
           <Menu.Portal>
@@ -241,13 +266,12 @@ export function Toolbar() {
                         setSortBy(option.value);
                       }
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer outline-none data-[highlighted]:bg-[var(--glass-bg-hover)] ${sortBy === option.value ? 'text-cyan-400' : 'text-[var(--color-text-primary)]'
-                      }`}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer outline-none data-[highlighted]:bg-[var(--glass-bg-hover)] ${
+                      sortBy === option.value ? 'text-cyan-400' : 'text-[var(--color-text-primary)]'
+                    }`}
                   >
                     <span>{option.label}</span>
-                    {sortBy === option.value && (
-                      sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />
-                    )}
+                    {sortBy === option.value && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
                   </Menu.Item>
                 ))}
               </Menu.Popup>
@@ -258,10 +282,11 @@ export function Toolbar() {
         {/* Rating Filter - Base UI Popover */}
         <Popover.Root>
           <Popover.Trigger
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border ${filterRating !== null
-              ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-              : 'backdrop-blur-glass-xs bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border-[var(--glass-border)] text-[var(--color-text-primary)] data-[popup-open]:bg-[var(--glass-bg-hover)]'
-              }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border ${
+              filterRating !== null
+                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                : 'backdrop-blur-glass-xs bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border-[var(--glass-border)] text-[var(--color-text-primary)] data-[popup-open]:bg-[var(--glass-bg-hover)]'
+            }`}
           >
             <Star size={16} className={filterRating !== null ? 'fill-cyan-400' : ''} />
             <span>{filterRating !== null ? `≥${filterRating}` : t('toolbar.rating')}</span>
@@ -278,10 +303,11 @@ export function Toolbar() {
                     >
                       <Star
                         size={20}
-                        className={`transition-colors ${filterRating !== null && rating <= filterRating
-                          ? 'text-cyan-400 fill-cyan-400'
-                          : 'text-[var(--color-text-muted)]'
-                          }`}
+                        className={`transition-colors ${
+                          filterRating !== null && rating <= filterRating
+                            ? 'text-cyan-400 fill-cyan-400'
+                            : 'text-[var(--color-text-muted)]'
+                        }`}
                       />
                     </button>
                   ))}
@@ -298,12 +324,7 @@ export function Toolbar() {
 
         {/* Clear Filters */}
         {hasActiveFilters && (
-          <GlassIconButton
-            onClick={clearFilters}
-            title={t('toolbar.clearFilters')}
-            variant="danger"
-            size="sm"
-          >
+          <GlassIconButton onClick={clearFilters} title={t('toolbar.clearFilters')} variant="danger" size="sm">
             <X size={16} />
           </GlassIconButton>
         )}
@@ -319,40 +340,20 @@ export function Toolbar() {
                 </div>
               ) : (
                 <>
-                  <GlassIconButton
-                    onClick={() => handleRotate(-90)}
-                    title={t('toolbar.rotate90Left')}
-                    size="sm"
-                  >
+                  <GlassIconButton onClick={() => handleRotate(-90)} title={t('toolbar.rotate90Left')} size="sm">
                     <RotateCcw size={16} />
                   </GlassIconButton>
-                  <GlassIconButton
-                    onClick={() => handleRotate(90)}
-                    title={t('toolbar.rotate90Right')}
-                    size="sm"
-                  >
+                  <GlassIconButton onClick={() => handleRotate(90)} title={t('toolbar.rotate90Right')} size="sm">
                     <RotateCw size={16} />
                   </GlassIconButton>
-                  <GlassIconButton
-                    onClick={() => handleRotate(180)}
-                    title={t('toolbar.rotate180')}
-                    size="sm"
-                  >
+                  <GlassIconButton onClick={() => handleRotate(180)} title={t('toolbar.rotate180')} size="sm">
                     <RefreshCw size={16} />
                   </GlassIconButton>
                   <div className="w-px h-4 bg-[var(--glass-border)] mx-1" />
-                  <GlassIconButton
-                    onClick={() => handleFlip(true)}
-                    title={t('toolbar.flipHorizontal')}
-                    size="sm"
-                  >
+                  <GlassIconButton onClick={() => handleFlip(true)} title={t('toolbar.flipHorizontal')} size="sm">
                     <FlipHorizontal size={16} />
                   </GlassIconButton>
-                  <GlassIconButton
-                    onClick={() => handleFlip(false)}
-                    title={t('toolbar.flipVertical')}
-                    size="sm"
-                  >
+                  <GlassIconButton onClick={() => handleFlip(false)} title={t('toolbar.flipVertical')} size="sm">
                     <FlipVertical size={16} />
                   </GlassIconButton>
                 </>
@@ -373,4 +374,3 @@ export function Toolbar() {
     </motion.div>
   );
 }
-

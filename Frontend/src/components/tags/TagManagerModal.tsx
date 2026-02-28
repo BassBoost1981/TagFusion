@@ -3,9 +3,21 @@ import { Dialog } from '@base-ui-components/react/dialog';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import type { TagCategory, TagSubcategory } from '../../types';
 import {
-  X, FolderPlus, FilePlus, Plus, Trash2, Edit2, Check,
-  ChevronRight, ChevronDown, Download, Upload, Tag,
-  GripVertical, ArrowUp, ArrowDown
+  X,
+  FolderPlus,
+  FilePlus,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  ChevronRight,
+  ChevronDown,
+  Download,
+  Upload,
+  Tag,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { useTagStore } from '../../stores/tagStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -16,13 +28,25 @@ import { Button, Input } from '../ui';
 
 export function TagManagerModal() {
   const { t } = useTranslation();
-  const theme = useSettingsStore(state => state.theme);
+  const theme = useSettingsStore((state) => state.theme);
   const {
-    categories, isModalOpen, closeModal,
-    addCategory, renameCategory, deleteCategory, toggleCategoryExpand,
-    addSubcategory, renameSubcategory, deleteSubcategory,
-    addTag, removeTag, importLibrary, exportLibrary,
-    reorderCategories, reorderSubcategories, reorderTags
+    categories,
+    isModalOpen,
+    closeModal,
+    addCategory,
+    renameCategory,
+    deleteCategory,
+    toggleCategoryExpand,
+    addSubcategory,
+    renameSubcategory,
+    deleteSubcategory,
+    addTag,
+    removeTag,
+    importLibrary,
+    exportLibrary,
+    reorderCategories,
+    reorderSubcategories,
+    reorderTags,
   } = useTagStore();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,31 +123,34 @@ export function TagManagerModal() {
         <Dialog.Popup
           className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[800px] max-h-[80vh] rounded-2xl overflow-hidden flex flex-col transition-all data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 glass-card"
           style={{
-            background: theme === 'dark'
-              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
-              : 'linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%)',
-            border: theme === 'dark'
-              ? '1px solid rgba(6, 182, 212, 0.20)'
-              : '1px solid rgba(8, 145, 178, 0.20)',
-            boxShadow: theme === 'dark'
-              ? '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(6, 182, 212, 0.1)'
-              : '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+            background:
+              theme === 'dark'
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)'
+                : 'linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%)',
+            border: theme === 'dark' ? '1px solid rgba(6, 182, 212, 0.20)' : '1px solid rgba(8, 145, 178, 0.20)',
+            boxShadow:
+              theme === 'dark'
+                ? '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(6, 182, 212, 0.1)'
+                : '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
           }}
         >
           {/* Glass Specular Highlight */}
           <div
             className="absolute inset-x-0 top-0 h-[1px] z-10"
             style={{
-              background: theme === 'dark'
-                ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)'
-                : 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.05) 50%, transparent 100%)'
+              background:
+                theme === 'dark'
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.05) 50%, transparent 100%)',
             }}
           />
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-cyan-500/20">
             <div className="flex items-center gap-3">
               <Tag className="text-cyan-600 dark:text-cyan-400" size={24} />
-              <Dialog.Title className="text-xl font-semibold text-slate-900 dark:text-white">{t('tagManager.title')}</Dialog.Title>
+              <Dialog.Title className="text-xl font-semibold text-slate-900 dark:text-white">
+                {t('tagManager.title')}
+              </Dialog.Title>
             </div>
             <div className="flex items-center gap-2">
               <input type="file" ref={fileInputRef} accept=".json" onChange={handleImport} className="hidden" />
@@ -171,11 +198,7 @@ export function TagManagerModal() {
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="categories-root" type="CATEGORY">
                 {(provided) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    className="space-y-2"
-                  >
+                  <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
                     {categories.map((cat, index) => (
                       <CategoryItem
                         key={cat.id}
@@ -244,13 +267,31 @@ interface CategoryItemProps {
 }
 
 function CategoryItem({
-  category: cat, index, isFirst, isLast, editingId, editValue, setEditValue, startEdit, confirmEdit, setEditingId,
-  newSubName, setNewSubName, newTagInput, setNewTagInput,
-  toggleCategoryExpand, deleteCategory, reorderCategories,
-  addSubcategory, deleteSubcategory, reorderSubcategories, addTag, removeTag
+  category: cat,
+  index,
+  isFirst,
+  isLast,
+  editingId,
+  editValue,
+  setEditValue,
+  startEdit,
+  confirmEdit,
+  setEditingId,
+  newSubName,
+  setNewSubName,
+  newTagInput,
+  setNewTagInput,
+  toggleCategoryExpand,
+  deleteCategory,
+  reorderCategories,
+  addSubcategory,
+  deleteSubcategory,
+  reorderSubcategories,
+  addTag,
+  removeTag,
 }: CategoryItemProps) {
   const { t } = useTranslation();
-  const theme = useSettingsStore(state => state.theme);
+  const theme = useSettingsStore((state) => state.theme);
 
   return (
     <Draggable draggableId={cat.id} index={index}>
@@ -262,18 +303,29 @@ function CategoryItem({
           style={{
             ...provided.draggableProps.style,
             background: snapshot.isDragging
-              ? (theme === 'dark' ? 'rgba(30, 41, 59, 0.95)' : 'rgba(241, 245, 249, 0.95)')
-              : (theme === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')
+              ? theme === 'dark'
+                ? 'rgba(30, 41, 59, 0.95)'
+                : 'rgba(241, 245, 249, 0.95)'
+              : theme === 'dark'
+                ? 'rgba(255,255,255,0.03)'
+                : 'rgba(0,0,0,0.03)',
           }}
         >
           {/* Category Header */}
           <div className="flex items-center gap-2 p-3 hover:bg-black/5 dark:hover:bg-white/5 group">
-            <div {...provided.dragHandleProps} className="p-1 cursor-grab active:cursor-grabbing text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div
+              {...provided.dragHandleProps}
+              className="p-1 cursor-grab active:cursor-grabbing text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <GripVertical size={16} />
             </div>
 
             <button onClick={() => toggleCategoryExpand(cat.id)} className="p-1">
-              {cat.isExpanded ? <ChevronDown size={16} className="text-cyan-600 dark:text-cyan-400" /> : <ChevronRight size={16} className="text-slate-500 dark:text-slate-400" />}
+              {cat.isExpanded ? (
+                <ChevronDown size={16} className="text-cyan-600 dark:text-cyan-400" />
+              ) : (
+                <ChevronRight size={16} className="text-slate-500 dark:text-slate-400" />
+              )}
             </button>
             {editingId === cat.id ? (
               <div className="flex-1 flex gap-2">
@@ -284,8 +336,12 @@ function CategoryItem({
                   onKeyDown={(e) => e.key === 'Enter' && confirmEdit('category', cat.id)}
                   className="flex-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-sm text-slate-900 dark:text-white border border-cyan-500/30"
                 />
-                <button onClick={() => confirmEdit('category', cat.id)} className="text-green-400"><Check size={16} /></button>
-                <button onClick={() => setEditingId(null)} className="text-slate-400"><X size={16} /></button>
+                <button onClick={() => confirmEdit('category', cat.id)} className="text-green-400">
+                  <Check size={16} />
+                </button>
+                <button onClick={() => setEditingId(null)} className="text-slate-400">
+                  <X size={16} />
+                </button>
               </div>
             ) : (
               <>
@@ -306,9 +362,24 @@ function CategoryItem({
                     <ArrowDown size={14} />
                   </button>
                 </div>
-                <button onClick={() => startEdit(cat.id, cat.name)} className="p-1 opacity-40 hover:opacity-100 text-slate-700 dark:text-slate-200"><Edit2 size={14} /></button>
-                <button onClick={() => setNewSubName({ catId: cat.id, value: '' })} className="p-1 opacity-40 hover:opacity-100 text-cyan-600 dark:text-cyan-400"><FilePlus size={14} /></button>
-                <button onClick={() => deleteCategory(cat.id)} className="p-1 opacity-40 hover:opacity-100 text-red-500"><Trash2 size={14} /></button>
+                <button
+                  onClick={() => startEdit(cat.id, cat.name)}
+                  className="p-1 opacity-40 hover:opacity-100 text-slate-700 dark:text-slate-200"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  onClick={() => setNewSubName({ catId: cat.id, value: '' })}
+                  className="p-1 opacity-40 hover:opacity-100 text-cyan-600 dark:text-cyan-400"
+                >
+                  <FilePlus size={14} />
+                </button>
+                <button
+                  onClick={() => deleteCategory(cat.id)}
+                  className="p-1 opacity-40 hover:opacity-100 text-red-500"
+                >
+                  <Trash2 size={14} />
+                </button>
               </>
             )}
           </div>
@@ -317,11 +388,7 @@ function CategoryItem({
           {cat.isExpanded && (
             <Droppable droppableId={`subs-${cat.id}`} type="SUBCATEGORY">
               {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className="pl-6 pb-2 min-h-[32px]"
-                >
+                <div {...provided.droppableProps} ref={provided.innerRef} className="pl-6 pb-2 min-h-[32px]">
                   {newSubName && newSubName.catId === cat.id && (
                     <div className="flex gap-2 p-2">
                       <input
@@ -374,8 +441,23 @@ function CategoryItem({
 
 // Subcategory Item Component
 function SubcategoryItem({
-  sub, index, isFirst, isLast, catId, editingId, editValue, setEditValue, startEdit, confirmEdit, setEditingId,
-  newTagInput, setNewTagInput, deleteSubcategory, reorderSubcategories, addTag, removeTag
+  sub,
+  index,
+  isFirst,
+  isLast,
+  catId,
+  editingId,
+  editValue,
+  setEditValue,
+  startEdit,
+  confirmEdit,
+  setEditingId,
+  newTagInput,
+  setNewTagInput,
+  deleteSubcategory,
+  reorderSubcategories,
+  addTag,
+  removeTag,
 }: {
   sub: TagSubcategory;
   index: number;
@@ -396,7 +478,7 @@ function SubcategoryItem({
   removeTag: (catId: string, subId: string, tag: string) => void;
 }) {
   const { t } = useTranslation();
-  const theme = useSettingsStore(state => state.theme);
+  const theme = useSettingsStore((state) => state.theme);
 
   return (
     <Draggable draggableId={sub.id} index={index}>
@@ -407,7 +489,10 @@ function SubcategoryItem({
           className={`mb-2 rounded-lg transition-colors ${snapshot.isDragging ? 'bg-cyan-500/10 ring-1 ring-cyan-500/30' : ''}`}
         >
           <div className="flex items-center gap-2 p-2 group">
-            <div {...provided.dragHandleProps} className="p-1 cursor-grab active:cursor-grabbing text-slate-500 dark:text-slate-600 hover:text-cyan-600 dark:hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div
+              {...provided.dragHandleProps}
+              className="p-1 cursor-grab active:cursor-grabbing text-slate-500 dark:text-slate-600 hover:text-cyan-600 dark:hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <GripVertical size={14} />
             </div>
 
@@ -420,8 +505,15 @@ function SubcategoryItem({
                   onKeyDown={(e) => e.key === 'Enter' && confirmEdit('subcategory', catId, sub.id)}
                   className="flex-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-sm text-slate-900 dark:text-white border border-cyan-500/30"
                 />
-                <button onClick={() => confirmEdit('subcategory', catId, sub.id)} className="text-green-600 dark:text-green-400"><Check size={16} /></button>
-                <button onClick={() => setEditingId(null)} className="text-slate-500 dark:text-slate-400"><X size={16} /></button>
+                <button
+                  onClick={() => confirmEdit('subcategory', catId, sub.id)}
+                  className="text-green-600 dark:text-green-400"
+                >
+                  <Check size={16} />
+                </button>
+                <button onClick={() => setEditingId(null)} className="text-slate-500 dark:text-slate-400">
+                  <X size={16} />
+                </button>
               </div>
             ) : (
               <>
@@ -442,9 +534,24 @@ function SubcategoryItem({
                     <ArrowDown size={12} />
                   </button>
                 </div>
-                <button onClick={() => startEdit(sub.id, sub.name)} className="p-1 opacity-40 hover:opacity-100 text-slate-700 dark:text-slate-200"><Edit2 size={12} /></button>
-                <button onClick={() => setNewTagInput({ catId, subId: sub.id, value: '' })} className="p-1 opacity-40 hover:opacity-100 text-cyan-600 dark:text-cyan-400"><Plus size={12} /></button>
-                <button onClick={() => deleteSubcategory(catId, sub.id)} className="p-1 opacity-40 hover:opacity-100 text-red-500"><Trash2 size={12} /></button>
+                <button
+                  onClick={() => startEdit(sub.id, sub.name)}
+                  className="p-1 opacity-40 hover:opacity-100 text-slate-700 dark:text-slate-200"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button
+                  onClick={() => setNewTagInput({ catId, subId: sub.id, value: '' })}
+                  className="p-1 opacity-40 hover:opacity-100 text-cyan-600 dark:text-cyan-400"
+                >
+                  <Plus size={12} />
+                </button>
+                <button
+                  onClick={() => deleteSubcategory(catId, sub.id)}
+                  className="p-1 opacity-40 hover:opacity-100 text-red-500"
+                >
+                  <Trash2 size={12} />
+                </button>
               </>
             )}
           </div>
@@ -487,14 +594,16 @@ function SubcategoryItem({
                         style={{
                           ...provided.draggableProps.style,
                           background: snapshot.isDragging
-                            ? (theme === 'dark' ? 'rgba(6, 182, 212, 0.4)' : 'rgba(8, 145, 178, 0.4)')
-                            : (theme === 'dark'
+                            ? theme === 'dark'
+                              ? 'rgba(6, 182, 212, 0.4)'
+                              : 'rgba(8, 145, 178, 0.4)'
+                            : theme === 'dark'
                               ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(6, 182, 212, 0.05) 100%)'
-                              : 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(8, 145, 178, 0.05) 100%)'
-                            ),
-                          border: theme === 'dark'
-                            ? '1px solid rgba(6, 182, 212, 0.25)'
-                            : '1px solid rgba(8, 145, 178, 0.25)',
+                              : 'linear-gradient(135deg, rgba(8, 145, 178, 0.1) 0%, rgba(8, 145, 178, 0.05) 100%)',
+                          border:
+                            theme === 'dark'
+                              ? '1px solid rgba(6, 182, 212, 0.25)'
+                              : '1px solid rgba(8, 145, 178, 0.25)',
                         }}
                       >
                         {tag}
@@ -517,5 +626,3 @@ function SubcategoryItem({
     </Draggable>
   );
 }
-
-

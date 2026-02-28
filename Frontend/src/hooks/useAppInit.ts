@@ -17,4 +17,3 @@ export function useAppInit() {
     initTagStore();
   }, [setupSubscriptions, loadAllTags, initTagStore]);
 }
-

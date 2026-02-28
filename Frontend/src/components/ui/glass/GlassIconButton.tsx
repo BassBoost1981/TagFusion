@@ -76,16 +76,7 @@ const activeClasses = {
 
 export const GlassIconButton = forwardRef<HTMLButtonElement, GlassIconButtonProps>(
   (
-    {
-      children,
-      className = '',
-      size = 'md',
-      variant = 'default',
-      disabled = false,
-      active = false,
-      title,
-      ...props
-    },
+    { children, className = '', size = 'md', variant = 'default', disabled = false, active = false, title, ...props },
     ref
   ) => {
     return (
@@ -126,4 +117,3 @@ export const GlassIconButton = forwardRef<HTMLButtonElement, GlassIconButtonProp
 );
 
 GlassIconButton.displayName = 'GlassIconButton';
-

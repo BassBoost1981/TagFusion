@@ -68,7 +68,7 @@ body::before {
   z-index: 9999;
   opacity: 0.04;
   /* Static noise pattern - more performant than SVG feTurbulence */
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAElBMVEUAAAAAAAAAAAAAAAAAAAAAAADgKxmiAAAABnRSTlMFBgcICQoLNvWdAAAARElEQVQ4y2NgGLTAH4qYQAiKmOGIGYZYoIgFhlihiJWBgYGJCYaYYIgZhphgiAWGWGCIFYZYGRgYmJhgiBmGmGAIAACGxAOjzM3xsAAAAABJRU5ErkJggg==");
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAElBMVEUAAAAAAAAAAAAAAAAAAAAAAADgKxmiAAAABnRSTlMFBgcICQoLNvWdAAAARElEQVQ4y2NgGLTAH4qYQAiKmOGIGYZYoIgFhlihiJWBgYGJCYaYYIgZhphgiAWGWGCIFYZYGRgYmJhgiBmGmGAIAACGxAOjzM3xsAAAAABJRU5ErkJggg==');
   background-repeat: repeat;
   mix-blend-mode: overlay;
 }
@@ -82,8 +82,9 @@ body::before {
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0000-00FF, U+0100-017F, U+0180-024F, U+0250-02AF,
-    U+1E00-1EFF, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215;
+  unicode-range:
+    U+0000-00FF, U+0100-017F, U+0180-024F, U+0250-02AF, U+1E00-1EFF, U+2000-206F, U+20AC, U+2122, U+2190-21FF, U+2212,
+    U+2215;
 }
 
 @font-face {
@@ -113,7 +114,11 @@ body,
 }
 
 body {
-  font-family: 'Lexend', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Lexend',
+    system-ui,
+    -apple-system,
+    sans-serif;
   background-color: var(--color-bg-primary);
   background-image:
     radial-gradient(ellipse at 20% 0%, var(--color-cyan-subtle) 0%, transparent 50%),
@@ -141,9 +146,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg,
-      rgba(6, 182, 212, 0.35) 0%,
-      rgba(6, 182, 212, 0.15) 100%);
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.35) 0%, rgba(6, 182, 212, 0.15) 100%);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -154,18 +157,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg,
-      rgba(6, 182, 212, 0.5) 0%,
-      rgba(6, 182, 212, 0.25) 100%);
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.5) 0%, rgba(6, 182, 212, 0.25) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
     0 0 20px rgba(6, 182, 212, 0.4);
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg,
-      rgba(6, 182, 212, 0.6) 0%,
-      rgba(6, 182, 212, 0.3) 100%);
+  background: linear-gradient(180deg, rgba(6, 182, 212, 0.6) 0%, rgba(6, 182, 212, 0.3) 100%);
 }
 
 ::-webkit-scrollbar-corner {
@@ -245,12 +244,14 @@ body {
     background: var(--glass-bg);
     border-bottom: 1px solid var(--glass-border);
     backdrop-filter: blur(var(--glass-blur));
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .glass-section {
     background: linear-gradient(135deg, rgba(6, 182, 212, 0.12) 0%, rgba(6, 182, 212, 0.04) 100%);
-    border: 1px solid rgba(6, 182, 212, 0.20);
+    border: 1px solid rgba(6, 182, 212, 0.2);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(10px);
     @apply rounded-xl relative overflow-hidden;
@@ -261,7 +262,6 @@ body {
    UTILITIES
    ============================================ */
 @layer utilities {
-
   /* Gradient Utilities */
   .gradient-primary {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -397,18 +397,14 @@ html.light-mode {
 
 /* Scrollbar for light mode */
 .light-mode ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg,
-      rgba(8, 145, 178, 0.4) 0%,
-      rgba(8, 145, 178, 0.2) 100%);
+  background: linear-gradient(180deg, rgba(8, 145, 178, 0.4) 0%, rgba(8, 145, 178, 0.2) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
     0 0 12px rgba(8, 145, 178, 0.15);
 }
 
 .light-mode ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg,
-      rgba(8, 145, 178, 0.55) 0%,
-      rgba(8, 145, 178, 0.3) 100%);
+  background: linear-gradient(180deg, rgba(8, 145, 178, 0.55) 0%, rgba(8, 145, 178, 0.3) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     0 0 20px rgba(8, 145, 178, 0.3);
@@ -416,12 +412,14 @@ html.light-mode {
 
 /* Glass components in light mode */
 .light-mode .glass-toolbar {
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 /* Popups, Dropdowns, and Combobox in light mode */
 .light-mode [data-popup-open] .bg-slate-900\/90,
-.light-mode [role="dialog"] .bg-slate-900\/90,
+.light-mode [role='dialog'] .bg-slate-900\/90,
 .light-mode .ComboboxPopup,
 .light-mode [data-radix-popper-content-wrapper] .bg-slate-900\/90 {
   background: rgba(255, 255, 255, 0.95) !important;
@@ -527,7 +525,6 @@ html.light-mode {
 
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
-
   *,
   ::before,
   ::after {

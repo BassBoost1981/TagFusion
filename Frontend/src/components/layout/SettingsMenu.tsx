@@ -8,29 +8,15 @@ import { useTranslation } from 'react-i18next';
 
 export function SettingsMenu() {
   const { t } = useTranslation();
-  const {
-    language,
-    setLanguage,
-    theme,
-    setTheme,
-    performanceMode,
-    togglePerformanceMode,
-  } = useSettingsStore();
+  const { language, setLanguage, theme, setTheme, performanceMode, togglePerformanceMode } = useSettingsStore();
 
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <Menu.Root open={isOpen} onOpenChange={setIsOpen}>
       <Menu.Trigger className="relative">
-        <motion.div
-          animate={{ rotate: isOpen ? 30 : 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <GlassIconButton
-            variant="ghost"
-            size="sm"
-            title={t('settings.title')}
-          >
+        <motion.div animate={{ rotate: isOpen ? 30 : 0 }} transition={{ duration: 0.2 }}>
+          <GlassIconButton variant="ghost" size="sm" title={t('settings.title')}>
             <Settings size={18} className="text-[var(--color-text-primary)]" />
           </GlassIconButton>
         </motion.div>
@@ -48,18 +34,14 @@ export function SettingsMenu() {
                 <Menu.Popup className="w-64 py-2 rounded-xl backdrop-blur-glass-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-glass-lg z-50 outline-none">
                   {/* Header */}
                   <div className="px-4 py-2 border-b border-[var(--glass-border)]">
-                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      {t('settings.title')}
-                    </h3>
+                    <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{t('settings.title')}</h3>
                   </div>
 
                   {/* Language Section */}
                   <div className="px-4 py-3">
                     <div className="flex items-center gap-2 mb-2 text-[var(--color-text-secondary)]">
                       <Languages size={14} />
-                      <span className="text-xs uppercase tracking-wide">
-                        {t('settings.language')}
-                      </span>
+                      <span className="text-xs uppercase tracking-wide">{t('settings.language')}</span>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -94,14 +76,8 @@ export function SettingsMenu() {
                   {/* Theme Section */}
                   <div className="px-4 py-3 border-t border-[var(--glass-border)]">
                     <div className="flex items-center gap-2 mb-2 text-[var(--color-text-secondary)]">
-                      {theme === 'dark' ? (
-                        <Moon size={14} />
-                      ) : (
-                        <Sun size={14} />
-                      )}
-                      <span className="text-xs uppercase tracking-wide">
-                        {t('settings.theme')}
-                      </span>
+                      {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+                      <span className="text-xs uppercase tracking-wide">{t('settings.theme')}</span>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -142,9 +118,7 @@ export function SettingsMenu() {
                       <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
                         <Zap
                           size={16}
-                          className={
-                            performanceMode ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'
-                          }
+                          className={performanceMode ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'}
                         />
                         <div className="text-left">
                           <div className="text-sm">{t('settings.performanceMode')}</div>

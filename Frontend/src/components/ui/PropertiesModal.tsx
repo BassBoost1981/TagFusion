@@ -70,12 +70,7 @@ export function PropertiesModal() {
   };
 
   return (
-    <GlassModal
-      isOpen={isOpen}
-      onClose={closeModal}
-      title="Eigenschaften"
-      size="sm"
-    >
+    <GlassModal isOpen={isOpen} onClose={closeModal} title="Eigenschaften" size="sm">
       <div className="space-y-4">
         {isLoading && (
           <div className="flex justify-center py-8">
@@ -83,9 +78,7 @@ export function PropertiesModal() {
           </div>
         )}
 
-        {error && (
-          <p className="text-sm text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
         {properties && !isLoading && (
           <>

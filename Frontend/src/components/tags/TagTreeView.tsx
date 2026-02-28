@@ -15,14 +15,14 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
   const updateImageTags = useUpdateImageTags();
 
   // O(1) lookup map for images by path
-  const imageMap = useMemo(() => new Map(images.map(img => [img.path, img])), [images]);
+  const imageMap = useMemo(() => new Map(images.map((img) => [img.path, img])), [images]);
 
   // Get all unique tags from selected images
   const selectedImagesTags = useMemo(() => {
     const selectedImgs = Array.from(selectedImages)
-      .map(path => imageMap.get(path))
+      .map((path) => imageMap.get(path))
       .filter(Boolean);
-    return new Set(selectedImgs.flatMap(img => img!.tags));
+    return new Set(selectedImgs.flatMap((img) => img!.tags));
   }, [imageMap, selectedImages]);
 
   // Filter categories based on search query
@@ -31,16 +31,16 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
 
     const query = searchQuery.toLowerCase();
     return categories
-      .map(cat => ({
+      .map((cat) => ({
         ...cat,
         subcategories: cat.subcategories
-          .map(sub => ({
+          .map((sub) => ({
             ...sub,
-            tags: sub.tags.filter(tag => tag.toLowerCase().includes(query))
+            tags: sub.tags.filter((tag) => tag.toLowerCase().includes(query)),
           }))
-          .filter(sub => sub.tags.length > 0)
+          .filter((sub) => sub.tags.length > 0),
       }))
-      .filter(cat => cat.subcategories.length > 0);
+      .filter((cat) => cat.subcategories.length > 0);
   }, [categories, searchQuery]);
 
   // Add tag to selected images
@@ -69,7 +69,10 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
     for (const imagePath of selectedImages) {
       const image = imageMap.get(imagePath);
       if (image && image.tags.includes(tag)) {
-        await updateImageTags(imagePath, image.tags.filter(t => t !== tag));
+        await updateImageTags(
+          imagePath,
+          image.tags.filter((t) => t !== tag)
+        );
       }
     }
   };
@@ -126,9 +129,13 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
                           <button
                             onClick={() => handleTagClick(tag)}
                             aria-pressed={isApplied}
-                            aria-label={selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag}
+                            aria-label={
+                              selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag
+                            }
                             className={`px-2 py-0.5 ${isApplied ? 'text-cyan-300' : 'text-slate-200'}`}
-                            title={selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag}
+                            title={
+                              selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag
+                            }
                           >
                             {tag}
                           </button>
@@ -155,4 +162,3 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
     </div>
   );
 }
-

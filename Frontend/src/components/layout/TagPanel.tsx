@@ -27,34 +27,37 @@ export function TagPanel() {
   }, [isFolderTagsCollapsed]);
 
   // Handle resize
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
 
-    const startX = e.clientX;
-    const startWidth = tagPanelWidth;
+      const startX = e.clientX;
+      const startWidth = tagPanelWidth;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const diff = startX - e.clientX;
-      const newWidth = Math.min(TAG_PANEL_WIDTH_MAX, Math.max(TAG_PANEL_WIDTH_MIN, startWidth + diff));
-      setTagPanelWidth(newWidth);
-    };
+      const handleMouseMove = (e: MouseEvent) => {
+        const diff = startX - e.clientX;
+        const newWidth = Math.min(TAG_PANEL_WIDTH_MAX, Math.max(TAG_PANEL_WIDTH_MIN, startWidth + diff));
+        setTagPanelWidth(newWidth);
+      };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+      const handleMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [tagPanelWidth, setTagPanelWidth]);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [tagPanelWidth, setTagPanelWidth]
+  );
 
   // Get all tags from folder
   const folderTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
-    images.forEach(img => {
-      img.tags?.forEach(tag => {
+    images.forEach((img) => {
+      img.tags?.forEach((tag) => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
     });
@@ -89,7 +92,7 @@ export function TagPanel() {
             <div className="absolute inset-x-0 top-0 h-[1px] glass-specular" />
             {/* Clickable Header */}
             <button
-              onClick={() => setIsFolderTagsCollapsed(prev => !prev)}
+              onClick={() => setIsFolderTagsCollapsed((prev) => !prev)}
               className={`flex items-center gap-2 w-full text-left cursor-pointer group ${!isFolderTagsCollapsed ? 'mb-3' : ''}`}
             >
               <FolderOpen size={14} className="text-cyan-400" />
@@ -132,7 +135,7 @@ export function TagPanel() {
                             delay={index}
                             onClick={() => {
                               if (isActive) {
-                                setFilterTags(filterTags.filter(t => t !== name));
+                                setFilterTags(filterTags.filter((t) => t !== name));
                               } else {
                                 setFilterTags([...filterTags, name]);
                               }
@@ -157,16 +160,9 @@ export function TagPanel() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <FolderTree size={14} className="text-cyan-400" />
-                <h4 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-                  {t('tagPanel.title')}
-                </h4>
+                <h4 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">{t('tagPanel.title')}</h4>
               </div>
-              <GlassIconButton
-                onClick={openModal}
-                title={t('common.edit')}
-                size="xs"
-                variant="ghost"
-              >
+              <GlassIconButton onClick={openModal} title={t('common.edit')} size="xs" variant="ghost">
                 <Settings2 size={14} />
               </GlassIconButton>
             </div>
@@ -181,13 +177,14 @@ export function TagPanel() {
             {categories.length > 0 ? (
               <TagTreeView searchQuery={tagSearchQuery} />
             ) : (
-              <p className="text-xs text-[var(--color-text-muted)] text-center py-2">
-                {t('tagPanel.selectImage')}
-              </p>
+              <p className="text-xs text-[var(--color-text-muted)] text-center py-2">{t('tagPanel.selectImage')}</p>
             )}
           </div>
         </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar orientation="vertical" className="w-2 p-0.5 flex touch-none select-none transition-colors bg-transparent hover:bg-white/5">
+        <ScrollArea.Scrollbar
+          orientation="vertical"
+          className="w-2 p-0.5 flex touch-none select-none transition-colors bg-transparent hover:bg-white/5"
+        >
           <ScrollArea.Thumb className="flex-1 rounded-full bg-cyan-500/30 hover:bg-cyan-500/50 transition-colors" />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>

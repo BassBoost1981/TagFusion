@@ -7,32 +7,32 @@ import deCommon from '../public/locales/de/common.json';
 import enCommon from '../public/locales/en/common.json';
 
 const resources = {
-    de: { common: deCommon },
-    en: { common: enCommon },
+  de: { common: deCommon },
+  en: { common: enCommon },
 };
 
 i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-        resources,
-        fallbackLng: 'de',
-        defaultNS: 'common',
-        ns: ['common'],
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources,
+    fallbackLng: 'de',
+    defaultNS: 'common',
+    ns: ['common'],
 
-        detection: {
-            order: ['localStorage', 'navigator'],
-            caches: ['localStorage'],
-            lookupLocalStorage: 'tagfusion-language',
-        },
+    detection: {
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'tagfusion-language',
+    },
 
-        interpolation: {
-            escapeValue: false,
-        },
+    interpolation: {
+      escapeValue: false,
+    },
 
-        react: {
-            useSuspense: false,
-        },
-    });
+    react: {
+      useSuspense: false,
+    },
+  });
 
 export default i18n;

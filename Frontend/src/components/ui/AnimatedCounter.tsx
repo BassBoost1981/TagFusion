@@ -9,7 +9,7 @@ interface AnimatedCounterProps {
 
 export function AnimatedCounter({ value, duration = 500, className = '' }: AnimatedCounterProps) {
   const prevValue = useRef(0);
-  
+
   const { number } = useSpring({
     from: { number: prevValue.current },
     to: { number: value },
@@ -20,10 +20,5 @@ export function AnimatedCounter({ value, duration = 500, className = '' }: Anima
     prevValue.current = value;
   }, [value]);
 
-  return (
-    <animated.span className={className}>
-      {number.to(n => Math.round(n))}
-    </animated.span>
-  );
+  return <animated.span className={className}>{number.to((n) => Math.round(n))}</animated.span>;
 }
-

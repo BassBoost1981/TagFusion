@@ -7,18 +7,11 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'classN
   className?: string;
 }
 
-export function Input({
-  icon,
-  error,
-  className = '',
-  ...props
-}: InputProps) {
+export function Input({ icon, error, className = '', ...props }: InputProps) {
   return (
     <div className="relative">
       {icon && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-          {icon}
-        </div>
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">{icon}</div>
       )}
       <BaseInput
         className={`
@@ -33,10 +26,7 @@ export function Input({
         `}
         {...props}
       />
-      {error && (
-        <p className="mt-1 text-sm text-red-400">{error}</p>
-      )}
+      {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
     </div>
   );
 }
-

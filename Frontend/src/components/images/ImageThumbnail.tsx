@@ -18,9 +18,7 @@ export function ImageThumbnail({
   thumbnailSize,
   onThumbnailError,
 }: ImageThumbnailProps) {
-  const imageSrc = thumbnail
-    ? `data:image/jpeg;base64,${thumbnail}`
-    : thumbnailUrl || null;
+  const imageSrc = thumbnail ? `data:image/jpeg;base64,${thumbnail}` : thumbnailUrl || null;
 
   return (
     <div
@@ -31,9 +29,7 @@ export function ImageThumbnail({
       }}
     >
       {/* Skeleton loading animation */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-[var(--glass-bg-hover)] animate-pulse" />
-      )}
+      {isLoading && <div className="absolute inset-0 bg-[var(--glass-bg-hover)] animate-pulse" />}
 
       {/* Blurred background image for glass effect */}
       {!isLoading && imageSrc && (
@@ -71,12 +67,13 @@ export function ImageThumbnail({
           className="relative z-[1] w-full h-full object-contain transition-opacity duration-300"
           style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
         />
-      ) : !isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <ImageIcon size={32} className="text-[var(--color-text-muted)]" />
-        </div>
+      ) : (
+        !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ImageIcon size={32} className="text-[var(--color-text-muted)]" />
+          </div>
+        )
       )}
     </div>
   );
 }
-

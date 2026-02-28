@@ -84,7 +84,9 @@ function requestThumbnail(path: string) {
 
 function subscribe(cb: () => void) {
   subscribers.add(cb);
-  return () => { subscribers.delete(cb); };
+  return () => {
+    subscribers.delete(cb);
+  };
 }
 
 // ============================================================================
@@ -105,14 +107,11 @@ export function useThumbnail(imagePath: string, initialThumbnail?: string | null
   }
 
   // Subscribe to cache changes — snapshot is a string hash for this specific path
-  useSyncExternalStore(
-    subscribe,
-    () => {
-      const cached = cache.has(imagePath) ? 'y' : 'n';
-      const loading = loadingPaths.has(imagePath) ? 'y' : 'n';
-      return `${cached}-${loading}`;
-    }
-  );
+  useSyncExternalStore(subscribe, () => {
+    const cached = cache.has(imagePath) ? 'y' : 'n';
+    const loading = loadingPaths.has(imagePath) ? 'y' : 'n';
+    return `${cached}-${loading}`;
+  });
 
   const thumbnail = cache.get(imagePath) ?? null;
   const isLoading = loadingPaths.has(imagePath) || pendingPaths.has(imagePath);
@@ -121,4 +120,3 @@ export function useThumbnail(imagePath: string, initialThumbnail?: string | null
 }
 
 export { requestThumbnail };
-

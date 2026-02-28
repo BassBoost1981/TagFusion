@@ -47,32 +47,34 @@ export const useClearSelection = () => useAppStore((state) => state.clearSelecti
 
 // Zoom selectors
 export const useZoomLevel = () => useAppStore((state) => state.zoomLevel);
-export const useZoomControls = () => useAppStore(
-  useShallow((state) => ({
-    zoomLevel: state.zoomLevel,
-    zoomIn: state.zoomIn,
-    zoomOut: state.zoomOut,
-    setZoomLevel: state.setZoomLevel
-  }))
-);
+export const useZoomControls = () =>
+  useAppStore(
+    useShallow((state) => ({
+      zoomLevel: state.zoomLevel,
+      zoomIn: state.zoomIn,
+      zoomOut: state.zoomOut,
+      setZoomLevel: state.setZoomLevel,
+    }))
+  );
 
 // Filter/Sort selectors
-export const useFilterSort = () => useAppStore(
-  useShallow((state) => ({
-    searchQuery: state.searchQuery,
-    sortBy: state.sortBy,
-    sortOrder: state.sortOrder,
-    filterRating: state.filterRating,
-    filterTags: state.filterTags,
-    setSearchQuery: state.setSearchQuery,
-    setSortBy: state.setSortBy,
-    setSortOrder: state.setSortOrder,
-    toggleSortOrder: state.toggleSortOrder,
-    setFilterRating: state.setFilterRating,
-    setFilterTags: state.setFilterTags,
-    clearFilters: state.clearFilters
-  }))
-);
+export const useFilterSort = () =>
+  useAppStore(
+    useShallow((state) => ({
+      searchQuery: state.searchQuery,
+      sortBy: state.sortBy,
+      sortOrder: state.sortOrder,
+      filterRating: state.filterRating,
+      filterTags: state.filterTags,
+      setSearchQuery: state.setSearchQuery,
+      setSortBy: state.setSortBy,
+      setSortOrder: state.setSortOrder,
+      toggleSortOrder: state.toggleSortOrder,
+      setFilterRating: state.setFilterRating,
+      setFilterTags: state.setFilterTags,
+      clearFilters: state.clearFilters,
+    }))
+  );
 
 // Image action selectors
 export const useRefreshImages = () => useAppStore((state) => state.refreshImages);
@@ -83,36 +85,38 @@ export const useUpdateImageTags = () => useAppStore((state) => state.updateImage
 export const useUpdateImageRating = () => useAppStore((state) => state.updateImageRating);
 
 // Sidebar selectors
-export const useSidebarState = () => useAppStore(
-  useShallow((state) => ({
-    drives: state.drives,
-    favorites: state.favorites,
-    expandedPaths: state.expandedPaths,
-    folderCache: state.folderCache,
-    loadingPaths: state.loadingPaths,
-    sidebarWidth: state.sidebarWidth,
-    isLoadingDrives: state.isLoadingDrives,
-    loadDrives: state.loadDrives,
-    toggleFolder: state.toggleFolder,
-    setSidebarWidth: state.setSidebarWidth,
-    addFavorite: state.addFavorite,
-    removeFavorite: state.removeFavorite
-  }))
-);
+export const useSidebarState = () =>
+  useAppStore(
+    useShallow((state) => ({
+      drives: state.drives,
+      favorites: state.favorites,
+      expandedPaths: state.expandedPaths,
+      folderCache: state.folderCache,
+      loadingPaths: state.loadingPaths,
+      sidebarWidth: state.sidebarWidth,
+      isLoadingDrives: state.isLoadingDrives,
+      loadDrives: state.loadDrives,
+      toggleFolder: state.toggleFolder,
+      setSidebarWidth: state.setSidebarWidth,
+      addFavorite: state.addFavorite,
+      removeFavorite: state.removeFavorite,
+    }))
+  );
 
 // Tag Panel selectors
-export const useTagPanelState = () => useAppStore(
-  useShallow((state) => ({
-    selectedImages: state.selectedImages,
-    images: state.images,
-    tags: state.tags,
-    tagPanelWidth: state.tagPanelWidth,
-    filterTags: state.filterTags,
-    setTagPanelWidth: state.setTagPanelWidth,
-    updateImageTags: state.updateImageTags,
-    setFilterTags: state.setFilterTags
-  }))
-);
+export const useTagPanelState = () =>
+  useAppStore(
+    useShallow((state) => ({
+      selectedImages: state.selectedImages,
+      images: state.images,
+      tags: state.tags,
+      tagPanelWidth: state.tagPanelWidth,
+      filterTags: state.filterTags,
+      setTagPanelWidth: state.setTagPanelWidth,
+      updateImageTags: state.updateImageTags,
+      setFilterTags: state.setFilterTags,
+    }))
+  );
 
 // Error selectors
 export const useError = () => useAppStore((state) => state.error);

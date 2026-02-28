@@ -118,10 +118,8 @@ export function ImageGrid() {
   const zoomLevel = useZoomLevel();
   const isLoadingImages = useIsLoadingImages();
   const selectedImages = useSelectedImages();
-  const {
-    searchQuery, sortBy, sortOrder, filterRating, filterTags,
-    setSearchQuery, setFilterRating, setFilterTags
-  } = useFilterSort();
+  const { searchQuery, sortBy, sortOrder, filterRating, filterTags, setSearchQuery, setFilterRating, setFilterTags } =
+    useFilterSort();
 
   // Container ref for measuring width
   const containerRef = useRef<HTMLDivElement>(null);
@@ -176,7 +174,7 @@ export function ImageGrid() {
     if (searchQuery || filterRating !== null || filterTagsSet.size > 0) {
       const query = searchQuery ? searchQuery.toLowerCase() : '';
 
-      items = items.filter(item => {
+      items = items.filter((item) => {
         if (item.isFolder) {
           if (filterRating !== null || filterTagsSet.size > 0) return false;
           if (query) return item.name.toLowerCase().includes(query);
@@ -187,13 +185,13 @@ export function ImageGrid() {
 
           if (query) {
             const matchesName = (img.fileName || '').toLowerCase().includes(query);
-            const matchesTags = (img.tags || []).some(tag => tag.toLowerCase().includes(query));
+            const matchesTags = (img.tags || []).some((tag) => tag.toLowerCase().includes(query));
             if (!matchesName && !matchesTags) return false;
           }
           if (filterRating !== null && (img.rating || 0) !== filterRating) return false;
           if (filterTagsSet.size > 0) {
             const imgTags = img.tags || [];
-            if (!imgTags.some(t => filterTagsSet.has(t))) return false;
+            if (!imgTags.some((t) => filterTagsSet.has(t))) return false;
           }
           return true;
         }
@@ -201,8 +199,8 @@ export function ImageGrid() {
     }
 
     // Sort and Group
-    const folders = items.filter(i => i.isFolder);
-    const images = items.filter(i => !i.isFolder);
+    const folders = items.filter((i) => i.isFolder);
+    const images = items.filter((i) => !i.isFolder);
 
     const sortedFolders = [...folders].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const sortedImages = [...images].sort((aItem, bItem) => {
@@ -212,10 +210,18 @@ export function ImageGrid() {
 
       let comparison = 0;
       switch (sortBy) {
-        case 'name': comparison = (a.fileName || '').localeCompare(b.fileName || ''); break;
-        case 'date': comparison = new Date(a.dateModified || 0).getTime() - new Date(b.dateModified || 0).getTime(); break;
-        case 'size': comparison = (a.fileSize || 0) - (b.fileSize || 0); break;
-        case 'rating': comparison = (a.rating || 0) - (b.rating || 0); break;
+        case 'name':
+          comparison = (a.fileName || '').localeCompare(b.fileName || '');
+          break;
+        case 'date':
+          comparison = new Date(a.dateModified || 0).getTime() - new Date(b.dateModified || 0).getTime();
+          break;
+        case 'size':
+          comparison = (a.fileSize || 0) - (b.fileSize || 0);
+          break;
+        case 'rating':
+          comparison = (a.rating || 0) - (b.rating || 0);
+          break;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -238,7 +244,7 @@ export function ImageGrid() {
         const image = item.imageData;
         if (!image) continue;
         const imageTags = image.tags || [];
-        const isHighlighted = filterTagsSet.size > 0 && imageTags.some(tag => filterTagsSet.has(tag));
+        const isHighlighted = filterTagsSet.size > 0 && imageTags.some((tag) => filterTagsSet.has(tag));
         const isDimmed = filterTagsSet.size > 0 && !isHighlighted;
         result.push({ type: 'image', item, isHighlighted, isDimmed });
       }
@@ -257,63 +263,70 @@ export function ImageGrid() {
 
   // Render a single virtual item — ALL items wrapped in a uniform-size container
   // VirtuosoGrid requires all items to be the same size.
-  const renderItem = useCallback((index: number) => {
-    const vItem = virtualItems[index];
-    if (!vItem) return null;
+  const renderItem = useCallback(
+    (index: number) => {
+      const vItem = virtualItems[index];
+      if (!vItem) return null;
 
-    // Uniform wrapper: flex: 1 fills the Item padding box, aspect-ratio ensures same height
-    const uniformStyle: React.CSSProperties = {
-      display: 'flex',
-      flex: 1,
-      aspectRatio: '1/1',
-      overflow: 'hidden',
-      borderRadius: '0.75rem', // rounded-xl
-    };
+      // Uniform wrapper: flex: 1 fills the Item padding box, aspect-ratio ensures same height
+      const uniformStyle: React.CSSProperties = {
+        display: 'flex',
+        flex: 1,
+        aspectRatio: '1/1',
+        overflow: 'hidden',
+        borderRadius: '0.75rem', // rounded-xl
+      };
 
-    switch (vItem.type) {
-      case 'navigate-up':
-        return (
-          <motion.div
-            whileHover={{ scale: 1.03, y: -4 }}
-            whileTap={{ scale: 0.98 }}
-            onDoubleClick={() => navigateUp()}
-            className="relative group cursor-pointer shadow-lg"
-            style={uniformStyle}
-          >
-            <div className="relative flex flex-col w-full h-full backdrop-blur-glass-sm bg-[var(--glass-bg)] border border-cyan-500/15 rounded-xl overflow-hidden">
-              <div className="flex-1 flex items-center justify-center bg-[var(--glass-bg)] relative overflow-hidden group-hover:bg-[var(--glass-bg-hover)] transition-colors">
-                <div className="absolute inset-0 bg-cyan-500/5 blur-3xl rounded-full scale-50 group-hover:scale-100 transition-transform duration-500" />
-                <CornerLeftUp size={56} className="text-cyan-400 drop-shadow-lg relative z-10 group-hover:text-cyan-300 transition-colors" strokeWidth={1.5} />
+      switch (vItem.type) {
+        case 'navigate-up':
+          return (
+            <motion.div
+              whileHover={{ scale: 1.03, y: -4 }}
+              whileTap={{ scale: 0.98 }}
+              onDoubleClick={() => navigateUp()}
+              className="relative group cursor-pointer shadow-lg"
+              style={uniformStyle}
+            >
+              <div className="relative flex flex-col w-full h-full backdrop-blur-glass-sm bg-[var(--glass-bg)] border border-cyan-500/15 rounded-xl overflow-hidden">
+                <div className="flex-1 flex items-center justify-center bg-[var(--glass-bg)] relative overflow-hidden group-hover:bg-[var(--glass-bg-hover)] transition-colors">
+                  <div className="absolute inset-0 bg-cyan-500/5 blur-3xl rounded-full scale-50 group-hover:scale-100 transition-transform duration-500" />
+                  <CornerLeftUp
+                    size={56}
+                    className="text-cyan-400 drop-shadow-lg relative z-10 group-hover:text-cyan-300 transition-colors"
+                    strokeWidth={1.5}
+                  />
+                </div>
+                <div className="p-3 relative bg-[var(--glass-bg)] border-t border-[var(--glass-border)]">
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--glass-specular)] to-transparent" />
+                  <h3 className="text-sm font-medium text-[var(--color-text-primary)] truncate">..</h3>
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-1">{t('common.parentFolder')}</p>
+                </div>
               </div>
-              <div className="p-3 relative bg-[var(--glass-bg)] border-t border-[var(--glass-border)]">
-                <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--glass-specular)] to-transparent" />
-                <h3 className="text-sm font-medium text-[var(--color-text-primary)] truncate">..</h3>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-1">{t('common.parentFolder')}</p>
-              </div>
+            </motion.div>
+          );
+
+        case 'folder':
+          return (
+            <div style={uniformStyle}>
+              <FolderCard item={vItem.item} />
             </div>
-          </motion.div>
-        );
+          );
 
-      case 'folder':
-        return (
-          <div style={uniformStyle}>
-            <FolderCard item={vItem.item} />
-          </div>
-        );
-
-      case 'image': {
-        const image = vItem.item.imageData!;
-        return (
-          <div
-            style={{ ...uniformStyle, opacity: vItem.isDimmed ? 0.3 : 1 }}
-            className={vItem.isHighlighted ? 'ring-2 ring-cyan-400 rounded-xl' : ''}
-          >
-            <ImageCard image={image} allImages={storeImages} isSelected={selectedImages.has(image.path)} />
-          </div>
-        );
+        case 'image': {
+          const image = vItem.item.imageData!;
+          return (
+            <div
+              style={{ ...uniformStyle, opacity: vItem.isDimmed ? 0.3 : 1 }}
+              className={vItem.isHighlighted ? 'ring-2 ring-cyan-400 rounded-xl' : ''}
+            >
+              <ImageCard image={image} allImages={storeImages} isSelected={selectedImages.has(image.path)} />
+            </div>
+          );
+        }
       }
-    }
-  }, [virtualItems, navigateUp, storeImages, selectedImages]);
+    },
+    [virtualItems, navigateUp, storeImages, selectedImages, t]
+  );
 
   // Loading state
   if (isLoadingImages) {

@@ -29,7 +29,7 @@ export const useLightboxStore = create<LightboxState>((set, get) => ({
   zoomLevel: LIGHTBOX_ZOOM_DEFAULT,
 
   open: (image, images) => {
-    const index = images.findIndex(img => img.path === image.path);
+    const index = images.findIndex((img) => img.path === image.path);
     set({
       isOpen: true,
       currentImage: image,
@@ -100,4 +100,3 @@ export const useLightboxStore = create<LightboxState>((set, get) => ({
     set({ zoomLevel: LIGHTBOX_ZOOM_DEFAULT });
   },
 }));
-

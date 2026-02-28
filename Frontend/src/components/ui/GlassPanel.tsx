@@ -73,8 +73,8 @@ export function GlassPanel({
               glowColor === 'cyan'
                 ? 'rgba(6,182,212,0.15)'
                 : glowColor === 'purple'
-                ? 'rgba(139,92,246,0.15)'
-                : 'rgba(236,72,153,0.15)'
+                  ? 'rgba(139,92,246,0.15)'
+                  : 'rgba(236,72,153,0.15)'
             } 0%, transparent 70%)`,
             transform: 'translateZ(-5px)',
           }}

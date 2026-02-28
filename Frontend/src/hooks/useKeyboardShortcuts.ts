@@ -29,7 +29,7 @@ export function useKeyboardShortcuts() {
     if (e.key === 'F2' && state.selectedImages.size === 1) {
       e.preventDefault();
       const path = Array.from(state.selectedImages)[0];
-      const img = state.images.find(i => i.path === path);
+      const img = state.images.find((i) => i.path === path);
       if (img) {
         openModal('rename', { path, name: img.fileName, isFolder: false });
       }
@@ -56,7 +56,7 @@ export function useKeyboardShortcuts() {
       if (e.key === 'c' || e.key === 'C') {
         if (state.selectedImages.size > 0) {
           e.preventDefault();
-          copy(Array.from(state.selectedImages).map(path => ({ path, isFolder: false })));
+          copy(Array.from(state.selectedImages).map((path) => ({ path, isFolder: false })));
         }
         return;
       }
@@ -64,7 +64,7 @@ export function useKeyboardShortcuts() {
       if (e.key === 'x' || e.key === 'X') {
         if (state.selectedImages.size > 0) {
           e.preventDefault();
-          cut(Array.from(state.selectedImages).map(path => ({ path, isFolder: false })));
+          cut(Array.from(state.selectedImages).map((path) => ({ path, isFolder: false })));
         }
         return;
       }
@@ -101,4 +101,3 @@ export function useKeyboardShortcuts() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 }
-

@@ -18,10 +18,11 @@ export function GlassContextMenu() {
   // Check if light mode is active
   const isLightMode = document.documentElement.classList.contains('light-mode');
 
+  // eslint-disable-next-line no-console
   console.log('[GlassContextMenu] render - isOpen:', isOpen, 'x:', x, 'y:', y, 'sections:', sections.length);
 
   // Flatten items for keyboard navigation
-  const allItems = sections.flatMap(s => s.items.filter(i => !i.disabled));
+  const allItems = sections.flatMap((s) => s.items.filter((i) => !i.disabled));
 
   // Set initial position from store values
   useEffect(() => {
@@ -97,31 +98,34 @@ export function GlassContextMenu() {
   }, [isOpen, hide]);
 
   // Keyboard navigation
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isOpen) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isOpen) return;
 
-    switch (e.key) {
-      case 'Escape':
-        e.preventDefault();
-        hide();
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setFocusedIndex(prev => (prev + 1) % allItems.length);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setFocusedIndex(prev => (prev - 1 + allItems.length) % allItems.length);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < allItems.length) {
-          allItems[focusedIndex].onClick();
+      switch (e.key) {
+        case 'Escape':
+          e.preventDefault();
           hide();
-        }
-        break;
-    }
-  }, [isOpen, hide, allItems, focusedIndex]);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusedIndex((prev) => (prev + 1) % allItems.length);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusedIndex((prev) => (prev - 1 + allItems.length) % allItems.length);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (focusedIndex >= 0 && focusedIndex < allItems.length) {
+            allItems[focusedIndex].onClick();
+            hide();
+          }
+          break;
+      }
+    },
+    [isOpen, hide, allItems, focusedIndex]
+  );
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -142,17 +146,17 @@ export function GlassContextMenu() {
   // Theme-aware styles
   const menuStyles = isLightMode
     ? {
-      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(248, 250, 252, 0.70) 100%)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(8, 145, 178, 0.3)',
-      boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
-    }
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.75) 0%, rgba(248, 250, 252, 0.70) 100%)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(8, 145, 178, 0.3)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
+      }
     : {
-      background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.60) 0%, rgba(15, 23, 42, 0.50) 100%)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(6, 182, 212, 0.25)',
-      boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
-    };
+        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.60) 0%, rgba(15, 23, 42, 0.50) 100%)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(6, 182, 212, 0.25)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+      };
 
   return createPortal(
     <AnimatePresence>
@@ -167,7 +171,7 @@ export function GlassContextMenu() {
           style={{
             left: position.x,
             top: position.y,
-            ...menuStyles
+            ...menuStyles,
           }}
         >
           {/* Specular highlight */}
@@ -176,7 +180,7 @@ export function GlassContextMenu() {
             style={{
               background: isLightMode
                 ? 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)'
-                : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)'
+                : 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
             }}
           />
 
@@ -201,24 +205,28 @@ export function GlassContextMenu() {
                     disabled={item.disabled}
                     className={`
                       w-full px-3 py-2 flex items-center gap-3 text-left text-sm transition-colors
-                      ${item.disabled
-                        ? 'opacity-40 cursor-not-allowed'
-                        : isLightMode
-                          ? 'cursor-pointer hover:bg-cyan-500/10'
-                          : 'cursor-pointer hover:bg-white/10'
+                      ${
+                        item.disabled
+                          ? 'opacity-40 cursor-not-allowed'
+                          : isLightMode
+                            ? 'cursor-pointer hover:bg-cyan-500/10'
+                            : 'cursor-pointer hover:bg-white/10'
                       }
-                      ${item.danger
-                        ? 'text-red-500 hover:text-red-600'
-                        : isLightMode
-                          ? 'text-slate-700'
-                          : 'text-slate-200'
+                      ${
+                        item.danger
+                          ? 'text-red-500 hover:text-red-600'
+                          : isLightMode
+                            ? 'text-slate-700'
+                            : 'text-slate-200'
                       }
                       ${isFocused ? 'bg-cyan-500/20' : ''}
                     `}
                     whileHover={!item.disabled ? { x: 2 } : undefined}
                   >
                     {item.icon && (
-                      <span className={`w-4 h-4 flex items-center justify-center ${item.danger ? 'text-red-500' : 'text-cyan-500'}`}>
+                      <span
+                        className={`w-4 h-4 flex items-center justify-center ${item.danger ? 'text-red-500' : 'text-cyan-500'}`}
+                      >
                         {item.icon}
                       </span>
                     )}
@@ -239,4 +247,3 @@ export function GlassContextMenu() {
     document.body
   );
 }
-

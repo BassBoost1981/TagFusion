@@ -9,13 +9,7 @@ interface CardProps {
   onClick?: () => void;
 }
 
-export function Card({
-  children,
-  variant = 'default',
-  padding = 'md',
-  className = '',
-  onClick,
-}: CardProps) {
+export function Card({ children, variant = 'default', padding = 'md', className = '', onClick }: CardProps) {
   const baseStyles = 'rounded-xl';
 
   const variantStyles = {
@@ -45,12 +39,8 @@ export function Card({
   }
 
   return (
-    <div
-      className={`${baseStyles} ${variantStyles[variant]} ${paddings[padding]} ${className}`}
-      onClick={onClick}
-    >
+    <div className={`${baseStyles} ${variantStyles[variant]} ${paddings[padding]} ${className}`} onClick={onClick}>
       {children}
     </div>
   );
 }
-

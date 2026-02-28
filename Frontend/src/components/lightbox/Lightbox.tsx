@@ -1,8 +1,19 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  RotateCcw, RotateCw, Star, Tag, Info, FlipHorizontal, FlipVertical, Film
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  RotateCw,
+  Star,
+  Tag,
+  Info,
+  FlipHorizontal,
+  FlipVertical,
+  Film,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLightboxStore } from '../../stores/lightboxStore';
@@ -13,8 +24,19 @@ import { GlassIconButton as GlassIconButtonBase } from '../ui/glass';
 
 export function Lightbox() {
   const {
-    isOpen, currentImage, currentIndex, images, zoomLevel,
-    close, next, previous, zoomIn, zoomOut, resetZoom, setZoom, goToIndex
+    isOpen,
+    currentImage,
+    currentIndex,
+    images,
+    zoomLevel,
+    close,
+    next,
+    previous,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    setZoom,
+    goToIndex,
   } = useLightboxStore();
   const { refreshImages } = useAppStore();
   const setError = useSetError();
@@ -51,14 +73,15 @@ export function Lightbox() {
     }
   }, [zoomLevel]);
 
-  // Load full resolution image
+  // Load full resolution image — intentionally depends only on path, not the full object
   useEffect(() => {
     if (isOpen && currentImage) {
       setIsLoading(true);
       setFullImage(null);
 
       // Load full image via bridge
-      bridge.getFullImage(currentImage.path)
+      bridge
+        .getFullImage(currentImage.path)
         .then((base64) => {
           setFullImage(base64);
           setIsLoading(false);
@@ -70,22 +93,20 @@ export function Lightbox() {
           setIsLoading(false);
         });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentImage?.path]);
 
   // Preload adjacent images for instant navigation
   useEffect(() => {
     if (!isOpen || images.length <= 1) return;
 
-    const preloadIndices = [
-      currentIndex - 1,
-      currentIndex + 1
-    ].filter(i => i >= 0 && i < images.length);
+    const preloadIndices = [currentIndex - 1, currentIndex + 1].filter((i) => i >= 0 && i < images.length);
 
-    preloadIndices.forEach(idx => {
+    preloadIndices.forEach((idx) => {
       const img = images[idx];
       if (img?.path) {
         // Preload in background (result is cached by backend)
-        bridge.getFullImage(img.path).catch(() => { });
+        bridge.getFullImage(img.path).catch(() => {});
       }
     });
   }, [isOpen, currentIndex, images]);
@@ -102,73 +123,88 @@ export function Lightbox() {
   }, [currentIndex, showFilmstrip]);
 
   // Scroll-wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const delta = e.deltaY > 0 ? -10 : 10;
-    const newZoom = zoomLevel + delta;
-    setZoom(newZoom);
-  }, [zoomLevel, setZoom]);
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -10 : 10;
+      const newZoom = zoomLevel + delta;
+      setZoom(newZoom);
+    },
+    [zoomLevel, setZoom]
+  );
 
   // Drag-to-pan handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!isZoomed) return;
-    e.preventDefault();
-    setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, panX, panY };
-  }, [isZoomed, panX, panY]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isZoomed) return;
+      e.preventDefault();
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY, panX, panY };
+    },
+    [isZoomed, panX, panY]
+  );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPanX(dragStart.current.panX + dx);
-    setPanY(dragStart.current.panY + dy);
-  }, [isDragging]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPanX(dragStart.current.panX + dx);
+      setPanY(dragStart.current.panY + dy);
+    },
+    [isDragging]
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   // Double-click to toggle fit ↔ 100%
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (zoomLevel === LIGHTBOX_ZOOM_DEFAULT) {
-      setZoom(200);
-    } else {
-      resetZoom();
-    }
-  }, [zoomLevel, setZoom, resetZoom]);
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (zoomLevel === LIGHTBOX_ZOOM_DEFAULT) {
+        setZoom(200);
+      } else {
+        resetZoom();
+      }
+    },
+    [zoomLevel, setZoom, resetZoom]
+  );
 
   // Keyboard navigation
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isOpen) return;
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isOpen) return;
 
-    switch (e.key) {
-      case 'Escape':
-        close();
-        break;
-      case 'ArrowLeft':
-        previous();
-        break;
-      case 'ArrowRight':
-        next();
-        break;
-      case '+':
-      case '=':
-        zoomIn();
-        break;
-      case '-':
-        zoomOut();
-        break;
-      case '0':
-        resetZoom();
-        break;
-      case 'i':
-        setShowInfo(prev => !prev);
-        break;
-    }
-  }, [isOpen, close, next, previous, zoomIn, zoomOut, resetZoom]);
+      switch (e.key) {
+        case 'Escape':
+          close();
+          break;
+        case 'ArrowLeft':
+          previous();
+          break;
+        case 'ArrowRight':
+          next();
+          break;
+        case '+':
+        case '=':
+          zoomIn();
+          break;
+        case '-':
+          zoomOut();
+          break;
+        case '0':
+          resetZoom();
+          break;
+        case 'i':
+          setShowInfo((prev) => !prev);
+          break;
+      }
+    },
+    [isOpen, close, next, previous, zoomIn, zoomOut, resetZoom]
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -279,13 +315,13 @@ export function Lightbox() {
               className="w-full h-full object-contain select-none"
               style={{
                 transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel / 100})`,
-                opacity: (isLoading || isProcessing) ? 0.3 : 1,
+                opacity: isLoading || isProcessing ? 0.3 : 1,
                 filter: isProcessing ? 'blur(2px)' : 'none',
                 transition: isDragging ? 'none' : 'transform 0.15s ease-out',
               }}
               draggable={false}
               initial={{ opacity: 0 }}
-              animate={{ opacity: (isLoading || isProcessing) ? 0.3 : 1 }}
+              animate={{ opacity: isLoading || isProcessing ? 0.3 : 1 }}
             />
           </motion.div>
 
@@ -320,7 +356,10 @@ export function Lightbox() {
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -20, opacity: 0 }}
-                onClick={(e) => { e.stopPropagation(); previous(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  previous();
+                }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full transition-all hover:scale-110"
                 style={{
                   background: 'rgba(255,255,255,0.1)',
@@ -338,7 +377,10 @@ export function Lightbox() {
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 20, opacity: 0 }}
-                onClick={(e) => { e.stopPropagation(); next(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  next();
+                }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full transition-all hover:scale-110"
                 style={{
                   background: 'rgba(255,255,255,0.1)',
@@ -386,10 +428,7 @@ export function Lightbox() {
                       className={`
                         flex-shrink-0 rounded overflow-hidden transition-all duration-150
                         outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
-                        ${isActive
-                          ? 'ring-2 ring-cyan-400 opacity-100 brightness-110'
-                          : 'opacity-40 hover:opacity-75'
-                        }
+                        ${isActive ? 'ring-2 ring-cyan-400 opacity-100 brightness-110' : 'opacity-40 hover:opacity-75'}
                       `}
                       style={{ width: 56, height: 40 }}
                     >
@@ -469,30 +508,46 @@ export function Lightbox() {
 
               {/* Controls */}
               <div className="flex items-center gap-2">
-                <GlassIconButton onClick={() => setShowFilmstrip(p => !p)} title={t('lightbox.filmstrip')}>
+                <GlassIconButton onClick={() => setShowFilmstrip((p) => !p)} title={t('lightbox.filmstrip')}>
                   <Film size={18} className={showFilmstrip ? 'text-cyan-400' : ''} />
                 </GlassIconButton>
-                <GlassIconButton onClick={() => setShowInfo(p => !p)} title={t('lightbox.info')}>
+                <GlassIconButton onClick={() => setShowInfo((p) => !p)} title={t('lightbox.info')}>
                   <Info size={18} className={showInfo ? 'text-cyan-400' : ''} />
                 </GlassIconButton>
 
                 <div className="w-px h-6 bg-white/20 mx-2" />
 
                 {/* Rotate Controls */}
-                <GlassIconButton onClick={() => handleRotate(-90)} title={t('lightbox.rotateLeft')} disabled={isProcessing}>
+                <GlassIconButton
+                  onClick={() => handleRotate(-90)}
+                  title={t('lightbox.rotateLeft')}
+                  disabled={isProcessing}
+                >
                   <RotateCcw size={18} />
                 </GlassIconButton>
-                <GlassIconButton onClick={() => handleRotate(90)} title={t('lightbox.rotateRight')} disabled={isProcessing}>
+                <GlassIconButton
+                  onClick={() => handleRotate(90)}
+                  title={t('lightbox.rotateRight')}
+                  disabled={isProcessing}
+                >
                   <RotateCw size={18} />
                 </GlassIconButton>
 
                 <div className="w-px h-6 bg-white/20 mx-1" />
 
                 {/* Flip Controls */}
-                <GlassIconButton onClick={() => handleFlip(true)} title={t('lightbox.flipHorizontal')} disabled={isProcessing}>
+                <GlassIconButton
+                  onClick={() => handleFlip(true)}
+                  title={t('lightbox.flipHorizontal')}
+                  disabled={isProcessing}
+                >
                   <FlipHorizontal size={18} />
                 </GlassIconButton>
-                <GlassIconButton onClick={() => handleFlip(false)} title={t('lightbox.flipVertical')} disabled={isProcessing}>
+                <GlassIconButton
+                  onClick={() => handleFlip(false)}
+                  title={t('lightbox.flipVertical')}
+                  disabled={isProcessing}
+                >
                   <FlipVertical size={18} />
                 </GlassIconButton>
 
@@ -520,7 +575,7 @@ function GlassIconButton({
   children,
   onClick,
   title,
-  disabled = false
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
@@ -540,4 +595,3 @@ function GlassIconButton({
     </GlassIconButtonBase>
   );
 }
-

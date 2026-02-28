@@ -39,19 +39,7 @@ const iconPosition = {
 };
 
 export const GlassInput = forwardRef<HTMLInputElement, GlassInputProps>(
-  (
-    {
-      className = '',
-      size = 'md',
-      leftIcon,
-      rightIcon,
-      error = false,
-      fullWidth = false,
-      disabled,
-      ...props
-    },
-    ref
-  ) => {
+  ({ className = '', size = 'md', leftIcon, rightIcon, error = false, fullWidth = false, disabled, ...props }, ref) => {
     return (
       <motion.div
         className={`relative ${fullWidth ? 'w-full' : 'inline-flex'}`}
@@ -84,9 +72,10 @@ export const GlassInput = forwardRef<HTMLInputElement, GlassInputProps>(
             backdrop-blur-glass-sm
             bg-[var(--glass-bg)]
             border
-            ${error
-              ? 'border-red-500/50 focus-visible:border-red-500/70 focus-visible:ring-red-500/20'
-              : 'border-[var(--glass-border)] focus-visible:border-cyan-500/50 focus-visible:ring-cyan-500/20'
+            ${
+              error
+                ? 'border-red-500/50 focus-visible:border-red-500/70 focus-visible:ring-red-500/20'
+                : 'border-[var(--glass-border)] focus-visible:border-cyan-500/50 focus-visible:ring-cyan-500/20'
             }
             text-slate-100
             placeholder:text-slate-500
@@ -119,10 +108,7 @@ export const GlassInput = forwardRef<HTMLInputElement, GlassInputProps>(
             absolute inset-0 rounded-lg pointer-events-none
             opacity-0 focus-within:opacity-100
             transition-opacity duration-200
-            ${error
-              ? 'shadow-[0_0_0_2px_rgba(239,68,68,0.15)]'
-              : 'shadow-[0_0_0_2px_rgba(6,182,212,0.15)]'
-            }
+            ${error ? 'shadow-[0_0_0_2px_rgba(239,68,68,0.15)]' : 'shadow-[0_0_0_2px_rgba(6,182,212,0.15)]'}
           `}
         />
       </motion.div>
@@ -131,4 +117,3 @@ export const GlassInput = forwardRef<HTMLInputElement, GlassInputProps>(
 );
 
 GlassInput.displayName = 'GlassInput';
-

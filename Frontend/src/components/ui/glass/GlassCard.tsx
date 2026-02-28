@@ -87,11 +87,11 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
         {...props}
       >
         {/* Specular highlight - top edge */}
-        <div 
+        <div
           className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--glass-specular)] to-transparent opacity-50 pointer-events-none"
           style={{ borderRadius: 'inherit' }}
         />
-        
+
         {/* Content */}
         <div className="relative z-10">{children}</div>
       </motion.div>
@@ -100,4 +100,3 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
 );
 
 GlassCard.displayName = 'GlassCard';
-

@@ -72,12 +72,7 @@ export function RenameModal() {
   };
 
   return (
-    <GlassModal
-      isOpen={isOpen}
-      onClose={closeModal}
-      title="Umbenennen"
-      size="sm"
-    >
+    <GlassModal isOpen={isOpen} onClose={closeModal} title="Umbenennen" size="sm">
       <div className="space-y-4">
         {/* Current file/folder info */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
@@ -100,20 +95,14 @@ export function RenameModal() {
         />
 
         {/* Error message */}
-        {error && (
-          <p className="text-sm text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400">{error}</p>}
 
         {/* Actions */}
         <div className="flex justify-end gap-3">
           <GlassButton variant="ghost" onClick={closeModal} disabled={isLoading}>
             Abbrechen
           </GlassButton>
-          <GlassButton
-            variant="accent"
-            onClick={handleRename}
-            disabled={isLoading || !newName.trim()}
-          >
+          <GlassButton variant="accent" onClick={handleRename} disabled={isLoading || !newName.trim()}>
             {isLoading ? 'Umbenennen...' : 'Umbenennen'}
           </GlassButton>
         </div>

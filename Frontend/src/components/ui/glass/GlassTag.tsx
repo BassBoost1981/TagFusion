@@ -137,9 +137,7 @@ export function GlassTag({
       <span className="truncate">{children}</span>
 
       {/* Count Badge */}
-      {count !== undefined && (
-        <span className="text-[10px] opacity-70 font-medium">{count}</span>
-      )}
+      {count !== undefined && <span className="text-[10px] opacity-70 font-medium">{count}</span>}
 
       {/* Remove Button */}
       {removable && onRemove && (
@@ -158,4 +156,3 @@ export function GlassTag({
     </motion.span>
   );
 }
-

@@ -8,7 +8,7 @@ import {
   useIsLoadingImages,
   useSelectedImages,
   useUpdateImageTags,
-  useNavigateUp
+  useNavigateUp,
 } from '../../stores/appStore';
 import { ImageGrid } from '../images/ImageGrid';
 import { HeroSection } from '../dashboard';
@@ -42,10 +42,10 @@ export function MainContent() {
   const selectedTags = useMemo(() => {
     if (selectedImages.size === 0) return [];
 
-    const selectedImgs = images.filter(img => selectedImages.has(img.path));
+    const selectedImgs = images.filter((img) => selectedImages.has(img.path));
     const tagCounts = new Map<string, number>();
-    selectedImgs.forEach(img => {
-      img.tags?.forEach(tag => {
+    selectedImgs.forEach((img) => {
+      img.tags?.forEach((tag) => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
     });
@@ -93,11 +93,7 @@ export function MainContent() {
             className="flex-1 flex items-center justify-center"
           >
             <div className="flex flex-col items-center gap-4">
-              <Spinner
-                size="lg"
-                color="primary"
-                label={t('common.loadingItems')}
-              />
+              <Spinner size="lg" color="primary" label={t('common.loadingItems')} />
             </div>
           </motion.div>
         ) : gridItems.length === 0 ? (
@@ -116,9 +112,7 @@ export function MainContent() {
               <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-2">
                 {t('emptyState.folderEmpty')}
               </h3>
-              <p className="text-[var(--color-text-muted)] text-sm">
-                {t('emptyState.noImages')}
-              </p>
+              <p className="text-[var(--color-text-muted)] text-sm">{t('emptyState.noImages')}</p>
             </div>
           </motion.div>
         ) : (
@@ -157,9 +151,18 @@ export function MainContent() {
 
                 {/* Stats */}
                 <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] flex-shrink-0 ml-auto">
-                  {gridItems.filter(i => i.isFolder).length > 0 && <span>{gridItems.filter(i => i.isFolder).length} {t('statusBar.folders')}</span>}
-                  {gridItems.filter(i => i.isFolder).length > 0 && gridItems.filter(i => !i.isFolder).length > 0 && <span>•</span>}
-                  {gridItems.filter(i => !i.isFolder).length > 0 && <span>{gridItems.filter(i => !i.isFolder).length} {t('statusBar.images')}</span>}
+                  {gridItems.filter((i) => i.isFolder).length > 0 && (
+                    <span>
+                      {gridItems.filter((i) => i.isFolder).length} {t('statusBar.folders')}
+                    </span>
+                  )}
+                  {gridItems.filter((i) => i.isFolder).length > 0 &&
+                    gridItems.filter((i) => !i.isFolder).length > 0 && <span>•</span>}
+                  {gridItems.filter((i) => !i.isFolder).length > 0 && (
+                    <span>
+                      {gridItems.filter((i) => !i.isFolder).length} {t('statusBar.images')}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -171,9 +174,7 @@ export function MainContent() {
 
             {/* Selected Image Tags Panel */}
             {selectedTags.length > 0 && (
-              <div
-                className="border-t border-[var(--glass-border)] bg-[var(--glass-bg)] overflow-hidden animate-slide-up"
-              >
+              <div className="border-t border-[var(--glass-border)] bg-[var(--glass-bg)] overflow-hidden animate-slide-up">
                 <div className="p-3">
                   <div
                     className="rounded-xl p-3 relative overflow-hidden"
@@ -186,7 +187,10 @@ export function MainContent() {
                     {/* Glass Specular Highlight */}
                     <div
                       className="absolute inset-x-0 top-0 h-[1px]"
-                      style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)' }}
+                      style={{
+                        background:
+                          'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.25) 50%, transparent 100%)',
+                      }}
                     />
                     <div className="flex items-center gap-2 mb-2">
                       <Tag size={14} className="text-cyan-400" />
@@ -202,7 +206,8 @@ export function MainContent() {
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs text-[var(--color-text-primary)] cursor-pointer group/tag
                                      transition-transform duration-200 ease-out hover:scale-105 hover:-translate-y-0.5 active:scale-95"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(6, 182, 212, 0.05) 100%)',
+                            background:
+                              'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(6, 182, 212, 0.05) 100%)',
                             border: '1px solid rgba(6, 182, 212, 0.25)',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
                           }}
@@ -234,4 +239,3 @@ export function MainContent() {
     </div>
   );
 }
-

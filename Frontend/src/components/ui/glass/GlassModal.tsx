@@ -43,19 +43,19 @@ const backdropVariants = {
 };
 
 const modalVariants = {
-  initial: { 
-    opacity: 0, 
+  initial: {
+    opacity: 0,
     scale: 0.9,
     y: 20,
   },
-  animate: { 
-    opacity: 1, 
+  animate: {
+    opacity: 1,
     scale: 1,
     y: 0,
     transition: springBouncy,
   },
-  exit: { 
-    opacity: 0, 
+  exit: {
+    opacity: 0,
     scale: 0.95,
     y: 10,
     transition: { duration: 0.15 },
@@ -75,11 +75,11 @@ export function GlassModal({
   // Handle escape key
   useEffect(() => {
     if (!closeOnEscape || !isOpen) return;
-    
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    
+
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeOnEscape, onClose]);
@@ -109,7 +109,7 @@ export function GlassModal({
             exit="exit"
             onClick={closeOnBackdrop ? onClose : undefined}
           />
-          
+
           {/* Modal */}
           <motion.div
             className={`
@@ -128,35 +128,24 @@ export function GlassModal({
           >
             {/* Specular highlight */}
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            
+
             {/* Header */}
             {(title || showClose) && (
               <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--glass-border)]">
-                {title && (
-                  <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-                )}
+                {title && <h2 className="text-lg font-semibold text-slate-100">{title}</h2>}
                 {showClose && (
-                  <GlassIconButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={onClose}
-                    title="Schließen"
-                    className="ml-auto"
-                  >
+                  <GlassIconButton size="sm" variant="ghost" onClick={onClose} title="Schließen" className="ml-auto">
                     <X size={18} />
                   </GlassIconButton>
                 )}
               </div>
             )}
-            
+
             {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              {children}
-            </div>
+            <div className="p-6 overflow-y-auto max-h-[70vh]">{children}</div>
           </motion.div>
         </div>
       )}
     </AnimatePresence>
   );
 }
-

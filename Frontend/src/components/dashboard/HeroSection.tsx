@@ -33,11 +33,7 @@ export function HeroSection() {
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             className="w-24 h-24 mx-auto mb-8 relative"
           >
-            <img
-              src="/logo.png"
-              alt="TagFusion Logo"
-              className="w-full h-full object-contain"
-            />
+            <img src="/logo.png" alt="TagFusion Logo" className="w-full h-full object-contain" />
           </motion.div>
 
           <motion.h1
@@ -61,23 +57,14 @@ export function HeroSection() {
 
         {/* Drives Section */}
         {drives.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
             <div className="flex items-center gap-3 mb-4">
               <HardDrive size={20} className="text-cyan-400" />
               <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{t('hero.drives')}</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {drives.map((drive, index) => (
-                <DriveCard
-                  key={drive.path}
-                  drive={drive}
-                  onClick={handleDriveClick}
-                  delay={0.6 + index * 0.1}
-                />
+                <DriveCard key={drive.path} drive={drive} onClick={handleDriveClick} delay={0.6 + index * 0.1} />
               ))}
             </div>
           </motion.div>

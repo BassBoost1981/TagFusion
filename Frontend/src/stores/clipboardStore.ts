@@ -30,7 +30,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
     const { items, operation, clear } = get();
     if (!items.length || !operation) return;
 
-    const paths = items.map(i => i.path);
+    const paths = items.map((i) => i.path);
 
     try {
       if (operation === 'copy') {

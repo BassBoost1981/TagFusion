@@ -9,7 +9,7 @@ export interface ImageFile {
   width?: number;
   height?: number;
   tags: string[];
-  rating?: number;  // 0-5 star rating
+  rating?: number; // 0-5 star rating
   thumbnailBase64?: string;
   thumbnailUrl?: string;
   isSelected?: boolean;

@@ -35,4 +35,3 @@ export const TAG_PANEL_WIDTH_MAX = 600;
 export const TOAST_DURATION_DEFAULT = 4000;
 export const TOAST_DURATION_ERROR = 6000;
 export const TOAST_DURATION_WARNING = 5000;
-

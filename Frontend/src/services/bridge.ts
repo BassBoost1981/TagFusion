@@ -1,16 +1,25 @@
-import type { BridgeMessage, BridgeResponse, BridgeEvent, ImageFile, FolderItem, Tag, GridItem, TagLibrary } from '../types';
+import type {
+  BridgeMessage,
+  BridgeResponse,
+  BridgeEvent,
+  ImageFile,
+  FolderItem,
+  Tag,
+  GridItem,
+  TagLibrary,
+} from '../types';
 
 type EventCallback = (data: unknown) => void;
 
 const isDev = import.meta.env.DEV;
 
 /** Debug-only logger — calls are no-ops in production builds */
-const log = isDev
-  ? (...args: unknown[]) => console.log('[Bridge]', ...args)
-  : () => {};
+// eslint-disable-next-line no-console
+const log = isDev ? (...args: unknown[]) => console.log('[Bridge]', ...args) : () => {};
 
 class BridgeService {
-  private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }> = new Map();
+  private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }> =
+    new Map();
   private eventListeners: Map<string, Set<EventCallback>> = new Map();
   private isWebView: boolean;
 
@@ -56,7 +65,7 @@ class BridgeService {
         const event = parsed as BridgeEvent;
         const listeners = this.eventListeners.get(event.event);
         if (listeners) {
-          listeners.forEach(callback => callback(event.data));
+          listeners.forEach((callback) => callback(event.data));
         }
       } else {
         log('Unhandled - id not in pending:', parsed.id);
@@ -218,16 +227,34 @@ class BridgeService {
       case 'getDrives':
         return [
           {
-            name: 'Lokaler Datenträger (C:)', path: 'C:\\', type: 'Drive', hasSubfolders: true,
-            totalSize: 500 * 1024 ** 3, freeSpace: 200 * 1024 ** 3, driveFormat: 'NTFS', driveType: 'Fixed'
+            name: 'Lokaler Datenträger (C:)',
+            path: 'C:\\',
+            type: 'Drive',
+            hasSubfolders: true,
+            totalSize: 500 * 1024 ** 3,
+            freeSpace: 200 * 1024 ** 3,
+            driveFormat: 'NTFS',
+            driveType: 'Fixed',
           },
           {
-            name: 'Daten (D:)', path: 'D:\\', type: 'Drive', hasSubfolders: true,
-            totalSize: 2000 * 1024 ** 3, freeSpace: 1500 * 1024 ** 3, driveFormat: 'NTFS', driveType: 'Fixed'
+            name: 'Daten (D:)',
+            path: 'D:\\',
+            type: 'Drive',
+            hasSubfolders: true,
+            totalSize: 2000 * 1024 ** 3,
+            freeSpace: 1500 * 1024 ** 3,
+            driveFormat: 'NTFS',
+            driveType: 'Fixed',
           },
           {
-            name: 'Backup (E:)', path: 'E:\\', type: 'Drive', hasSubfolders: true,
-            totalSize: 4000 * 1024 ** 3, freeSpace: 500 * 1024 ** 3, driveFormat: 'NTFS', driveType: 'Fixed'
+            name: 'Backup (E:)',
+            path: 'E:\\',
+            type: 'Drive',
+            hasSubfolders: true,
+            totalSize: 4000 * 1024 ** 3,
+            freeSpace: 500 * 1024 ** 3,
+            driveFormat: 'NTFS',
+            driveType: 'Fixed',
           },
         ];
       case 'getFolders':
@@ -253,4 +280,3 @@ class BridgeService {
 }
 
 export const bridge = new BridgeService();
-

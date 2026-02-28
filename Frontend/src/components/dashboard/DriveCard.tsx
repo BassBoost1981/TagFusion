@@ -11,8 +11,8 @@ interface DriveCardProps {
 
 export function DriveCard({ drive, onClick, delay = 0 }: DriveCardProps) {
   const { t } = useTranslation();
-  const totalGB = drive.totalSize ? drive.totalSize / (1024 ** 3) : 0;
-  const freeGB = drive.freeSpace ? drive.freeSpace / (1024 ** 3) : 0;
+  const totalGB = drive.totalSize ? drive.totalSize / 1024 ** 3 : 0;
+  const freeGB = drive.freeSpace ? drive.freeSpace / 1024 ** 3 : 0;
   const usedGB = totalGB - freeGB;
   const usagePercent = totalGB > 0 ? (usedGB / totalGB) * 100 : 0;
 
@@ -39,7 +39,7 @@ export function DriveCard({ drive, onClick, delay = 0 }: DriveCardProps) {
   };
 
   const formatSize = (bytes: number) => {
-    const gb = bytes / (1024 ** 3);
+    const gb = bytes / 1024 ** 3;
     if (gb >= 1000) {
       return `${(gb / 1024).toFixed(2)} TB`;
     }
@@ -62,10 +62,7 @@ export function DriveCard({ drive, onClick, delay = 0 }: DriveCardProps) {
       }}
     >
       {/* Glass Specular Highlight */}
-      <div
-        className="absolute inset-x-0 top-0 h-[1px]"
-        style={{ background: 'var(--glass-specular)' }}
-      />
+      <div className="absolute inset-x-0 top-0 h-[1px]" style={{ background: 'var(--glass-specular)' }} />
       <div className="flex items-start gap-4">
         {/* Drive Icon */}
         <div className="p-2 rounded-lg bg-[var(--color-cyan-subtle)] group-hover:bg-cyan-500/20 transition-colors">
@@ -94,11 +91,11 @@ export function DriveCard({ drive, onClick, delay = 0 }: DriveCardProps) {
 
           {/* Size Info */}
           <p className="text-xs text-[var(--color-text-secondary)]">
-            <span className="text-[var(--color-text-primary)]">{formatSize(drive.freeSpace || 0)}</span> {t('hero.freeOf')} {formatSize(drive.totalSize || 0)}
+            <span className="text-[var(--color-text-primary)]">{formatSize(drive.freeSpace || 0)}</span>{' '}
+            {t('hero.freeOf')} {formatSize(drive.totalSize || 0)}
           </p>
         </div>
       </div>
     </motion.button>
   );
 }
-

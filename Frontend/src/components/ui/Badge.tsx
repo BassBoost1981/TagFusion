@@ -10,13 +10,7 @@ interface BadgeProps {
   onRemove?: () => void;
 }
 
-export function Badge({
-  children,
-  variant = 'default',
-  size = 'md',
-  removable,
-  onRemove,
-}: BadgeProps) {
+export function Badge({ children, variant = 'default', size = 'md', removable, onRemove }: BadgeProps) {
   const variants = {
     default: 'bg-slate-700/50 text-slate-300',
     primary: 'bg-indigo-500/20 text-indigo-300',
@@ -42,14 +36,10 @@ export function Badge({
     >
       {children}
       {removable && (
-        <button
-          onClick={onRemove}
-          className="ml-0.5 hover:bg-white/10 rounded-full p-0.5 transition-colors"
-        >
+        <button onClick={onRemove} className="ml-0.5 hover:bg-white/10 rounded-full p-0.5 transition-colors">
           <X size={size === 'sm' ? 12 : 14} />
         </button>
       )}
     </motion.span>
   );
 }
-

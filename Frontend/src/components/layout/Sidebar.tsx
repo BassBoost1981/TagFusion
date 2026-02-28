@@ -3,7 +3,13 @@ import { Collapsible } from '@base-ui-components/react/collapsible';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion } from 'framer-motion';
 import { HardDrive, FolderClosed, ChevronDown, FolderOpen, Loader2, Star, Plus, X, Monitor } from 'lucide-react';
-import { useSidebarState, useCurrentFolder, useLoadImages, useNavigateToFolder, useAddCurrentFolderToFavorites } from '../../stores/appStore';
+import {
+  useSidebarState,
+  useCurrentFolder,
+  useLoadImages,
+  useNavigateToFolder,
+  useAddCurrentFolderToFavorites,
+} from '../../stores/appStore';
 import type { FolderItem } from '../../types';
 import { GlassIconButton } from '../ui/glass';
 import { Skeleton } from '../ui/Skeleton';
@@ -12,7 +18,19 @@ import { SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX } from '../../constants/ui';
 
 export function Sidebar() {
   const { t } = useTranslation();
-  const { drives, favorites, expandedPaths, folderCache, loadingPaths, sidebarWidth, isLoadingDrives, setSidebarWidth, loadDrives, toggleFolder, removeFavorite } = useSidebarState();
+  const {
+    drives,
+    favorites,
+    expandedPaths,
+    folderCache,
+    loadingPaths,
+    sidebarWidth,
+    isLoadingDrives,
+    setSidebarWidth,
+    loadDrives,
+    toggleFolder,
+    removeFavorite,
+  } = useSidebarState();
   const currentFolder = useCurrentFolder();
   const loadImages = useLoadImages();
   const navigateToFolder = useNavigateToFolder();
@@ -25,28 +43,31 @@ export function Sidebar() {
   }, [loadDrives]);
 
   // Handle resize (drag right edge)
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
 
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const diff = e.clientX - startX;
-      const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, startWidth + diff));
-      setSidebarWidth(newWidth);
-    };
+      const handleMouseMove = (e: MouseEvent) => {
+        const diff = e.clientX - startX;
+        const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, startWidth + diff));
+        setSidebarWidth(newWidth);
+      };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+      const handleMouseUp = () => {
+        setIsResizing(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [sidebarWidth, setSidebarWidth]);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [sidebarWidth, setSidebarWidth]
+  );
 
   return (
     <aside
@@ -69,9 +90,7 @@ export function Sidebar() {
         <div className="flex items-center justify-between px-2 py-1.5">
           <div className="flex items-center gap-2">
             <Star size={14} className="text-cyan-400" />
-            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-              {t('sidebar.favorites')}
-            </h3>
+            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">{t('sidebar.favorites')}</h3>
           </div>
           <GlassIconButton
             onClick={addCurrentFolderToFavorites}
@@ -95,9 +114,7 @@ export function Sidebar() {
             />
           ))}
           {favorites.length === 0 && (
-            <li className="px-2 py-2 text-xs text-[var(--color-text-muted)] italic">
-              {t('sidebar.noFavorites')}
-            </li>
+            <li className="px-2 py-2 text-xs text-[var(--color-text-muted)] italic">{t('sidebar.noFavorites')}</li>
           )}
         </ul>
       </div>
@@ -149,7 +166,10 @@ export function Sidebar() {
             </ul>
           </div>
         </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar orientation="vertical" className="w-2 p-0.5 flex touch-none select-none transition-colors bg-transparent hover:bg-white/5">
+        <ScrollArea.Scrollbar
+          orientation="vertical"
+          className="w-2 p-0.5 flex touch-none select-none transition-colors bg-transparent hover:bg-white/5"
+        >
           <ScrollArea.Thumb className="flex-1 rounded-full bg-cyan-500/30 hover:bg-cyan-500/50 transition-colors" />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
@@ -177,9 +197,10 @@ function FavoriteItem({ path, name, isActive, onSelect, onRemove }: FavoriteItem
       className={`
         group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm
         transition-colors duration-150
-        ${isActive
-          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-          : 'text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--color-text-primary)] border border-transparent'
+        ${
+          isActive
+            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+            : 'text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--color-text-primary)] border border-transparent'
         }
       `}
       onClick={() => onSelect(path)}
@@ -226,7 +247,7 @@ function TreeNode({
   folderCache,
   loadingPaths,
   onToggle,
-  onSelect
+  onSelect,
 }: TreeNodeProps) {
   const itemRef = useRef<HTMLDivElement>(null);
   const isExpanded = expandedPaths.has(item.path);
@@ -335,9 +356,10 @@ function TreeNode({
             flex items-center gap-1 py-1.5 px-2 rounded-lg cursor-pointer text-sm
             transition-colors duration-150 outline-none
             focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent
-            ${isActive
-              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-              : 'text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--color-text-primary)] border border-transparent'
+            ${
+              isActive
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                : 'text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--color-text-primary)] border border-transparent'
             }
           `}
           style={{ paddingLeft: `calc(var(--sidebar-indent-base) + ${level} * var(--sidebar-indent-step))` }}
@@ -365,10 +387,7 @@ function TreeNode({
             {isLoading ? (
               <Loader2 size={12} className="text-[var(--color-text-secondary)] animate-spin" />
             ) : item.hasSubfolders ? (
-              <motion.div
-                animate={{ rotateZ: isExpanded ? 0 : -90 }}
-                transition={{ duration: 0.2 }}
-              >
+              <motion.div animate={{ rotateZ: isExpanded ? 0 : -90 }} transition={{ duration: 0.2 }}>
                 <ChevronDown size={14} className="text-[var(--color-text-secondary)]" />
               </motion.div>
             ) : (
@@ -407,4 +426,3 @@ function TreeNode({
     </Collapsible.Root>
   );
 }
-

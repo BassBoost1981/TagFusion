@@ -27,11 +27,7 @@ export function calculateTilt(
  * @param depth - Depth factor (higher = more movement)
  * @returns Object with x and y offset values
  */
-export function calculateParallax(
-  mouseX: number,
-  mouseY: number,
-  depth: number = 10
-): { x: number; y: number } {
+export function calculateParallax(mouseX: number, mouseY: number, depth: number = 10): { x: number; y: number } {
   const x = (mouseX - 0.5) * depth;
   const y = (mouseY - 0.5) * depth;
   return { x, y };
@@ -60,10 +56,7 @@ export function generate3DTransform(
  * @param color - Shadow color (defaults to black)
  * @returns CSS box-shadow string
  */
-export function getDepthShadow(
-  depth: 'near' | 'mid' | 'far',
-  color: string = '0,0,0'
-): string {
+export function getDepthShadow(depth: 'near' | 'mid' | 'far', color: string = '0,0,0'): string {
   const shadows = {
     near: `0 8px 32px rgba(${color},0.3), 0 2px 8px rgba(${color},0.2)`,
     mid: `0 4px 16px rgba(${color},0.2), 0 1px 4px rgba(${color},0.15)`,
@@ -78,10 +71,7 @@ export function getDepthShadow(
  * @param intensity - Glow intensity (0-1)
  * @returns CSS box-shadow string
  */
-export function getGlowEffect(
-  color: 'cyan' | 'purple' | 'pink',
-  intensity: number = 0.4
-): string {
+export function getGlowEffect(color: 'cyan' | 'purple' | 'pink', intensity: number = 0.4): string {
   const colors = {
     cyan: `6,182,212`,
     purple: `139,92,246`,

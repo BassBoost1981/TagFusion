@@ -21,11 +21,7 @@ export function DeleteConfirmModal() {
 
     try {
       await bridge.deleteFiles(deleteData.paths);
-      useToastStore.getState().success(
-        count === 1
-          ? 'Element wurde gelöscht'
-          : `${count} Elemente wurden gelöscht`
-      );
+      useToastStore.getState().success(count === 1 ? 'Element wurde gelöscht' : `${count} Elemente wurden gelöscht`);
       closeModal();
       // Refresh the view
       window.location.reload();
@@ -40,12 +36,7 @@ export function DeleteConfirmModal() {
   const count = deleteData?.paths.length || 0;
 
   return (
-    <GlassModal
-      isOpen={isOpen}
-      onClose={closeModal}
-      title="Löschen bestätigen"
-      size="sm"
-    >
+    <GlassModal isOpen={isOpen} onClose={closeModal} title="Löschen bestätigen" size="sm">
       <div className="space-y-4">
         {/* Warning icon */}
         <div className="flex justify-center">
@@ -59,12 +50,9 @@ export function DeleteConfirmModal() {
           <p className="text-slate-200">
             {count === 1
               ? 'Möchtest du dieses Element wirklich löschen?'
-              : `Möchtest du diese ${count} Elemente wirklich löschen?`
-            }
+              : `Möchtest du diese ${count} Elemente wirklich löschen?`}
           </p>
-          <p className="text-sm text-slate-400 mt-2">
-            Die Elemente werden in den Papierkorb verschoben.
-          </p>
+          <p className="text-sm text-slate-400 mt-2">Die Elemente werden in den Papierkorb verschoben.</p>
         </div>
 
         {/* File list (if multiple) */}
@@ -79,9 +67,7 @@ export function DeleteConfirmModal() {
         )}
 
         {/* Error message */}
-        {error && (
-          <p className="text-sm text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
         {/* Actions */}
         <div className="flex justify-center gap-3">

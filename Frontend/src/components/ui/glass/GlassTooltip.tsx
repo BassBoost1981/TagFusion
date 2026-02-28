@@ -29,13 +29,7 @@ const positionClasses = {
   right: 'left-full top-1/2 -translate-y-1/2 ml-2',
 };
 
-export function GlassTooltip({
-  content,
-  children,
-  side = 'top',
-  delay = 300,
-  disabled = false,
-}: GlassTooltipProps) {
+export function GlassTooltip({ content, children, side = 'top', delay = 300, disabled = false }: GlassTooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,4 +78,3 @@ export function GlassTooltip({
     </div>
   );
 }
-
