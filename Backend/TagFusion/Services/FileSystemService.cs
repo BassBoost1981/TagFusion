@@ -106,50 +106,54 @@ public class FileSystemService
     }
 
     /// <summary>
-    /// Get images from a folder (with tags and rating from EXIF)
+    /// Get images from a folder (with tags and rating from EXIF).
+    /// Runs file I/O on a background thread to avoid blocking the UI.
     /// </summary>
     public Task<List<ImageFile>> GetImagesAsync(string folderPath, CancellationToken cancellationToken = default)
     {
-        var images = new List<ImageFile>();
-
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
-            return Task.FromResult(images);
+            return Task.FromResult(new List<ImageFile>());
 
-        try
+        return Task.Run(() =>
         {
-            var files = Directory.GetFiles(folderPath)
-                .Where(f => _supportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .ToList();
-
-            // Create image objects with thumbnails
-            foreach (var file in files)
+            var images = new List<ImageFile>();
+            try
             {
-                try
+                var files = Directory.GetFiles(folderPath)
+                    .Where(f => _supportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .ToList();
+
+                foreach (var file in files)
                 {
-                    var fileInfo = new FileInfo(file);
-                    images.Add(new ImageFile
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
                     {
-                        Path = file,
-                        FileName = fileInfo.Name,
-                        Extension = fileInfo.Extension.ToLowerInvariant(),
-                        FileSize = fileInfo.Length,
-                        DateModified = fileInfo.LastWriteTime,
-                        DateCreated = fileInfo.CreationTime,
-                        ThumbnailUrl = _thumbnailService.GetThumbnailUrl(file)
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[FileSystem] Skipping inaccessible file: {ex.Message}");
+                        var fileInfo = new FileInfo(file);
+                        images.Add(new ImageFile
+                        {
+                            Path = file,
+                            FileName = fileInfo.Name,
+                            Extension = fileInfo.Extension.ToLowerInvariant(),
+                            FileSize = fileInfo.Length,
+                            DateModified = fileInfo.LastWriteTime,
+                            DateCreated = fileInfo.CreationTime,
+                            ThumbnailUrl = _thumbnailService.GetThumbnailUrl(file)
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[FileSystem] Skipping inaccessible file: {ex.Message}");
+                    }
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[FileSystem] Access denied reading images: {ex.Message}");
-        }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FileSystem] Access denied reading images: {ex.Message}");
+            }
 
-        return Task.FromResult(images.OrderBy(i => i.FileName, StringComparer.OrdinalIgnoreCase).ToList());
+            return images.OrderBy(i => i.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+        }, cancellationToken);
     }
 
     /// <summary>

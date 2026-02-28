@@ -2,6 +2,13 @@ import type { BridgeMessage, BridgeResponse, BridgeEvent, ImageFile, FolderItem,
 
 type EventCallback = (data: unknown) => void;
 
+const isDev = import.meta.env.DEV;
+
+/** Debug-only logger — calls are no-ops in production builds */
+const log = isDev
+  ? (...args: unknown[]) => console.log('[Bridge]', ...args)
+  : () => {};
+
 class BridgeService {
   private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }> = new Map();
   private eventListeners: Map<string, Set<EventCallback>> = new Map();
@@ -9,11 +16,11 @@ class BridgeService {
 
   constructor() {
     this.isWebView = typeof window !== 'undefined' && !!window.chrome?.webview;
-    console.log('[Bridge] isWebView:', this.isWebView);
+    log('isWebView:', this.isWebView);
 
     if (this.isWebView) {
       window.chrome!.webview!.addEventListener('message', (event) => {
-        console.log('[Bridge] Received message:', event.data);
+        log('Received message:', event.data);
         this.handleMessage(event.data);
       });
     }
@@ -27,8 +34,8 @@ class BridgeService {
     try {
       // PostWebMessageAsJson sends already-parsed objects, not strings
       const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-      console.log('[Bridge] Parsed message:', JSON.stringify(parsed, null, 2));
-      console.log('[Bridge] Message id:', parsed.id, 'Pending IDs:', Array.from(this.pendingRequests.keys()));
+      log('Parsed message:', JSON.stringify(parsed, null, 2));
+      log('Message id:', parsed.id, 'Pending IDs:', Array.from(this.pendingRequests.keys()));
 
       // Check if it's a response to a pending request
       if (parsed.id && this.pendingRequests.has(parsed.id)) {
@@ -36,7 +43,7 @@ class BridgeService {
         this.pendingRequests.delete(parsed.id);
 
         const response = parsed as BridgeResponse;
-        console.log('[Bridge] Response for id:', parsed.id, 'success:', response.success);
+        log('Response for id:', parsed.id, 'success:', response.success);
         if (response.success) {
           resolve(response.data);
         } else {
@@ -51,7 +58,7 @@ class BridgeService {
           listeners.forEach(callback => callback(event.data));
         }
       } else {
-        console.log('[Bridge] Unhandled - id not in pending:', parsed.id);
+        log('Unhandled - id not in pending:', parsed.id);
       }
     } catch (error) {
       console.error('Failed to parse bridge message:', error);
@@ -61,11 +68,11 @@ class BridgeService {
   private async send<T>(action: string, payload?: Record<string, unknown>): Promise<T> {
     const id = this.generateId();
     const message: BridgeMessage = { id, action, payload };
-    console.log('[Bridge] Sending:', action, 'id:', id);
+    log('Sending:', action, 'id:', id);
 
     return new Promise((resolve, reject) => {
       if (!this.isWebView) {
-        console.log('[Bridge] Using mock response for:', action);
+        log('Using mock response for:', action);
         // Mock responses for development
         setTimeout(() => {
           resolve(this.getMockResponse(action, payload) as T);
@@ -75,7 +82,7 @@ class BridgeService {
 
       this.pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject });
       const msgStr = JSON.stringify(message);
-      console.log('[Bridge] Posting to WebView:', msgStr);
+      log('Posting to WebView:', msgStr);
       window.chrome!.webview!.postMessage(msgStr);
 
       // Timeout after 120 seconds (increased from 30s for slow network drives)
