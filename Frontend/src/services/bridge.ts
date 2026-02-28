@@ -27,7 +27,8 @@ class BridgeService {
   }
 
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const random = crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
+    return `${Date.now()}-${random}`;
   }
 
   private handleMessage(data: unknown): void {

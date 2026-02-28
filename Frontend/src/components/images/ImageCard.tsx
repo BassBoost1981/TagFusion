@@ -1,15 +1,14 @@
-import { useState, useEffect, memo } from 'react';
+import { useEffect, memo } from 'react';
 import { Check, Tag } from 'lucide-react';
 import { Card, CardFooter } from '@heroui/react';
-import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../../stores/appStore';
 import { useLightboxStore } from '../../stores/lightboxStore';
-import { useToastStore } from '../../stores/toastStore';
 import type { ImageFile } from '../../types';
 import { ImageThumbnail } from './ImageThumbnail';
 import { StarRating } from './StarRating';
 import { useImageContextMenu } from './useImageContextMenu';
 import { useThumbnail, requestThumbnail } from '../../hooks/useThumbnailManager';
+import { useImageRating } from '../../hooks/useImageRating';
 
 interface ImageCardProps {
   image: ImageFile;
@@ -19,25 +18,17 @@ interface ImageCardProps {
 }
 
 export const ImageCard = memo(function ImageCard({ image, thumbnailSize, allImages = [], isSelected: isSelectedProp }: ImageCardProps) {
-  const { t } = useTranslation();
   const selectImage = useAppStore((s) => s.selectImage);
-  const updateImageRating = useAppStore((s) => s.updateImageRating);
   const storeImages = useAppStore((s) => s.images);
   const openLightbox = useLightboxStore((s) => s.open);
   const [thumbnail, isLoading] = useThumbnail(image.path, image.thumbnailBase64);
-  const [rating, setRating] = useState(image.rating || 0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { rating, isSaving, handleRate: handleRating, handleClear: handleClearRating } = useImageRating(image.path, image.rating || 0);
 
   // Use prop if provided, otherwise fall back to store lookup
   const selectedImages = useAppStore((s) => isSelectedProp === undefined ? s.selectedImages : null);
   const isSelected = isSelectedProp ?? selectedImages?.has(image.path) ?? false;
   const tagCount = image.tags?.length || 0;
   const handleContextMenu = useImageContextMenu({ image, allImages });
-
-  // Sync rating from props when image changes
-  useEffect(() => {
-    setRating(image.rating || 0);
-  }, [image.rating]);
 
   // VirtuosoGrid only renders visible items — request thumbnail on mount
   useEffect(() => {
@@ -51,40 +42,8 @@ export const ImageCard = memo(function ImageCard({ image, thumbnailSize, allImag
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Use provided images or fall back to store images
     const imageList = allImages.length > 0 ? allImages : storeImages;
     openLightbox(image, imageList);
-  };
-
-  const handleRating = async (e: React.MouseEvent, starIndex: number) => {
-    e.stopPropagation();
-    const newRating = starIndex + 1;
-    setRating(newRating);
-    setIsSaving(true);
-    try {
-      await updateImageRating(image.path, newRating);
-      useToastStore.getState().success(`${t('imageCard.ratingSet')} ${'★'.repeat(newRating)}${'☆'.repeat(5 - newRating)}`);
-    } catch (error) {
-      console.error('Failed to save rating:', error);
-      setRating(image.rating || 0); // Revert on error
-      useToastStore.getState().error(t('imageCard.ratingFailed'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleClearRating = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRating(0);
-    setIsSaving(true);
-    try {
-      await updateImageRating(image.path, 0);
-    } catch (error) {
-      console.error('Failed to clear rating:', error);
-      setRating(image.rating || 0); // Revert on error
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   return (

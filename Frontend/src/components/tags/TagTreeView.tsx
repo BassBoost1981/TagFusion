@@ -84,9 +84,9 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="tree" aria-label="Tag-Bibliothek">
       {filteredCategories.map((cat) => (
-        <div key={cat.id}>
+        <div key={cat.id} role="treeitem" aria-expanded={true}>
           {/* Category Header */}
           <div className="flex items-center gap-1.5 px-2 py-1 text-sm text-cyan-400 font-medium">
             <span>{cat.name}</span>
@@ -96,9 +96,9 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
           </div>
 
           {/* Subcategories - always expanded */}
-          <div className="pl-2 space-y-1">
+          <div className="pl-2 space-y-1" role="group">
             {cat.subcategories.map((sub) => (
-              <div key={sub.id}>
+              <div key={sub.id} role="treeitem" aria-expanded={true}>
                 {/* Subcategory Header */}
                 <div className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-slate-400">
                   <span>{sub.name}</span>
@@ -107,7 +107,7 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
 
                 {/* Tags - always visible */}
                 {sub.tags.length > 0 && (
-                  <div className="pl-3 py-1 flex flex-wrap gap-1.5">
+                  <div className="pl-3 py-1 flex flex-wrap gap-1.5" role="group" aria-label={`Tags in ${sub.name}`}>
                     {sub.tags.map((tag) => {
                       const isApplied = selectedImages.size > 0 && selectedImagesTags.has(tag);
                       return (
@@ -125,6 +125,8 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
                         >
                           <button
                             onClick={() => handleTagClick(tag)}
+                            aria-pressed={isApplied}
+                            aria-label={selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag}
                             className={`px-2 py-0.5 ${isApplied ? 'text-cyan-300' : 'text-slate-200'}`}
                             title={selectedImages.size > 0 ? `"${tag}" zu ${selectedImages.size} Bild(ern) hinzufügen` : tag}
                           >
@@ -133,6 +135,7 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
                           {isApplied && (
                             <button
                               onClick={(e) => handleRemoveTag(tag, e)}
+                              aria-label={`"${tag}" von ${selectedImages.size} Bild(ern) entfernen`}
                               className="pr-1.5 pl-0.5 py-0.5 text-cyan-400 hover:text-red-400 transition-colors"
                               title={`"${tag}" von ${selectedImages.size} Bild(ern) entfernen`}
                             >
