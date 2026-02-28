@@ -53,9 +53,23 @@ ehthumbs.db
 # Claude Code
 .claude/
 
+# AI agent configs (local tooling, not project-relevant)
+.agent/
+.agents/
+.augment/
+.shared/
+
 # Scratch/temp files
 heroui.txt
 lucide.txt
+
+# Build scripts (local only)
+build_release.ps1
+build_app.md
+
+# Python cache
+__pycache__/
+*.pyc
 
 # Credentials
 credentials.json
