@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Frontend ────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: Frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: Frontend
+        run: npm run build
+
+      # ── Prepare wwwroot ─────────────────────────────────────────
+      - name: Copy frontend dist to wwwroot
+        shell: pwsh
+        run: |
+          $wwwroot = "Backend/TagFusion/wwwroot"
+          if (Test-Path $wwwroot) { Remove-Item $wwwroot -Recurse -Force }
+          New-Item -ItemType Directory -Path $wwwroot -Force | Out-Null
+          Copy-Item -Path "Frontend/dist/*" -Destination $wwwroot -Recurse
+
+      # ── Backend ─────────────────────────────────────────────────
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish backend (self-contained)
+        working-directory: Backend
+        run: dotnet publish TagFusion/TagFusion.csproj -c Release -r win-x64 --self-contained
+
+      - name: Copy wwwroot to publish directory
+        shell: pwsh
+        run: |
+          $publishDir = "Backend/TagFusion/bin/Release/net8.0-windows/win-x64/publish"
+          $publishWwwRoot = "$publishDir/wwwroot"
+          if (Test-Path $publishWwwRoot) { Remove-Item $publishWwwRoot -Recurse -Force }
+          Copy-Item -Path "Backend/TagFusion/wwwroot" -Destination $publishWwwRoot -Recurse
+
+      # ── Package & Release ───────────────────────────────────────
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $publishDir = "Backend/TagFusion/bin/Release/net8.0-windows/win-x64/publish"
+          $zipName = "TagFusion-v${{ steps.version.outputs.version }}-win-x64.zip"
+          Compress-Archive -Path "$publishDir/*" -DestinationPath $zipName
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TagFusion v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: TagFusion-v${{ steps.version.outputs.version }}-win-x64.zip
