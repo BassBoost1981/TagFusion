@@ -3,12 +3,13 @@ import { bridge } from '../services/bridge';
 
 const BATCH_DELAY_MS = 30;
 const BATCH_SIZE = 50;
+const MAX_CACHE_SIZE = 500;
 
 // ============================================================================
 // Singleton thumbnail manager — shared across all ImageCard instances
 // ============================================================================
 
-/** Cache: path → base64 thumbnail */
+/** LRU Cache: path → base64 thumbnail (max MAX_CACHE_SIZE entries) */
 const cache = new Map<string, string | null>();
 
 /** Paths waiting to be fetched in the next batch */
@@ -26,6 +27,19 @@ function notify() {
   subscribers.forEach((cb) => cb());
 }
 
+/** Set cache entry with LRU eviction when exceeding MAX_CACHE_SIZE */
+function cacheSet(key: string, value: string | null) {
+  // Delete first so re-insertion moves key to end (Map preserves insertion order)
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+
+  // Evict oldest entries (first in Map) if over limit
+  while (cache.size > MAX_CACHE_SIZE) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+}
+
 async function fetchBatch(paths: string[]) {
   paths.forEach((p) => loadingPaths.add(p));
   notify();
@@ -33,7 +47,7 @@ async function fetchBatch(paths: string[]) {
   try {
     const result = await bridge.getThumbnailsBatch(paths);
     for (const path of paths) {
-      cache.set(path, result[path] ?? null);
+      cacheSet(path, result[path] ?? null);
       loadingPaths.delete(path);
     }
   } catch (error) {
@@ -87,7 +101,7 @@ function subscribe(cb: () => void) {
 export function useThumbnail(imagePath: string, initialThumbnail?: string | null): [string | null, boolean] {
   // Seed cache from initial data if available
   if (initialThumbnail && !cache.has(imagePath)) {
-    cache.set(imagePath, initialThumbnail);
+    cacheSet(imagePath, initialThumbnail);
   }
 
   // Subscribe to cache changes — snapshot is a string hash for this specific path

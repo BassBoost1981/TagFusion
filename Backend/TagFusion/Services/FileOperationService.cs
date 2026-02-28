@@ -11,27 +11,31 @@ namespace TagFusion.Services
     public class FileOperationService
     {
         /// <summary>
-        /// Copy files/folders to a target directory
+        /// Copy files/folders to a target directory.
+        /// Rolls back already-copied files on failure to avoid partial state.
         /// </summary>
         public bool CopyFiles(string[] sourcePaths, string targetFolder)
         {
+            var copiedPaths = new List<string>();
             try
             {
                 foreach (var sourcePath in sourcePaths)
                 {
                     var name = Path.GetFileName(sourcePath);
                     var destPath = Path.Combine(targetFolder, name);
-                    
+
                     // Handle name conflicts
                     destPath = GetUniqueDestPath(destPath);
 
                     if (Directory.Exists(sourcePath))
                     {
                         CopyDirectory(sourcePath, destPath);
+                        copiedPaths.Add(destPath);
                     }
                     else if (File.Exists(sourcePath))
                     {
                         File.Copy(sourcePath, destPath, false);
+                        copiedPaths.Add(destPath);
                     }
                 }
                 return true;
@@ -39,6 +43,23 @@ namespace TagFusion.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"CopyFiles error: {ex.Message}");
+
+                // Rollback: delete already-copied files/folders
+                foreach (var copied in copiedPaths)
+                {
+                    try
+                    {
+                        if (Directory.Exists(copied))
+                            Directory.Delete(copied, true);
+                        else if (File.Exists(copied))
+                            File.Delete(copied);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        Debug.WriteLine($"CopyFiles rollback failed for {copied}: {rollbackEx.Message}");
+                    }
+                }
+
                 throw;
             }
         }

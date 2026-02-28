@@ -107,6 +107,16 @@ public class ExifToolService : IDisposable
         _commandWriter = _exifToolProcess.StandardInput;
         _outputReader = _exifToolProcess.StandardOutput;
 
+        // Read stderr in background to prevent buffer deadlock and capture errors
+        _exifToolProcess.ErrorDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrEmpty(args.Data))
+            {
+                Log($"[stderr] {args.Data}");
+            }
+        };
+        _exifToolProcess.BeginErrorReadLine();
+
         Debug.WriteLine("ExifTool persistent process started");
     }
 

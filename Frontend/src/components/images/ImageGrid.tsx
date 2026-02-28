@@ -11,6 +11,7 @@ import {
   useZoomLevel,
   useIsLoadingImages,
   useFilterSort,
+  useSelectedImages,
 } from '../../stores/appStore';
 import { ImageCard } from './ImageCard';
 import { FolderCard } from './FolderCard';
@@ -116,6 +117,7 @@ export function ImageGrid() {
   const storeImages = useImages();
   const zoomLevel = useZoomLevel();
   const isLoadingImages = useIsLoadingImages();
+  const selectedImages = useSelectedImages();
   const {
     searchQuery, sortBy, sortOrder, filterRating, filterTags,
     setSearchQuery, setFilterRating, setFilterTags
@@ -306,12 +308,12 @@ export function ImageGrid() {
             style={{ ...uniformStyle, opacity: vItem.isDimmed ? 0.3 : 1 }}
             className={vItem.isHighlighted ? 'ring-2 ring-cyan-400 rounded-xl' : ''}
           >
-            <ImageCard image={image} allImages={storeImages} />
+            <ImageCard image={image} allImages={storeImages} isSelected={selectedImages.has(image.path)} />
           </div>
         );
       }
     }
-  }, [virtualItems, navigateUp, storeImages]);
+  }, [virtualItems, navigateUp, storeImages, selectedImages]);
 
   // Loading state
   if (isLoadingImages) {

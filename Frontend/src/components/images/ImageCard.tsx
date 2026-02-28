@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Check, Tag } from 'lucide-react';
 import { Card, CardFooter } from '@heroui/react';
 import { useTranslation } from 'react-i18next';
@@ -15,18 +15,22 @@ interface ImageCardProps {
   image: ImageFile;
   thumbnailSize?: number;
   allImages?: ImageFile[];
+  isSelected?: boolean;
 }
 
-export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardProps) {
+export const ImageCard = memo(function ImageCard({ image, thumbnailSize, allImages = [], isSelected: isSelectedProp }: ImageCardProps) {
   const { t } = useTranslation();
-  const { selectedImages, selectImage, images: storeImages, updateImageRating } = useAppStore();
-  const { open: openLightbox } = useLightboxStore();
+  const selectImage = useAppStore((s) => s.selectImage);
+  const updateImageRating = useAppStore((s) => s.updateImageRating);
+  const storeImages = useAppStore((s) => s.images);
+  const openLightbox = useLightboxStore((s) => s.open);
   const [thumbnail, isLoading] = useThumbnail(image.path, image.thumbnailBase64);
   const [rating, setRating] = useState(image.rating || 0);
   const [isSaving, setIsSaving] = useState(false);
 
-
-  const isSelected = selectedImages.has(image.path);
+  // Use prop if provided, otherwise fall back to store lookup
+  const selectedImages = useAppStore((s) => isSelectedProp === undefined ? s.selectedImages : null);
+  const isSelected = isSelectedProp ?? selectedImages?.has(image.path) ?? false;
   const tagCount = image.tags?.length || 0;
   const handleContextMenu = useImageContextMenu({ image, allImages });
 
@@ -177,5 +181,12 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
       </Card>
     </div>
   );
-}
+}, (prev, next) => {
+  return prev.image.path === next.image.path &&
+    prev.image.rating === next.image.rating &&
+    prev.isSelected === next.isSelected &&
+    prev.thumbnailSize === next.thumbnailSize &&
+    prev.image.tags?.length === next.image.tags?.length &&
+    prev.image.tags?.join(',') === next.image.tags?.join(',');
+});
 
