@@ -5,8 +5,10 @@ using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Web.WebView2.Core;
 using TagFusion.Bridge;
+using TagFusion.Configuration;
 using TagFusion.Database;
 using TagFusion.Services;
 
@@ -21,6 +23,7 @@ public partial class MainWindow : Window
     private readonly string _wwwrootPath;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MainWindow> _logger;
+    private readonly UiSettings _uiSettings;
 
     private WebViewBridge? _bridge;
 
@@ -36,6 +39,7 @@ public partial class MainWindow : Window
 
         _serviceProvider = serviceProvider;
         _logger = serviceProvider.GetRequiredService<ILogger<MainWindow>>();
+        _uiSettings = serviceProvider.GetRequiredService<IOptions<UiSettings>>().Value;
 
         // Use multiple fallbacks for app directory (single-file publishing can cause issues)
         _appDirectory = GetAppDirectory();
@@ -114,7 +118,7 @@ public partial class MainWindow : Window
             var options = new CoreWebView2EnvironmentOptions
             {
                 // Enable GPU acceleration and disable software rendering fallback
-                AdditionalBrowserArguments = "--enable-gpu-rasterization --enable-zero-copy --enable-features=VaapiVideoDecoder --disable-software-rasterizer --enable-accelerated-2d-canvas --enable-accelerated-video-decode --gpu-rasterization-msaa-sample-count=0 --disable-http-cache"
+                AdditionalBrowserArguments = _uiSettings.BrowserArgs
             };
 
             var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
@@ -190,7 +194,7 @@ public partial class MainWindow : Window
             // Small delay to let React render
             Dispatcher.BeginInvoke(async () =>
             {
-                await Task.Delay(300);
+                await Task.Delay(_uiSettings.SplashDelayMs);
                 HideSplash();
             });
         }

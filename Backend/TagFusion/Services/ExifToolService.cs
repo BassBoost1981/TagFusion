@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TagFusion.Configuration;
 using TagFusion.Models;
 
 namespace TagFusion.Services;
@@ -16,6 +18,9 @@ public class ExifToolService : IDisposable
     private readonly string _exifToolPath;
     private readonly ThumbnailService _thumbnailService;
     private readonly ILogger<ExifToolService> _logger;
+    private readonly int _batchSize;
+    private readonly int _maxImageSize;
+    private readonly int _processStopTimeoutMs;
     private Process? _exifToolProcess;
     private StreamWriter? _commandWriter;
     private StreamReader? _outputReader;
@@ -24,10 +29,14 @@ public class ExifToolService : IDisposable
 
     public string ExifToolPath => _exifToolPath;
 
-    public ExifToolService(ThumbnailService thumbnailService, ILogger<ExifToolService> logger)
+    public ExifToolService(ThumbnailService thumbnailService, ILogger<ExifToolService> logger, IOptions<ExifToolSettings> options)
     {
         _thumbnailService = thumbnailService;
         _logger = logger;
+        var settings = options.Value;
+        _batchSize = settings.BatchSize;
+        _maxImageSize = settings.MaxImageSize;
+        _processStopTimeoutMs = settings.ProcessStopTimeoutMs;
 
         // Find ExifTool path relative to app directory
         var appDir = AppContext.BaseDirectory ?? string.Empty;
@@ -269,8 +278,8 @@ public class ExifToolService : IDisposable
         if (imagePaths.Count == 0)
             return result;
 
-        // Process in batches to avoid command line length limits (max ~50 files per batch)
-        const int batchSize = 50;
+        // Process in batches to avoid command line length limits
+        var batchSize = _batchSize;
         var batches = imagePaths
             .Select((path, index) => new { path, index })
             .GroupBy(x => x.index / batchSize)
@@ -389,8 +398,9 @@ public class ExifToolService : IDisposable
     /// <summary>
     /// Get full resolution image scaled for lightbox viewing
     /// </summary>
-    public async Task<string?> GetFullImageAsync(string imagePath, int maxSize = 1920, CancellationToken cancellationToken = default)
+    public async Task<string?> GetFullImageAsync(string imagePath, int maxSize = 0, CancellationToken cancellationToken = default)
     {
+        if (maxSize <= 0) maxSize = _maxImageSize;
         return await _thumbnailService.GetFullImageAsync(imagePath, maxSize, cancellationToken);
     }
 
@@ -644,7 +654,7 @@ public class ExifToolService : IDisposable
                 {
                     if (!_exifToolProcess.HasExited)
                     {
-                        if (!_exifToolProcess.WaitForExit(1000))
+                        if (!_exifToolProcess.WaitForExit(_processStopTimeoutMs))
                             _exifToolProcess.Kill();
                     }
                     _exifToolProcess.Dispose();

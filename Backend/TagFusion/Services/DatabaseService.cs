@@ -1,6 +1,8 @@
 using System.Data.SQLite;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TagFusion.Configuration;
 using TagFusion.Database;
 using TagFusion.Models;
 
@@ -11,13 +13,16 @@ public class DatabaseService : IDatabaseService, IDisposable
     private readonly SQLiteConnection _connection;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly ILogger<DatabaseService> _logger;
+    private readonly int _chunkSize;
     private bool _disposed;
 
-    public DatabaseService(ILogger<DatabaseService> logger)
+    public DatabaseService(ILogger<DatabaseService> logger, IOptions<DatabaseSettings> options)
     {
         _logger = logger;
+        var settings = options.Value;
+        _chunkSize = settings.ChunkSize;
         var appDir = AppContext.BaseDirectory ?? string.Empty;
-        var dbPath = Path.Combine(appDir, "tagfusion.db");
+        var dbPath = Path.Combine(appDir, settings.DbFileName);
         var connectionString = $"Data Source={dbPath};Version=3;";
 
         _connection = new SQLiteConnection(connectionString);
@@ -31,18 +36,25 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
 
         InitializeDatabase();
+        new MigrationRunner(_connection, _logger).ApplyMigrations();
         _logger.LogInformation("Database initialized at {DbPath}", dbPath);
     }
 
     /// <summary>
     /// Internal constructor for testing — accepts custom connection string (e.g. in-memory DB).
     /// </summary>
+    /// <summary>
+    /// Internal constructor for testing — accepts custom connection string (e.g. in-memory DB).
+    /// Interner Konstruktor für Tests — akzeptiert benutzerdefinierten Connection String.
+    /// </summary>
     internal DatabaseService(string connectionString)
     {
         _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<DatabaseService>.Instance;
+        _chunkSize = 500;
         _connection = new SQLiteConnection(connectionString);
         _connection.Open();
         InitializeDatabase();
+        new MigrationRunner(_connection, _logger).ApplyMigrations();
     }
 
     private void InitializeDatabase()
@@ -239,8 +251,8 @@ public class DatabaseService : IDatabaseService, IDisposable
         await _semaphore.WaitAsync(cancellationToken);
         try
         {
-            // Process in chunks of 500 to avoid parameter limits
-            const int chunkSize = 500;
+            // Process in chunks to avoid parameter limits
+            var chunkSize = _chunkSize;
             for (int i = 0; i < paths.Count; i += chunkSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();

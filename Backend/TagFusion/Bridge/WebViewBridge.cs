@@ -55,9 +55,11 @@ public class WebViewBridge
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        // Delegate to async Task method to avoid async void pitfalls
-        // (unhandled exceptions in async void crash the process)
-        _ = HandleWebMessageAsync(e);
+        // Delegate to async Task method and catch unobserved exceptions
+        // to prevent process crash from unhandled task exceptions.
+        _ = HandleWebMessageAsync(e).ContinueWith(
+            t => _logger.LogError(t.Exception, "Unbehandelte Exception in HandleWebMessageAsync"),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private async Task HandleWebMessageAsync(CoreWebView2WebMessageReceivedEventArgs e)

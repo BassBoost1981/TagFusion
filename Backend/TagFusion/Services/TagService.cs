@@ -1,6 +1,8 @@
 using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TagFusion.Configuration;
 using TagFusion.Models;
 
 namespace TagFusion.Services;
@@ -18,9 +20,10 @@ public class TagService
         WriteIndented = true
     };
 
-    public TagService(ILogger<TagService> logger)
+    public TagService(ILogger<TagService> logger, IOptions<TagSettings> options)
     {
         _logger = logger;
+        var settings = options.Value;
 
         // Look for the tag file in the workspace root (development) or app directory (production)
         var appDir = AppContext.BaseDirectory ?? string.Empty;
@@ -29,8 +32,8 @@ public class TagService
         var currentDir = new DirectoryInfo(appDir);
         string? foundPath = null;
 
-        // Search up to 6 levels up
-        for (int i = 0; i < 6; i++)
+        // Search up to configured levels
+        for (int i = 0; i < settings.MaxDirSearchDepth; i++)
         {
             if (currentDir == null) break;
 
@@ -44,8 +47,18 @@ public class TagService
             currentDir = currentDir.Parent;
         }
 
-        _tagFilePath = foundPath ?? Path.Combine(appDir, "TagFusion_Tags_20251112.json");
+        _tagFilePath = foundPath ?? Path.Combine(appDir, settings.DefaultTagFile);
         _logger.LogInformation("Tag file path: {TagFilePath}", _tagFilePath);
+    }
+
+    /// <summary>
+    /// Internal constructor for testing — accepts a direct file path.
+    /// Interner Konstruktor für Tests — akzeptiert direkten Dateipfad.
+    /// </summary>
+    internal TagService(ILogger<TagService> logger, string tagFilePath)
+    {
+        _logger = logger;
+        _tagFilePath = tagFilePath;
     }
 
     public async Task<List<Tag>> GetAllTagsAsync(CancellationToken cancellationToken = default)

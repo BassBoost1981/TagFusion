@@ -2,6 +2,8 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TagFusion.Configuration;
 
 namespace TagFusion.Services;
 
@@ -13,11 +15,13 @@ public class ImageEditService
 {
     private readonly ThumbnailService _thumbnailService;
     private readonly ILogger<ImageEditService> _logger;
+    private readonly int _jpegQuality;
 
-    public ImageEditService(ThumbnailService thumbnailService, ILogger<ImageEditService> logger)
+    public ImageEditService(ThumbnailService thumbnailService, ILogger<ImageEditService> logger, IOptions<ImageEditSettings> options)
     {
         _thumbnailService = thumbnailService;
         _logger = logger;
+        _jpegQuality = options.Value.JpegQuality;
     }
 
     /// <summary>
@@ -111,7 +115,7 @@ public class ImageEditService
                     {
                         var encoder = GetEncoder(ImageFormat.Jpeg);
                         var encoderParams = new EncoderParameters(1);
-                        encoderParams.Param[0] = new EncoderParameter(Encoder.Quality, 95L);
+                        encoderParams.Param[0] = new EncoderParameter(Encoder.Quality, (long)_jpegQuality);
                         workingImage.Save(tempPath, encoder, encoderParams);
                     }
                     else if (format.Guid == ImageFormat.Png.Guid)
@@ -150,7 +154,7 @@ public class ImageEditService
         });
     }
 
-    private ImageFormat GetImageFormat(string extension)
+    internal static ImageFormat GetImageFormat(string extension)
     {
         return extension switch
         {

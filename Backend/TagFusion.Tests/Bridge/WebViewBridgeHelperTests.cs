@@ -129,6 +129,50 @@ public class WebViewBridgeHelperTests
     }
 
     // ========================================================================
+    // Edge-Case Tests
+    // ========================================================================
+
+    [Test]
+    public void ExtractInt_DoubleValue_CastsToInt()
+    {
+        var result = InvokeExtractInt(3.7, 0);
+        Assert.That(result, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ExtractInt_IntValue_ReturnsDirectly()
+    {
+        var result = InvokeExtractInt(42, 0);
+        Assert.That(result, Is.EqualTo(42));
+    }
+
+    [Test]
+    public void ExtractStringArray_ObjectEnumerable_ExtractsToString()
+    {
+        var list = new List<object> { "Alpha", "Beta", "Gamma" };
+        var result = InvokeExtractStringArray(list);
+
+        Assert.That(result, Has.Count.EqualTo(3));
+        Assert.That(result, Is.EquivalentTo(new[] { "Alpha", "Beta", "Gamma" }));
+    }
+
+    [Test]
+    public void GetPayloadString_NullValue_ReturnsEmpty()
+    {
+        var payload = new Dictionary<string, object> { { "key", null! } };
+        var result = InvokeGetPayloadString(payload, "key");
+        Assert.That(result, Is.EqualTo(string.Empty));
+    }
+
+    [Test]
+    public void ExtractStringArray_EmptyJsonArray_ReturnsEmpty()
+    {
+        var json = JsonSerializer.Deserialize<JsonElement>("[]");
+        var result = InvokeExtractStringArray(json);
+        Assert.That(result, Is.Empty);
+    }
+
+    // ========================================================================
     // Helpers — direct static calls, no reflection needed
     // ========================================================================
 

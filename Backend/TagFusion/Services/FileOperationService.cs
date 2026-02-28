@@ -264,7 +264,7 @@ namespace TagFusion.Services
 
         #region Helpers
 
-        private static string GetUniqueDestPath(string destPath)
+        internal static string GetUniqueDestPath(string destPath)
         {
             if (!File.Exists(destPath) && !Directory.Exists(destPath))
                 return destPath;

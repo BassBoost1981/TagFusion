@@ -6,6 +6,8 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using TagFusion.Configuration;
 
 namespace TagFusion.Services;
 
@@ -15,13 +17,18 @@ namespace TagFusion.Services;
 public class ThumbnailService
 {
     private readonly int _thumbnailSize;
+    private readonly int _jpegQuality;
+    private readonly int _maxParallel;
     private readonly string _cacheDirectory;
     private readonly ILogger<ThumbnailService> _logger;
 
-    public ThumbnailService(ILogger<ThumbnailService> logger, int thumbnailSize = 256)
+    public ThumbnailService(ILogger<ThumbnailService> logger, IOptions<ThumbnailSettings> options)
     {
         _logger = logger;
-        _thumbnailSize = thumbnailSize;
+        var settings = options.Value;
+        _thumbnailSize = settings.Size;
+        _jpegQuality = settings.JpegQuality;
+        _maxParallel = settings.MaxParallel;
         var appDir = AppContext.BaseDirectory ?? string.Empty;
         _cacheDirectory = Path.Combine(appDir, "cache", "thumbnails");
 
@@ -154,8 +161,9 @@ public class ThumbnailService
     /// Phase 2: Extract embedded thumbnails with ONE ExifTool process (not one per file!)
     /// Phase 3: Generate remaining thumbnails with System.Drawing in parallel
     /// </summary>
-    public async Task<Dictionary<string, string?>> GetThumbnailsBatchAsync(string[] imagePaths, string exifToolPath, int maxParallel = 8, CancellationToken cancellationToken = default)
+    public async Task<Dictionary<string, string?>> GetThumbnailsBatchAsync(string[] imagePaths, string exifToolPath, int maxParallel = 0, CancellationToken cancellationToken = default)
     {
+        if (maxParallel <= 0) maxParallel = _maxParallel;
         var results = new ConcurrentDictionary<string, string?>();
         var uncachedPaths = new List<string>();
 
@@ -391,7 +399,7 @@ public class ThumbnailService
                     var encoder = GetEncoder(ImageFormat.Jpeg);
                     var encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
                     encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-                        System.Drawing.Imaging.Encoder.Quality, 92L);
+                        System.Drawing.Imaging.Encoder.Quality, (long)_jpegQuality);
                     originalImage.Save(memoryStream, encoder, encoderParams);
                     return Convert.ToBase64String(memoryStream.ToArray());
                 }
