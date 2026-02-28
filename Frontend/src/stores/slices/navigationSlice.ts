@@ -153,6 +153,8 @@ export const createNavigationSlice: StateCreator<
   navigateToFolder: async (path) => {
     await get().expandToPath(path);
     await get().loadImages(path);
+    // Start watching the new folder for file changes
+    bridge.watchFolder(path).catch(() => {});
   },
 
   navigateUp: async () => {

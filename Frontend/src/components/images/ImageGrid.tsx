@@ -12,6 +12,7 @@ import {
   useIsLoadingImages,
   useFilterSort,
   useSelectedImages,
+  useGlobalSearch,
 } from '../../stores/appStore';
 import { ImageCard } from './ImageCard';
 import { FolderCard } from './FolderCard';
@@ -120,6 +121,7 @@ export function ImageGrid() {
   const selectedImages = useSelectedImages();
   const { searchQuery, sortBy, sortOrder, filterRating, filterTags, setSearchQuery, setFilterRating, setFilterTags } =
     useFilterSort();
+  const { isGlobalSearch, isSearching, searchResults } = useGlobalSearch();
 
   // Container ref for measuring width
   const containerRef = useRef<HTMLDivElement>(null);
@@ -168,6 +170,17 @@ export function ImageGrid() {
 
   // Filter and sort items
   const filteredAndSortedItems = useMemo(() => {
+    // Global search mode: show search results as GridItems
+    if (isGlobalSearch && searchResults.length > 0) {
+      const searchItems: GridItem[] = searchResults.map((img) => ({
+        path: img.path,
+        name: img.fileName,
+        isFolder: false,
+        imageData: img,
+      }));
+      return searchItems;
+    }
+
     let items = [...gridItems];
 
     // Filter
@@ -227,7 +240,7 @@ export function ImageGrid() {
     });
 
     return [...sortedFolders, ...sortedImages];
-  }, [gridItems, searchQuery, sortBy, sortOrder, filterRating, filterTagsSet]);
+  }, [gridItems, searchQuery, sortBy, sortOrder, filterRating, filterTagsSet, isGlobalSearch, searchResults]);
 
   // Build unified virtual items array (navigate-up + folders + images)
   const virtualItems = useMemo<VirtualItem[]>(() => {
@@ -327,6 +340,27 @@ export function ImageGrid() {
     },
     [virtualItems, navigateUp, storeImages, selectedImages, t]
   );
+
+  // Global search loading state
+  if (isGlobalSearch && isSearching) {
+    return (
+      <div className="h-full p-4 overflow-auto">
+        <div className="rounded-2xl p-4 backdrop-blur-glass-sm relative overflow-hidden bg-gradient-to-br from-cyan-500/08 to-cyan-500/02 border border-cyan-500/15">
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--glass-specular)] to-transparent z-10" />
+          <ImageGridSkeleton count={12} itemSize={itemSize} />
+        </div>
+      </div>
+    );
+  }
+
+  // Global search empty results
+  if (isGlobalSearch && !isSearching && searchResults.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <EmptyState type="no-results" onAction={handleResetFilters} />
+      </div>
+    );
+  }
 
   // Loading state
   if (isLoadingImages) {

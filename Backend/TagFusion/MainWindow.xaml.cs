@@ -141,6 +141,9 @@ public partial class MainWindow : Window
             var imageEditService = _serviceProvider.GetRequiredService<ImageEditService>();
             var fileOperationService = _serviceProvider.GetRequiredService<FileOperationService>();
             var diagnosticsService = _serviceProvider.GetRequiredService<DiagnosticsService>();
+            var folderWatcherService = _serviceProvider.GetRequiredService<FolderWatcherService>();
+            var tagExportService = _serviceProvider.GetRequiredService<TagExportService>();
+            var duplicateDetectionService = _serviceProvider.GetRequiredService<DuplicateDetectionService>();
 
             // Initialize bridge for C# <-> React communication
             var bridgeLogger = _serviceProvider.GetRequiredService<ILogger<WebViewBridge>>();
@@ -153,6 +156,9 @@ public partial class MainWindow : Window
                 imageEditService,
                 fileOperationService,
                 diagnosticsService,
+                folderWatcherService,
+                tagExportService,
+                duplicateDetectionService,
                 bridgeLogger);
 
             // Set up virtual host for wwwroot

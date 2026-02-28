@@ -76,6 +76,18 @@ export const useFilterSort = () =>
     }))
   );
 
+// Global search selectors
+export const useGlobalSearch = () =>
+  useAppStore(
+    useShallow((state) => ({
+      isGlobalSearch: state.isGlobalSearch,
+      isSearching: state.isSearching,
+      searchResults: state.searchResults,
+      executeGlobalSearch: state.executeGlobalSearch,
+      exitGlobalSearch: state.exitGlobalSearch,
+    }))
+  );
+
 // Image action selectors
 export const useRefreshImages = () => useAppStore((state) => state.refreshImages);
 

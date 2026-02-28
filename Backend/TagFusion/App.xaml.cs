@@ -59,12 +59,15 @@ public partial class App : Application
         services.AddSingleton<IDatabaseService, DatabaseService>();
         services.AddSingleton<TagService>();
         services.AddSingleton<FileOperationService>();
+        services.AddSingleton<FolderWatcherService>();
+        services.AddSingleton<DuplicateDetectionService>();
 
         // Services mit Abhängigkeiten
         services.AddSingleton<ExifToolService>();
         services.AddSingleton<FileSystemService>();
         services.AddSingleton<ImageEditService>();
         services.AddSingleton<DiagnosticsService>();
+        services.AddSingleton<TagExportService>();
 
         Services = services.BuildServiceProvider();
         _appLogger = Services.GetRequiredService<ILogger<App>>();

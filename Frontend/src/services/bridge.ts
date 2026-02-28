@@ -238,6 +238,40 @@ class BridgeService {
     return this.send<Record<string, boolean>>('writeBatchTags', { paths, tags });
   }
 
+  // Folder watcher — start/stop watching a folder for changes
+  async watchFolder(path: string): Promise<boolean> {
+    return this.send<boolean>('watchFolder', { path });
+  }
+
+  async stopWatching(): Promise<boolean> {
+    return this.send<boolean>('stopWatching');
+  }
+
+  // Tag import/export
+  async exportTagsJson(paths: string[]): Promise<string> {
+    return this.send<string>('exportTagsJson', { paths });
+  }
+
+  async exportTagsCsv(paths: string[]): Promise<string> {
+    return this.send<string>('exportTagsCsv', { paths });
+  }
+
+  async importTagsJson(data: string): Promise<Record<string, boolean>> {
+    return this.send<Record<string, boolean>>('importTagsJson', { data });
+  }
+
+  async importTagsCsv(data: string): Promise<Record<string, boolean>> {
+    return this.send<Record<string, boolean>>('importTagsCsv', { data });
+  }
+
+  // Duplicate detection
+  async findDuplicates(
+    path: string,
+    includeSubfolders: boolean = false,
+  ): Promise<{ hash: string; paths: string[]; fileSize: number }[]> {
+    return this.send('findDuplicates', { path, includeSubfolders });
+  }
+
   async getProperties(path: string): Promise<{
     name: string;
     path: string;
@@ -317,6 +351,18 @@ class BridgeService {
         return [];
       case 'writeBatchTags':
         return {};
+      case 'watchFolder':
+      case 'stopWatching':
+        return true;
+      case 'exportTagsJson':
+        return '[]';
+      case 'exportTagsCsv':
+        return 'Path;Tags;Rating';
+      case 'importTagsJson':
+      case 'importTagsCsv':
+        return {};
+      case 'findDuplicates':
+        return [];
       default:
         return null;
     }

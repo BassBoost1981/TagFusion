@@ -18,6 +18,8 @@ import {
   FlipHorizontal,
   FlipVertical,
   RefreshCw,
+  Globe,
+  Tags,
 } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 import {
@@ -29,6 +31,7 @@ import {
   useSetCurrentFolder,
   useRefreshImages,
   useSetError,
+  useGlobalSearch,
 } from '../../stores/appStore';
 import { bridge } from '../../services/bridge';
 import { GlassIconButton } from '../ui/glass';
@@ -70,8 +73,11 @@ export function Toolbar() {
   const setCurrentFolder = useSetCurrentFolder();
   const refreshImages = useRefreshImages();
   const setError = useSetError();
+  const { isGlobalSearch, isSearching, executeGlobalSearch, exitGlobalSearch } = useGlobalSearch();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isBatchTagging, setIsBatchTagging] = useState(false);
+  const [batchTagInput, setBatchTagInput] = useState('');
   const hasSelection = selectedImages.size > 0;
 
   // Image edit handlers
@@ -103,10 +109,40 @@ export function Toolbar() {
     }
   };
 
+  // Execute global cross-folder search via backend DB
+  const handleGlobalSearch = () => {
+    const searchTags = searchQuery.trim() ? [searchQuery.trim()] : undefined;
+    const minRating = filterRating ?? undefined;
+    if (searchTags || minRating) {
+      executeGlobalSearch(searchTags, minRating);
+    }
+  };
+
+  // Batch tag handler — apply tags to all selected images
+  const handleBatchTag = async () => {
+    if (!hasSelection || !batchTagInput.trim()) return;
+    setIsBatchTagging(true);
+    try {
+      const paths = Array.from(selectedImages);
+      const newTags = batchTagInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      await bridge.writeBatchTags(paths, newTags);
+      setBatchTagInput('');
+      await refreshImages();
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setIsBatchTagging(false);
+    }
+  };
+
   // Go to home screen
   const handleGoHome = () => {
     setCurrentFolder(null);
     clearSelection();
+    if (isGlobalSearch) exitGlobalSearch();
   };
 
   // Generate search suggestions from filenames and tags
@@ -322,11 +358,55 @@ export function Toolbar() {
           </Popover.Portal>
         </Popover.Root>
 
+        {/* Global Search Button */}
+        <GlassIconButton
+          onClick={handleGlobalSearch}
+          title={t('toolbar.globalSearch', 'Globale Suche')}
+          size="sm"
+          variant={isGlobalSearch ? 'accent' : 'ghost'}
+        >
+          {isSearching ? <Spinner size="sm" color="secondary" /> : <Globe size={16} />}
+        </GlassIconButton>
+
+        {/* Exit Global Search */}
+        {isGlobalSearch && (
+          <GlassIconButton onClick={exitGlobalSearch} title={t('toolbar.exitSearch', 'Suche beenden')} variant="danger" size="sm">
+            <X size={16} />
+          </GlassIconButton>
+        )}
+
         {/* Clear Filters */}
-        {hasActiveFilters && (
+        {hasActiveFilters && !isGlobalSearch && (
           <GlassIconButton onClick={clearFilters} title={t('toolbar.clearFilters')} variant="danger" size="sm">
             <X size={16} />
           </GlassIconButton>
+        )}
+
+        {/* Batch Tag — Show when multiple images selected */}
+        {hasSelection && selectedImages.size > 1 && (
+          <>
+            <div className="h-6 w-px bg-[var(--glass-border)]" />
+            <div className="flex items-center gap-1">
+              <Tags size={16} className="text-cyan-400" />
+              <input
+                type="text"
+                value={batchTagInput}
+                onChange={(e) => setBatchTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleBatchTag()}
+                placeholder={t('toolbar.batchTags', 'Tags (kommagetrennt)')}
+                className="w-40 h-7 px-2 rounded-md text-xs bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-cyan-500/50"
+                disabled={isBatchTagging}
+              />
+              <GlassIconButton
+                onClick={handleBatchTag}
+                title={t('toolbar.applyBatchTags', 'Tags anwenden')}
+                size="sm"
+                variant="accent"
+              >
+                {isBatchTagging ? <Spinner size="sm" color="secondary" /> : <Tag size={14} />}
+              </GlassIconButton>
+            </div>
+          </>
         )}
 
         {/* Image Edit Buttons - Show when images selected */}

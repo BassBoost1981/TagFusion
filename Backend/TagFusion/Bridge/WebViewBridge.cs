@@ -22,6 +22,9 @@ public class WebViewBridge
     private readonly ImageEditService _imageEditService;
     private readonly FileOperationService _fileOperationService;
     private readonly DiagnosticsService _diagnosticsService;
+    private readonly FolderWatcherService _folderWatcherService;
+    private readonly TagExportService _tagExportService;
+    private readonly DuplicateDetectionService _duplicateDetectionService;
     private readonly ILogger<WebViewBridge> _logger;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -39,6 +42,9 @@ public class WebViewBridge
         ImageEditService imageEditService,
         FileOperationService fileOperationService,
         DiagnosticsService diagnosticsService,
+        FolderWatcherService folderWatcherService,
+        TagExportService tagExportService,
+        DuplicateDetectionService duplicateDetectionService,
         ILogger<WebViewBridge> logger)
     {
         _webView = webView;
@@ -49,9 +55,18 @@ public class WebViewBridge
         _imageEditService = imageEditService;
         _fileOperationService = fileOperationService;
         _diagnosticsService = diagnosticsService;
+        _folderWatcherService = folderWatcherService;
+        _tagExportService = tagExportService;
+        _duplicateDetectionService = duplicateDetectionService;
         _logger = logger;
 
         _webView.WebMessageReceived += OnWebMessageReceived;
+
+        // FileSystemWatcher: push changes to frontend
+        _folderWatcherService.FilesChanged += (changedPaths) =>
+        {
+            SendEvent("folderChanged", new { paths = changedPaths });
+        };
 
         _logger.LogInformation("WebViewBridge initialized");
     }
@@ -141,6 +156,19 @@ public class WebViewBridge
 
                 // Batch tag operations
                 "writeBatchTags" => await WriteBatchTagsAsync(message.Payload),
+
+                // Folder watcher
+                "watchFolder" => WatchFolder(message.Payload),
+                "stopWatching" => StopWatching(),
+
+                // Tag import/export
+                "exportTagsJson" => await ExportTagsJsonAsync(message.Payload),
+                "exportTagsCsv" => await ExportTagsCsvAsync(message.Payload),
+                "importTagsJson" => await ImportTagsJsonAsync(message.Payload),
+                "importTagsCsv" => await ImportTagsCsvAsync(message.Payload),
+
+                // Duplicate detection
+                "findDuplicates" => await FindDuplicatesAsync(message.Payload),
 
                 _ => throw new NotSupportedException($"Unknown action: {message.Action}")
             };
@@ -513,6 +541,69 @@ public class WebViewBridge
         }
 
         return results;
+    }
+
+    #endregion
+
+    #region Folder Watcher Handlers
+
+    private object WatchFolder(Dictionary<string, object>? payload)
+    {
+        var path = GetPayloadString(payload, "path");
+        _folderWatcherService.Watch(path);
+        return true;
+    }
+
+    private object StopWatching()
+    {
+        _folderWatcherService.StopWatching();
+        return true;
+    }
+
+    #endregion
+
+    #region Tag Import/Export Handlers
+
+    private async Task<string> ExportTagsJsonAsync(Dictionary<string, object>? payload)
+    {
+        var paths = GetPayloadStringArray(payload, "paths");
+        return await _tagExportService.ExportTagsAsJsonAsync(paths);
+    }
+
+    private async Task<string> ExportTagsCsvAsync(Dictionary<string, object>? payload)
+    {
+        var paths = GetPayloadStringArray(payload, "paths");
+        return await _tagExportService.ExportTagsAsCsvAsync(paths);
+    }
+
+    private async Task<Dictionary<string, bool>> ImportTagsJsonAsync(Dictionary<string, object>? payload)
+    {
+        var json = GetPayloadString(payload, "data");
+        return await _tagExportService.ImportTagsFromJsonAsync(json);
+    }
+
+    private async Task<Dictionary<string, bool>> ImportTagsCsvAsync(Dictionary<string, object>? payload)
+    {
+        var csv = GetPayloadString(payload, "data");
+        return await _tagExportService.ImportTagsFromCsvAsync(csv);
+    }
+
+    #endregion
+
+    #region Duplicate Detection Handlers
+
+    private async Task<List<DuplicateGroup>> FindDuplicatesAsync(Dictionary<string, object>? payload)
+    {
+        var path = GetPayloadString(payload, "path");
+        var includeSubfoldersObj = payload?.GetValueOrDefault("includeSubfolders");
+        bool includeSubfolders = false;
+        if (includeSubfoldersObj is bool b) includeSubfolders = b;
+        else if (includeSubfoldersObj is System.Text.Json.JsonElement je)
+        {
+            if (je.ValueKind == System.Text.Json.JsonValueKind.True) includeSubfolders = true;
+        }
+
+        return await _duplicateDetectionService.FindDuplicatesAsync(path, includeSubfolders);
     }
 
     #endregion

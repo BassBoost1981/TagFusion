@@ -1,7 +1,8 @@
 import { StateCreator } from 'zustand';
 import { ImageSlice, normalizeGridItems } from './imageSlice';
-import type { Tag, GridItem, ImageFile } from '../../types';
+import type { Tag, ImageFile } from '../../types';
 import { bridge } from '../../services/bridge';
+import { NavigationSlice } from './navigationSlice';
 import {
   GRID_ZOOM_MIN,
   GRID_ZOOM_MAX,
@@ -22,6 +23,10 @@ export interface UISlice {
   sortOrder: 'asc' | 'desc';
   filterRating: number | null;
   filterTags: string[];
+  // Global search mode — cross-folder DB search
+  isGlobalSearch: boolean;
+  isSearching: boolean;
+  searchResults: ImageFile[];
 
   loadAllTags: () => Promise<void>;
   setSidebarWidth: (width: number) => void;
@@ -38,13 +43,13 @@ export interface UISlice {
   setFilterTags: (tags: string[]) => void;
   clearFilters: () => void;
   setupSubscriptions: () => void;
+  // Global search: search DB across all folders by tags/rating
+  executeGlobalSearch: (tags?: string[], minRating?: number) => Promise<void>;
+  exitGlobalSearch: () => void;
 }
 
 export const createUISlice: StateCreator<
-  UISlice & {
-    images: ImageFile[];
-    gridItems: GridItem[];
-  },
+  UISlice & ImageSlice & NavigationSlice,
   [],
   [],
   UISlice
@@ -59,6 +64,9 @@ export const createUISlice: StateCreator<
   sortOrder: 'asc',
   filterRating: null,
   filterTags: [],
+  isGlobalSearch: false,
+  isSearching: false,
+  searchResults: [],
 
   loadAllTags: async () => {
     try {
@@ -90,9 +98,42 @@ export const createUISlice: StateCreator<
   toggleSortOrder: () => set((state) => ({ sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc' })),
   setFilterRating: (rating) => set({ filterRating: rating }),
   setFilterTags: (tags) => set({ filterTags: tags }),
-  clearFilters: () => set({ searchQuery: '', filterRating: null, filterTags: [], sortBy: 'name', sortOrder: 'asc' }),
+  clearFilters: () => {
+    const wasGlobal = get().isGlobalSearch;
+    set({ searchQuery: '', filterRating: null, filterTags: [], sortBy: 'name', sortOrder: 'asc', isGlobalSearch: false, isSearching: false, searchResults: [] });
+    // If we were in global search mode, reload current folder to restore normal view
+    if (wasGlobal) {
+      const folder = get().currentFolder;
+      if (folder) get().loadImages(folder);
+    }
+  },
+
+  executeGlobalSearch: async (tags, minRating) => {
+    set({ isGlobalSearch: true, isSearching: true });
+    try {
+      const results = await bridge.searchImages(tags, minRating, 200);
+      set({ searchResults: results, isSearching: false });
+    } catch (error) {
+      set({ isSearching: false, error: (error as Error).message });
+    }
+  },
+
+  exitGlobalSearch: () => {
+    set({ isGlobalSearch: false, isSearching: false, searchResults: [] });
+    const folder = get().currentFolder;
+    if (folder) get().loadImages(folder);
+  },
 
   setupSubscriptions: () => {
+    // FileSystemWatcher: auto-refresh when files change in the watched folder
+    bridge.on('folderChanged', () => {
+      const { currentFolder } = get();
+      if (currentFolder) {
+        // Debounced refresh — the backend already debounces, but we add a small guard
+        get().loadImages(currentFolder);
+      }
+    });
+
     bridge.on('metadataUpdated', (data) => {
       // eslint-disable-next-line no-console
       console.log('metadataUpdated received', data);
