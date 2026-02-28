@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 using TagFusion.Bridge;
 using TagFusion.Database;
@@ -19,6 +20,7 @@ public partial class MainWindow : Window
     private readonly string _appDirectory;
     private readonly string _wwwrootPath;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<MainWindow> _logger;
 
     private WebViewBridge? _bridge;
 
@@ -33,6 +35,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _serviceProvider = serviceProvider;
+        _logger = serviceProvider.GetRequiredService<ILogger<MainWindow>>();
 
         // Use multiple fallbacks for app directory (single-file publishing can cause issues)
         _appDirectory = GetAppDirectory();
@@ -82,7 +85,7 @@ public partial class MainWindow : Window
         try
         {
             var version = CoreWebView2Environment.GetAvailableBrowserVersionString();
-            System.Diagnostics.Debug.WriteLine($"WebView2 Runtime Version: {version}");
+            _logger.LogInformation("WebView2 Runtime Version: {Version}", version);
         }
         catch (WebView2RuntimeNotFoundException)
         {
@@ -135,6 +138,7 @@ public partial class MainWindow : Window
             var fileOperationService = _serviceProvider.GetRequiredService<FileOperationService>();
 
             // Initialize bridge for C# <-> React communication
+            var bridgeLogger = _serviceProvider.GetRequiredService<ILogger<WebViewBridge>>();
             _bridge = new WebViewBridge(
                 webView.CoreWebView2,
                 exifToolService,
@@ -142,7 +146,8 @@ public partial class MainWindow : Window
                 tagService,
                 databaseService,
                 imageEditService,
-                fileOperationService);
+                fileOperationService,
+                bridgeLogger);
 
             // Set up virtual host for wwwroot
             if (Directory.Exists(_wwwrootPath))

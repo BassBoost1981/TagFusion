@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using TagFusion.Models;
 
@@ -14,11 +14,13 @@ public class FileSystemService
     private readonly string[] _videoExtensions = { ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm" };
     private readonly ExifToolService _exifToolService;
     private readonly ThumbnailService _thumbnailService;
+    private readonly ILogger<FileSystemService> _logger;
 
-    public FileSystemService(ExifToolService exifToolService, ThumbnailService thumbnailService)
+    public FileSystemService(ExifToolService exifToolService, ThumbnailService thumbnailService, ILogger<FileSystemService> logger)
     {
         _exifToolService = exifToolService;
         _thumbnailService = thumbnailService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -51,7 +53,7 @@ public class FileSystemService
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FileSystem] Skipping inaccessible drive: {ex.Message}");
+                _logger.LogDebug(ex, "Skipping inaccessible drive");
             }
         }
 
@@ -93,13 +95,13 @@ public class FileSystemService
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FileSystem] Skipping inaccessible folder: {ex.Message}");
+                    _logger.LogDebug(ex, "Skipping inaccessible folder");
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[FileSystem] Access denied reading folders: {ex.Message}");
+            _logger.LogWarning(ex, "Access denied reading folders");
         }
 
         return folders.OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -142,14 +144,14 @@ public class FileSystemService
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[FileSystem] Skipping inaccessible file: {ex.Message}");
+                        _logger.LogDebug(ex, "Skipping inaccessible file");
                     }
                 }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FileSystem] Access denied reading images: {ex.Message}");
+                _logger.LogWarning(ex, "Access denied reading images");
             }
 
             return images.OrderBy(i => i.FileName, StringComparer.OrdinalIgnoreCase).ToList();
@@ -195,13 +197,13 @@ public class FileSystemService
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FileSystem] Skipping inaccessible folder in content: {ex.Message}");
+                    _logger.LogDebug(ex, "Skipping inaccessible folder in content");
                 }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[FileSystem] Access denied reading folder content: {ex.Message}");
+            _logger.LogWarning(ex, "Access denied reading folder content");
         }
 
         // Sort folders by name
@@ -246,7 +248,7 @@ public class FileSystemService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[FileSystem] Failed to get folder stats: {ex.Message}");
+            _logger.LogDebug(ex, "Failed to get folder stats");
             return (0, 0, 0);
         }
     }
@@ -290,7 +292,7 @@ public class FileSystemService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[FileSystem] HasSubfolders check failed: {ex.Message}");
+            _logger.LogDebug(ex, "HasSubfolders check failed");
             return false;
         }
     }

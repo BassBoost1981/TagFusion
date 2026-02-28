@@ -1,6 +1,9 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using TagFusion.Database;
+using TagFusion.Logging;
 using TagFusion.Services;
 
 namespace TagFusion;
@@ -17,6 +20,15 @@ public partial class App : Application
         base.OnStartup(e);
 
         var services = new ServiceCollection();
+
+        // Logging: Console (debug) + File (persistent)
+        var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Debug);
+            builder.AddConsole();
+            builder.AddProvider(new FileLoggerProvider(logDir, LogLevel.Information));
+        });
 
         // Services ohne Abhängigkeiten
         services.AddSingleton<ThumbnailService>();

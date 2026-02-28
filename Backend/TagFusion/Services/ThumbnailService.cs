@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace TagFusion.Services;
 
@@ -15,13 +16,15 @@ public class ThumbnailService
 {
     private readonly int _thumbnailSize;
     private readonly string _cacheDirectory;
+    private readonly ILogger<ThumbnailService> _logger;
 
-    public ThumbnailService(int thumbnailSize = 256)
+    public ThumbnailService(ILogger<ThumbnailService> logger, int thumbnailSize = 256)
     {
+        _logger = logger;
         _thumbnailSize = thumbnailSize;
         var appDir = AppContext.BaseDirectory ?? string.Empty;
         _cacheDirectory = Path.Combine(appDir, "cache", "thumbnails");
-        
+
         if (!Directory.Exists(_cacheDirectory))
             Directory.CreateDirectory(_cacheDirectory);
     }
@@ -47,7 +50,7 @@ public class ThumbnailService
             else
             {
                 // Old Base64 text format - delete and regenerate
-                try { File.Delete(cachePath); } catch (Exception ex) { Debug.WriteLine($"[Thumbnail] Failed to delete old cache file: {ex.Message}"); }
+                try { File.Delete(cachePath); } catch (Exception ex) { _logger.LogDebug(ex, "Failed to delete old cache file"); }
                 return null;
             }
         }
@@ -80,7 +83,7 @@ public class ThumbnailService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Thumbnail] Failed to get cached thumbnail: {ex.Message}");
+            _logger.LogDebug(ex, "Failed to decode thumbnail path from URL");
             return null;
         }
     }
@@ -279,7 +282,7 @@ public class ThumbnailService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Thumbnail] Batch embedded extraction failed: {ex.Message}");
+            _logger.LogWarning(ex, "Batch embedded thumbnail extraction failed");
             // Fall through — images without results will go to System.Drawing fallback
         }
 
@@ -315,7 +318,7 @@ public class ThumbnailService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Failed to extract embedded thumbnail: {ex.Message}");
+            _logger.LogDebug(ex, "Failed to extract embedded thumbnail for {ImagePath}", imagePath);
         }
 
         return null;
@@ -355,7 +358,7 @@ public class ThumbnailService
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to generate thumbnail: {ex.Message}");
+                _logger.LogDebug(ex, "Failed to generate thumbnail for {ImagePath}", imagePath);
                 return null;
             }
         }, cancellationToken);
@@ -420,7 +423,7 @@ public class ThumbnailService
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to get full image: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to get full image: {ImagePath}", imagePath);
                 return null;
             }
         }, cancellationToken);
@@ -467,7 +470,7 @@ public class ThumbnailService
         {
             foreach (var file in Directory.GetFiles(_cacheDirectory, "*.thumb"))
             {
-                try { File.Delete(file); } catch (Exception ex) { Debug.WriteLine($"[Thumbnail] Failed to delete cache file: {ex.Message}"); }
+                try { File.Delete(file); } catch (Exception ex) { _logger.LogDebug(ex, "Failed to delete cache file: {FilePath}", file); }
             }
         }
     }

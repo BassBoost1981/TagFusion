@@ -1,7 +1,7 @@
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace TagFusion.Services;
 
@@ -12,10 +12,12 @@ namespace TagFusion.Services;
 public class ImageEditService
 {
     private readonly ThumbnailService _thumbnailService;
+    private readonly ILogger<ImageEditService> _logger;
 
-    public ImageEditService(ThumbnailService thumbnailService)
+    public ImageEditService(ThumbnailService thumbnailService, ILogger<ImageEditService> logger)
     {
         _thumbnailService = thumbnailService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -77,7 +79,7 @@ public class ImageEditService
             {
                 if (!File.Exists(imagePath))
                 {
-                    Debug.WriteLine($"[ImageEdit] File not found: {imagePath}");
+                    _logger.LogWarning("File not found: {ImagePath}", imagePath);
                     return false;
                 }
 
@@ -129,19 +131,18 @@ public class ImageEditService
                 // Invalidate thumbnail cache
                 InvalidateThumbnailCache(imagePath);
 
-                Debug.WriteLine($"[ImageEdit] Successfully transformed: {imagePath}");
+                _logger.LogDebug("Successfully transformed: {ImagePath}", imagePath);
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ImageEdit] Failed to transform {imagePath}: {ex.Message}");
-                Debug.WriteLine($"[ImageEdit] Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, "Failed to transform {ImagePath}", imagePath);
 
                 // Clean up temp file if it exists
                 var tempPath = imagePath + ".tmp";
                 if (File.Exists(tempPath))
                 {
-                    try { File.Delete(tempPath); } catch (Exception cleanupEx) { Debug.WriteLine($"[ImageEdit] Failed to delete temp file: {cleanupEx.Message}"); }
+                    try { File.Delete(tempPath); } catch (Exception cleanupEx) { _logger.LogWarning(cleanupEx, "Failed to delete temp file: {TempPath}", tempPath); }
                 }
 
                 return false;
@@ -176,12 +177,12 @@ public class ImageEditService
             if (File.Exists(cachePath))
             {
                 File.Delete(cachePath);
-                Debug.WriteLine($"[ImageEdit] Thumbnail cache invalidated: {imagePath}");
+                _logger.LogDebug("Thumbnail cache invalidated: {ImagePath}", imagePath);
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[ImageEdit] Failed to invalidate cache: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to invalidate thumbnail cache for {ImagePath}", imagePath);
         }
     }
 }

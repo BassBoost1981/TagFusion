@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
 
 namespace TagFusion.Services
@@ -10,6 +11,13 @@ namespace TagFusion.Services
     /// </summary>
     public class FileOperationService
     {
+        private readonly ILogger<FileOperationService> _logger;
+
+        public FileOperationService(ILogger<FileOperationService> logger)
+        {
+            _logger = logger;
+        }
+
         /// <summary>
         /// Copy files/folders to a target directory.
         /// Rolls back already-copied files on failure to avoid partial state.
@@ -42,7 +50,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CopyFiles error: {ex.Message}");
+                _logger.LogError(ex, "CopyFiles failed");
 
                 // Rollback: delete already-copied files/folders
                 foreach (var copied in copiedPaths)
@@ -56,7 +64,7 @@ namespace TagFusion.Services
                     }
                     catch (Exception rollbackEx)
                     {
-                        Debug.WriteLine($"CopyFiles rollback failed for {copied}: {rollbackEx.Message}");
+                        _logger.LogWarning(rollbackEx, "CopyFiles rollback failed for {Path}", copied);
                     }
                 }
 
@@ -92,7 +100,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MoveFiles error: {ex.Message}");
+                _logger.LogError(ex, "MoveFiles failed");
                 throw;
             }
         }
@@ -119,7 +127,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"DeleteFiles error: {ex.Message}");
+                _logger.LogError(ex, "DeleteFiles failed");
                 throw;
             }
         }
@@ -163,7 +171,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RenameFile error: {ex.Message}");
+                _logger.LogError(ex, "RenameFile failed");
                 throw;
             }
         }
@@ -187,7 +195,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"OpenInExplorer error: {ex.Message}");
+                _logger.LogError(ex, "OpenInExplorer failed");
                 throw;
             }
         }
@@ -237,7 +245,7 @@ namespace TagFusion.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[FileOps] Failed to read image dimensions: {ex.Message}");
+                        _logger.LogDebug(ex, "Failed to read image dimensions");
                     }
 
                     return result;
@@ -249,7 +257,7 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"GetProperties error: {ex.Message}");
+                _logger.LogError(ex, "GetProperties error");
                 throw;
             }
         }

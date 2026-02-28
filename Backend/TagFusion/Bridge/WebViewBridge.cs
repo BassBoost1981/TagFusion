@@ -1,7 +1,7 @@
-using System.Diagnostics;
 using System.Windows;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using Microsoft.Web.WebView2.Core;
 using TagFusion.Database;
 using TagFusion.Models;
@@ -21,6 +21,7 @@ public class WebViewBridge
     private readonly IDatabaseService _databaseService;
     private readonly ImageEditService _imageEditService;
     private readonly FileOperationService _fileOperationService;
+    private readonly ILogger<WebViewBridge> _logger;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -35,7 +36,8 @@ public class WebViewBridge
         TagService tagService,
         IDatabaseService databaseService,
         ImageEditService imageEditService,
-        FileOperationService fileOperationService)
+        FileOperationService fileOperationService,
+        ILogger<WebViewBridge> logger)
     {
         _webView = webView;
         _exifToolService = exifToolService;
@@ -44,10 +46,11 @@ public class WebViewBridge
         _databaseService = databaseService;
         _imageEditService = imageEditService;
         _fileOperationService = fileOperationService;
+        _logger = logger;
 
         _webView.WebMessageReceived += OnWebMessageReceived;
 
-        Debug.WriteLine("WebViewBridge initialized");
+        _logger.LogInformation("WebViewBridge initialized");
     }
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -63,23 +66,23 @@ public class WebViewBridge
         {
             // Use TryGetWebMessageAsString instead of WebMessageAsJson to avoid double-parsing
             var json = e.TryGetWebMessageAsString();
-            Debug.WriteLine($"[Bridge] Received: {json}");
+            _logger.LogDebug("Received: {Message}", json);
 
             var message = JsonSerializer.Deserialize<BridgeMessage>(json, _jsonOptions);
 
             if (message == null)
             {
-                Debug.WriteLine("[Bridge] ERROR: Invalid message format");
+                _logger.LogError("Invalid message format");
                 SendError(null, "Invalid message format");
                 return;
             }
 
-            Debug.WriteLine($"[Bridge] Processing action: {message.Action}");
+            _logger.LogDebug("Processing action: {Action}", message.Action);
             await ProcessMessageAsync(message);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Bridge] ERROR: {ex.Message}");
+            _logger.LogError(ex, "Error handling web message");
             SendError(null, ex.Message);
         }
     }
@@ -218,7 +221,7 @@ public class WebViewBridge
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Bridge] Background metadata load failed: {ex.Message}");
+                _logger.LogWarning(ex, "Background metadata load failed");
             }
         });
     }
@@ -237,7 +240,7 @@ public class WebViewBridge
             .Select(g => g.First())
             .ToList();
 
-        Debug.WriteLine($"[Bridge] WriteTagsAsync: path={imagePath}, tags=[{string.Join(", ", tags)}]");
+        _logger.LogDebug("WriteTagsAsync: path={ImagePath}, tags=[{Tags}]", imagePath, string.Join(", ", tags));
 
         var success = await _exifToolService.WriteTagsAsync(imagePath, tags);
         if (success)
@@ -256,7 +259,7 @@ public class WebViewBridge
                 Rating = await _exifToolService.ReadRatingAsync(imagePath)
             };
             await _databaseService.SaveImageAsync(image);
-            Debug.WriteLine($"[Bridge] WriteTagsAsync: DB updated with {tags.Count} tags");
+            _logger.LogDebug("WriteTagsAsync: DB updated with {TagCount} tags", tags.Count);
         }
         return success;
     }
@@ -415,7 +418,7 @@ public class WebViewBridge
     private void SendToFrontend(object message)
     {
         var json = JsonSerializer.Serialize(message, _jsonOptions);
-        Debug.WriteLine($"[Bridge] Sending: {json.Substring(0, Math.Min(200, json.Length))}...");
+        _logger.LogDebug("Sending: {Message}", json[..Math.Min(200, json.Length)]);
 
         // Ensure we're on the UI thread
         Application.Current.Dispatcher.Invoke(() =>

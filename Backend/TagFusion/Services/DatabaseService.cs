@@ -1,6 +1,6 @@
 using System.Data.SQLite;
-using System.Diagnostics;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using TagFusion.Database;
 using TagFusion.Models;
 
@@ -10,10 +10,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 {
     private readonly SQLiteConnection _connection;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly ILogger<DatabaseService> _logger;
     private bool _disposed;
 
-    public DatabaseService()
+    public DatabaseService(ILogger<DatabaseService> logger)
     {
+        _logger = logger;
         var appDir = AppContext.BaseDirectory ?? string.Empty;
         var dbPath = Path.Combine(appDir, "tagfusion.db");
         var connectionString = $"Data Source={dbPath};Version=3;";
@@ -29,6 +31,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
 
         InitializeDatabase();
+        _logger.LogInformation("Database initialized at {DbPath}", dbPath);
     }
 
     /// <summary>
@@ -36,6 +39,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     internal DatabaseService(string connectionString)
     {
+        _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<DatabaseService>.Instance;
         _connection = new SQLiteConnection(connectionString);
         _connection.Open();
         InitializeDatabase();
@@ -314,7 +318,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[Database] Health check failed: {ex.Message}");
+            _logger.LogError(ex, "Database health check failed");
             return false;
         }
         finally

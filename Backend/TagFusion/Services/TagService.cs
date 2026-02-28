@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using TagFusion.Models;
 
 namespace TagFusion.Services;
@@ -8,6 +9,7 @@ public class TagService
 {
     private readonly string _tagFilePath;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly ILogger<TagService> _logger;
     private List<Tag> _cachedTags = new();
     private DateTime _lastLoadTime = DateTime.MinValue;
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -16,11 +18,13 @@ public class TagService
         WriteIndented = true
     };
 
-    public TagService()
+    public TagService(ILogger<TagService> logger)
     {
+        _logger = logger;
+
         // Look for the tag file in the workspace root (development) or app directory (production)
         var appDir = AppContext.BaseDirectory ?? string.Empty;
-        
+
         // Try to find the file in parent directories (up to workspace root)
         var currentDir = new DirectoryInfo(appDir);
         string? foundPath = null;
@@ -29,7 +33,7 @@ public class TagService
         for (int i = 0; i < 6; i++)
         {
             if (currentDir == null) break;
-            
+
             var files = currentDir.GetFiles("TagFusion_Tags_*.json");
             if (files.Length > 0)
             {
@@ -41,7 +45,7 @@ public class TagService
         }
 
         _tagFilePath = foundPath ?? Path.Combine(appDir, "TagFusion_Tags_20251112.json");
-        System.Diagnostics.Debug.WriteLine($"Tag file path: {_tagFilePath}");
+        _logger.LogInformation("Tag file path: {TagFilePath}", _tagFilePath);
     }
 
     public async Task<List<Tag>> GetAllTagsAsync(CancellationToken cancellationToken = default)
@@ -94,7 +98,7 @@ public class TagService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading tags: {ex.Message}");
+            _logger.LogWarning(ex, "Error loading tags");
             return new List<Tag>();
         }
         finally
@@ -115,7 +119,7 @@ public class TagService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[TagService] Failed to load tag library: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to load tag library");
             return null;
         }
     }
@@ -136,7 +140,7 @@ public class TagService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error saving tags: {ex.Message}");
+            _logger.LogError(ex, "Error saving tags");
             return false;
         }
         finally

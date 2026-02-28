@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using TagFusion.Models;
 
 namespace TagFusion.Services;
@@ -14,36 +15,23 @@ public class ExifToolService : IDisposable
 {
     private readonly string _exifToolPath;
     private readonly ThumbnailService _thumbnailService;
+    private readonly ILogger<ExifToolService> _logger;
     private Process? _exifToolProcess;
     private StreamWriter? _commandWriter;
     private StreamReader? _outputReader;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private bool _disposed;
-    
-    // Log file for debugging (next to exe)
-    private static readonly string LogFile = Path.Combine(AppContext.BaseDirectory, "exiftool_debug.log");
-    
-    private static void Log(string message)
-    {
-        try
-        {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            var logLine = $"[{timestamp}] {message}";
-            File.AppendAllText(LogFile, logLine + Environment.NewLine);
-            Console.WriteLine(logLine);
-        }
-        catch (Exception ex) { Debug.WriteLine($"[ExifTool] Log write failed: {ex.Message}"); }
-    }
 
     public string ExifToolPath => _exifToolPath;
 
-    public ExifToolService(ThumbnailService thumbnailService)
+    public ExifToolService(ThumbnailService thumbnailService, ILogger<ExifToolService> logger)
     {
         _thumbnailService = thumbnailService;
+        _logger = logger;
 
         // Find ExifTool path relative to app directory
         var appDir = AppContext.BaseDirectory ?? string.Empty;
-        Log($"AppContext.BaseDirectory: {appDir}");
+        _logger.LogDebug("AppContext.BaseDirectory: {AppDir}", appDir);
 
         // Try different possible locations
         var possiblePaths = new[]
@@ -56,20 +44,19 @@ public class ExifToolService : IDisposable
             Path.Combine(appDir, "exiftool.exe")
         };
 
-        Log("Searching for exiftool.exe in:");
+        _logger.LogDebug("Searching for exiftool.exe in:");
         foreach (var p in possiblePaths)
         {
             var fullPath = Path.GetFullPath(p);
             var exists = File.Exists(fullPath);
-            Log($"  - {fullPath} (exists: {exists})");
+            _logger.LogDebug("  - {Path} (exists: {Exists})", fullPath, exists);
         }
 
         _exifToolPath = possiblePaths.FirstOrDefault(File.Exists)
             ?? throw new FileNotFoundException($"ExifTool not found. Searched in: {string.Join(", ", possiblePaths.Select(Path.GetFullPath))}");
 
         _exifToolPath = Path.GetFullPath(_exifToolPath);
-        Log($"Using path: {_exifToolPath}");
-        Debug.WriteLine($"ExifTool path: {_exifToolPath}");
+        _logger.LogInformation("ExifTool path: {ExifToolPath}", _exifToolPath);
     }
 
     /// <summary>
@@ -112,12 +99,12 @@ public class ExifToolService : IDisposable
         {
             if (!string.IsNullOrEmpty(args.Data))
             {
-                Log($"[stderr] {args.Data}");
+                _logger.LogWarning("[stderr] {StderrData}", args.Data);
             }
         };
         _exifToolProcess.BeginErrorReadLine();
 
-        Debug.WriteLine("ExifTool persistent process started");
+        _logger.LogInformation("ExifTool persistent process started");
     }
 
 
@@ -164,7 +151,7 @@ public class ExifToolService : IDisposable
         }
         catch (JsonException ex)
         {
-            Debug.WriteLine($"[ExifTool] Failed to parse tags JSON: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to parse tags JSON");
             return new List<string>();
         }
     }
@@ -177,8 +164,8 @@ public class ExifToolService : IDisposable
         if (!File.Exists(imagePath))
             throw new FileNotFoundException($"Image not found: {imagePath}");
 
-        Log($"WriteTagsAsync called for: {imagePath}");
-        Log($"Tags to write: [{string.Join(", ", tags)}]");
+        _logger.LogDebug("WriteTagsAsync called for: {ImagePath}", imagePath);
+        _logger.LogDebug("Tags to write: [{Tags}]", string.Join(", ", tags));
 
         // Deduplicate tags (case-insensitive, trim whitespace)
         var uniqueTags = tags
@@ -189,7 +176,7 @@ public class ExifToolService : IDisposable
             .ToList();
 
         if (uniqueTags.Count != tags.Count)
-            Log($"Deduplicated tags: {tags.Count} → {uniqueTags.Count}");
+            _logger.LogDebug("Deduplicated tags: {Original} → {Unique}", tags.Count, uniqueTags.Count);
 
         // Build argument list directly (no string→parse round-trip)
         var args = new List<string>();
@@ -213,29 +200,29 @@ public class ExifToolService : IDisposable
         args.Add("-overwrite_original");
         args.Add(imagePath);
 
-        Log($"Sending {args.Count} args directly to ExifTool");
+        _logger.LogDebug("Sending {ArgCount} args directly to ExifTool", args.Count);
 
         var output = await RunExifToolAsync(args, cancellationToken);
-        Log($"WriteTagsAsync output: '{output}'");
+        _logger.LogDebug("WriteTagsAsync output: '{Output}'", output.Trim());
 
         // Check for errors in output (warnings are often harmless, only throw on actual errors)
         if (output.Contains("Error", StringComparison.OrdinalIgnoreCase))
         {
-            Log("WriteTagsAsync ERROR detected in output!");
+            _logger.LogError("WriteTagsAsync ERROR detected in output");
             throw new InvalidOperationException($"ExifTool error: {output}");
         }
 
         // Log warnings but don't fail
         if (output.Contains("Warning", StringComparison.OrdinalIgnoreCase))
         {
-            Log($"WriteTagsAsync Warning (non-fatal): {output}");
+            _logger.LogWarning("WriteTagsAsync non-fatal warning: {Output}", output.Trim());
         }
 
         // Check if file was updated (ExifTool reports "1 image files updated")
         if (!output.Contains("1 image files updated", StringComparison.OrdinalIgnoreCase) &&
             !output.Contains("1 image file updated", StringComparison.OrdinalIgnoreCase))
         {
-            Log("WriteTagsAsync - No 'image files updated' confirmation found in output");
+            _logger.LogWarning("WriteTagsAsync - No 'image files updated' confirmation found in output");
         }
 
         return true;
@@ -267,7 +254,7 @@ public class ExifToolService : IDisposable
         }
         catch (JsonException ex)
         {
-            Debug.WriteLine($"[ExifTool] Failed to parse rating JSON: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to parse rating JSON");
             return 0;
         }
     }
@@ -344,11 +331,11 @@ public class ExifToolService : IDisposable
             }
             catch (JsonException ex)
             {
-                Debug.WriteLine($"Failed to parse batch metadata: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to parse batch metadata");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Failed to read batch metadata: {ex.Message}");
+                _logger.LogError(ex, "Failed to read batch metadata");
             }
         }
 
@@ -365,18 +352,18 @@ public class ExifToolService : IDisposable
 
         rating = Math.Clamp(rating, 0, 5);
 
-        Log($"WriteRatingAsync called for: {imagePath}, rating: {rating}");
+        _logger.LogDebug("WriteRatingAsync called for: {ImagePath}, rating: {Rating}", imagePath, rating);
 
         var args = $"-XMP:Rating={rating} -overwrite_original \"{imagePath}\"";
-        Log($"Command args: {args}");
+        _logger.LogDebug("Command args: {Args}", args);
 
         var output = await RunExifToolAsync(args, cancellationToken);
-        Log($"WriteRatingAsync output: '{output}'");
+        _logger.LogDebug("WriteRatingAsync output: '{Output}'", output.Trim());
         
         // Check for errors in output
         if (output.Contains("Error", StringComparison.OrdinalIgnoreCase))
         {
-            Log("WriteRatingAsync ERROR detected in output!");
+            _logger.LogError("WriteRatingAsync ERROR detected in output");
             throw new InvalidOperationException($"ExifTool error: {output}");
         }
         
@@ -450,7 +437,7 @@ public class ExifToolService : IDisposable
                 }
             }
         }
-        catch (JsonException ex) { Debug.WriteLine($"[ExifTool] Failed to parse image metadata JSON: {ex.Message}"); }
+        catch (JsonException ex) { _logger.LogWarning(ex, "Failed to parse image metadata JSON"); }
 
         return image;
     }
@@ -468,10 +455,10 @@ public class ExifToolService : IDisposable
             // In -stay_open mode with -@ -, each argument must be on a SEPARATE LINE
             // Parse the arguments string and send each argument individually
             var args = ParseArguments(arguments);
-            Log($"RunExifToolAsync: Sending {args.Count} arguments:");
+            _logger.LogDebug("RunExifToolAsync: Sending {ArgCount} arguments", args.Count);
             foreach (var arg in args)
             {
-                Log($"  > {arg}");
+                _logger.LogDebug("  > {Arg}", arg);
                 await _commandWriter.WriteLineAsync(arg.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
             await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -487,7 +474,7 @@ public class ExifToolService : IDisposable
                 sb.AppendLine(line);
             }
             var output = sb.ToString();
-            Log($"RunExifToolAsync: Output received: '{output.Trim()}'");
+            _logger.LogDebug("RunExifToolAsync: Output received: '{Output}'", output.Trim());
 
             return output;
         }
@@ -512,10 +499,10 @@ public class ExifToolService : IDisposable
             if (_commandWriter == null || _outputReader == null)
                 throw new InvalidOperationException("ExifTool process not initialized");
 
-            Log($"RunExifToolAsync (List): Sending {args.Count} arguments:");
+            _logger.LogDebug("RunExifToolAsync (List): Sending {ArgCount} arguments", args.Count);
             foreach (var arg in args)
             {
-                Log($"  > {arg}");
+                _logger.LogDebug("  > {Arg}", arg);
                 await _commandWriter.WriteLineAsync(arg.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
             await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -531,7 +518,7 @@ public class ExifToolService : IDisposable
                 sb.AppendLine(line);
             }
             var output = sb.ToString();
-            Log($"RunExifToolAsync (List): Output received: '{output.Trim()}'");
+            _logger.LogDebug("RunExifToolAsync (List): Output received: '{Output}'", output.Trim());
 
             return output;
         }
@@ -648,7 +635,7 @@ public class ExifToolService : IDisposable
                     _commandWriter.Flush();
                     _commandWriter.Dispose();
                 }
-                catch (Exception ex) { Debug.WriteLine($"[ExifTool] Failed to send shutdown command: {ex.Message}"); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to send ExifTool shutdown command"); }
             }
 
             if (_exifToolProcess != null)
@@ -662,7 +649,7 @@ public class ExifToolService : IDisposable
                     }
                     _exifToolProcess.Dispose();
                 }
-                catch (Exception ex) { Debug.WriteLine($"[ExifTool] Failed to dispose process: {ex.Message}"); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to dispose ExifTool process"); }
             }
 
             _outputReader?.Dispose();
