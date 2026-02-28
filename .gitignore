@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-Frontend/node_modules/
 
 # Build outputs
 Frontend/dist/
@@ -13,17 +12,21 @@ Backend/TagFusion.Tests/obj/
 Frontend/playwright-report/
 Frontend/test-results/
 Frontend/test-results.json
+Frontend/coverage/
 
 # IDE
 .vs/
 .vscode/
+.idea/
 *.user
 *.suo
+*.DotSettings.user
 
 # OS
 Thumbs.db
 Desktop.ini
 .DS_Store
+ehthumbs.db
 
 # Temp
 *.tmp
@@ -31,5 +34,29 @@ Desktop.ini
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
 
+# Logs
+*.log
+
+# Databases (runtime)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# WebView2 runtime data
+**/WebView2Data/
+**/*.WebView2/
+
+# Claude Code
+.claude/
+
+# Scratch/temp files
+heroui.txt
+lucide.txt
+
+# Credentials
+credentials.json
+token.json
