@@ -50,7 +50,14 @@ public class WebViewBridge
         Debug.WriteLine("WebViewBridge initialized");
     }
 
-    private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        // Delegate to async Task method to avoid async void pitfalls
+        // (unhandled exceptions in async void crash the process)
+        _ = HandleWebMessageAsync(e);
+    }
+
+    private async Task HandleWebMessageAsync(CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
         {

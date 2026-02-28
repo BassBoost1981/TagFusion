@@ -193,7 +193,7 @@ public class ThumbnailService
         // === Phase 3: Generate remaining thumbnails with System.Drawing ===
         if (needsGeneration.Count > 0)
         {
-            var semaphore = new SemaphoreSlim(maxParallel);
+            using var semaphore = new SemaphoreSlim(maxParallel);
             var tasks = needsGeneration.Select(async path =>
             {
                 await semaphore.WaitAsync(cancellationToken);

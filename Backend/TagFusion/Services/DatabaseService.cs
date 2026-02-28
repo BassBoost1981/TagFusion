@@ -326,9 +326,15 @@ public class DatabaseService : IDatabaseService, IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        _semaphore?.Dispose();
-        _connection?.Close();
-        _connection?.Dispose();
-        _disposed = true;
+        try
+        {
+            _semaphore?.Dispose();
+            _connection?.Close();
+            _connection?.Dispose();
+        }
+        finally
+        {
+            _disposed = true;
+        }
     }
 }

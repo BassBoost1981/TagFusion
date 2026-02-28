@@ -7,6 +7,7 @@ namespace TagFusion.Services;
 public class TagService
 {
     private readonly string _tagFilePath;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
     private List<Tag> _cachedTags = new();
     private DateTime _lastLoadTime = DateTime.MinValue;
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -45,18 +46,19 @@ public class TagService
 
     public async Task<List<Tag>> GetAllTagsAsync(CancellationToken cancellationToken = default)
     {
-        if (_cachedTags.Count > 0 && File.Exists(_tagFilePath) && File.GetLastWriteTime(_tagFilePath) <= _lastLoadTime)
-        {
-            return _cachedTags;
-        }
-
-        if (!File.Exists(_tagFilePath))
-        {
-            return new List<Tag>();
-        }
-
+        await _semaphore.WaitAsync(cancellationToken);
         try
         {
+            if (_cachedTags.Count > 0 && File.Exists(_tagFilePath) && File.GetLastWriteTime(_tagFilePath) <= _lastLoadTime)
+            {
+                return _cachedTags;
+            }
+
+            if (!File.Exists(_tagFilePath))
+            {
+                return new List<Tag>();
+            }
+
             var json = await File.ReadAllTextAsync(_tagFilePath, cancellationToken);
             var library = JsonSerializer.Deserialize<TagLibrary>(json, _jsonOptions);
 
@@ -83,7 +85,7 @@ public class TagService
             _cachedTags = tags.Select(t => new Tag
             {
                 Name = t,
-                UsageCount = 0, // We don't have usage counts in the JSON
+                UsageCount = 0,
                 IsFavorite = false
             }).OrderBy(t => t.Name).ToList();
 
@@ -94,6 +96,10 @@ public class TagService
         {
             System.Diagnostics.Debug.WriteLine($"Error loading tags: {ex.Message}");
             return new List<Tag>();
+        }
+        finally
+        {
+            _semaphore.Release();
         }
     }
 
@@ -116,21 +122,26 @@ public class TagService
 
     public async Task<bool> SaveTagLibraryAsync(object library, CancellationToken cancellationToken = default)
     {
+        await _semaphore.WaitAsync(cancellationToken);
         try
         {
             var json = JsonSerializer.Serialize(library, _jsonOptions);
             await File.WriteAllTextAsync(_tagFilePath, json, cancellationToken);
-            
+
             // Invalidate cache
             _lastLoadTime = DateTime.MinValue;
             _cachedTags.Clear();
-            
+
             return true;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error saving tags: {ex.Message}");
             return false;
+        }
+        finally
+        {
+            _semaphore.Release();
         }
     }
 
