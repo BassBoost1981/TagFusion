@@ -20,6 +20,8 @@ public record ThumbnailSettings
     public int Size { get; init; } = 256;
     public int JpegQuality { get; init; } = 92;
     public int MaxParallel { get; init; } = 8;
+    /// <summary>Max cache size in MB. When exceeded, oldest files are evicted. 0 = unlimited.</summary>
+    public int MaxCacheSizeMb { get; init; } = 500;
 }
 
 /// <summary>

@@ -22,13 +22,15 @@ namespace TagFusion.Services
         /// Copy files/folders to a target directory.
         /// Rolls back already-copied files on failure to avoid partial state.
         /// </summary>
-        public bool CopyFiles(string[] sourcePaths, string targetFolder)
+        public async Task<bool> CopyFilesAsync(string[] sourcePaths, string targetFolder, CancellationToken cancellationToken = default)
         {
             var copiedPaths = new List<string>();
             try
             {
                 foreach (var sourcePath in sourcePaths)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var name = Path.GetFileName(sourcePath);
                     var destPath = Path.Combine(targetFolder, name);
 
@@ -37,12 +39,12 @@ namespace TagFusion.Services
 
                     if (Directory.Exists(sourcePath))
                     {
-                        CopyDirectory(sourcePath, destPath);
+                        await Task.Run(() => CopyDirectory(sourcePath, destPath), cancellationToken);
                         copiedPaths.Add(destPath);
                     }
                     else if (File.Exists(sourcePath))
                     {
-                        File.Copy(sourcePath, destPath, false);
+                        await Task.Run(() => File.Copy(sourcePath, destPath, false), cancellationToken);
                         copiedPaths.Add(destPath);
                     }
                 }
@@ -75,25 +77,27 @@ namespace TagFusion.Services
         /// <summary>
         /// Move files/folders to a target directory
         /// </summary>
-        public bool MoveFiles(string[] sourcePaths, string targetFolder)
+        public async Task<bool> MoveFilesAsync(string[] sourcePaths, string targetFolder, CancellationToken cancellationToken = default)
         {
             try
             {
                 foreach (var sourcePath in sourcePaths)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var name = Path.GetFileName(sourcePath);
                     var destPath = Path.Combine(targetFolder, name);
-                    
+
                     // Handle name conflicts
                     destPath = GetUniqueDestPath(destPath);
 
                     if (Directory.Exists(sourcePath))
                     {
-                        Directory.Move(sourcePath, destPath);
+                        await Task.Run(() => Directory.Move(sourcePath, destPath), cancellationToken);
                     }
                     else if (File.Exists(sourcePath))
                     {
-                        File.Move(sourcePath, destPath);
+                        await Task.Run(() => File.Move(sourcePath, destPath), cancellationToken);
                     }
                 }
                 return true;
@@ -108,19 +112,21 @@ namespace TagFusion.Services
         /// <summary>
         /// Delete files/folders to recycle bin
         /// </summary>
-        public bool DeleteFiles(string[] paths)
+        public async Task<bool> DeleteFilesAsync(string[] paths, CancellationToken cancellationToken = default)
         {
             try
             {
                 foreach (var path in paths)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (Directory.Exists(path))
                     {
-                        FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                        await Task.Run(() => FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin), cancellationToken);
                     }
                     else if (File.Exists(path))
                     {
-                        FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                        await Task.Run(() => FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin), cancellationToken);
                     }
                 }
                 return true;
@@ -147,7 +153,7 @@ namespace TagFusion.Services
 
                 var directory = Path.GetDirectoryName(path);
                 var newPath = Path.Combine(directory!, newName);
-                
+
                 // Final safety check: ensuring the new path is still in the same parent directory
                 if (Path.GetDirectoryName(Path.GetFullPath(newPath)) != Path.GetDirectoryName(Path.GetFullPath(path)))
                 {

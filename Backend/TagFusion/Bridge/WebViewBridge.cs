@@ -21,6 +21,7 @@ public class WebViewBridge
     private readonly IDatabaseService _databaseService;
     private readonly ImageEditService _imageEditService;
     private readonly FileOperationService _fileOperationService;
+    private readonly DiagnosticsService _diagnosticsService;
     private readonly ILogger<WebViewBridge> _logger;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -37,6 +38,7 @@ public class WebViewBridge
         IDatabaseService databaseService,
         ImageEditService imageEditService,
         FileOperationService fileOperationService,
+        DiagnosticsService diagnosticsService,
         ILogger<WebViewBridge> logger)
     {
         _webView = webView;
@@ -46,6 +48,7 @@ public class WebViewBridge
         _databaseService = databaseService;
         _imageEditService = imageEditService;
         _fileOperationService = fileOperationService;
+        _diagnosticsService = diagnosticsService;
         _logger = logger;
 
         _webView.WebMessageReceived += OnWebMessageReceived;
@@ -123,12 +126,21 @@ public class WebViewBridge
                 "flipImages" => await FlipImagesAsync(message.Payload),
 
                 // File Operation actions
-                "copyFiles" => CopyFilesHandler(message.Payload),
-                "moveFiles" => MoveFilesHandler(message.Payload),
-                "deleteFiles" => DeleteFilesHandler(message.Payload),
+                "copyFiles" => await CopyFilesHandlerAsync(message.Payload),
+                "moveFiles" => await MoveFilesHandlerAsync(message.Payload),
+                "deleteFiles" => await DeleteFilesHandlerAsync(message.Payload),
                 "renameFile" => RenameFileHandler(message.Payload),
                 "openInExplorer" => OpenInExplorerHandler(message.Payload),
                 "getProperties" => GetPropertiesHandler(message.Payload),
+
+                // Diagnostics
+                "healthCheck" => await _diagnosticsService.CheckHealthAsync(),
+
+                // Search / Filter
+                "searchImages" => await SearchImagesAsync(message.Payload),
+
+                // Batch tag operations
+                "writeBatchTags" => await WriteBatchTagsAsync(message.Payload),
 
                 _ => throw new NotSupportedException($"Unknown action: {message.Action}")
             };
@@ -429,26 +441,102 @@ public class WebViewBridge
         });
     }
 
+    #region Search & Batch Handlers
+
+    private async Task<List<ImageFile>> SearchImagesAsync(Dictionary<string, object>? payload)
+    {
+        List<string>? tags = null;
+        int? minRating = null;
+        int limit = 200;
+
+        if (payload != null)
+        {
+            var tagsObj = payload.GetValueOrDefault("tags");
+            var extracted = ExtractStringArray(tagsObj);
+            if (extracted.Count > 0) tags = extracted;
+
+            var ratingObj = payload.GetValueOrDefault("minRating");
+            var rating = ExtractInt(ratingObj, 0);
+            if (rating > 0) minRating = rating;
+
+            var limitObj = payload.GetValueOrDefault("limit");
+            var parsedLimit = ExtractInt(limitObj, 200);
+            if (parsedLimit > 0) limit = parsedLimit;
+        }
+
+        return await _databaseService.SearchImagesAsync(tags, minRating, limit);
+    }
+
+    private async Task<Dictionary<string, bool>> WriteBatchTagsAsync(Dictionary<string, object>? payload)
+    {
+        if (payload == null) return new Dictionary<string, bool>();
+
+        var paths = GetPayloadStringArray(payload, "paths");
+        var tagsObj = payload.GetValueOrDefault("tags");
+        var tags = ExtractStringArray(tagsObj)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        var results = new Dictionary<string, bool>();
+
+        foreach (var path in paths)
+        {
+            try
+            {
+                var success = await _exifToolService.WriteTagsAsync(path, tags);
+                results[path] = success;
+
+                if (success)
+                {
+                    var fileInfo = new System.IO.FileInfo(path);
+                    var image = new ImageFile
+                    {
+                        Path = path,
+                        FileName = fileInfo.Name,
+                        Extension = fileInfo.Extension.ToLowerInvariant(),
+                        FileSize = fileInfo.Length,
+                        DateModified = fileInfo.LastWriteTime,
+                        Tags = tags,
+                        Rating = await _exifToolService.ReadRatingAsync(path)
+                    };
+                    await _databaseService.SaveImageAsync(image);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "WriteBatchTags failed for {Path}", path);
+                results[path] = false;
+            }
+        }
+
+        return results;
+    }
+
+    #endregion
+
     #region File Operation Handlers
 
-    private bool CopyFilesHandler(Dictionary<string, object>? payload)
+    private async Task<bool> CopyFilesHandlerAsync(Dictionary<string, object>? payload)
     {
         var paths = GetPayloadStringArray(payload, "paths");
         var targetFolder = GetPayloadString(payload, "targetFolder");
-        return _fileOperationService.CopyFiles(paths, targetFolder);
+        return await _fileOperationService.CopyFilesAsync(paths, targetFolder);
     }
 
-    private bool MoveFilesHandler(Dictionary<string, object>? payload)
+    private async Task<bool> MoveFilesHandlerAsync(Dictionary<string, object>? payload)
     {
         var paths = GetPayloadStringArray(payload, "paths");
         var targetFolder = GetPayloadString(payload, "targetFolder");
-        return _fileOperationService.MoveFiles(paths, targetFolder);
+        return await _fileOperationService.MoveFilesAsync(paths, targetFolder);
     }
 
-    private bool DeleteFilesHandler(Dictionary<string, object>? payload)
+    private async Task<bool> DeleteFilesHandlerAsync(Dictionary<string, object>? payload)
     {
         var paths = GetPayloadStringArray(payload, "paths");
-        return _fileOperationService.DeleteFiles(paths);
+        return await _fileOperationService.DeleteFilesAsync(paths);
     }
 
     private bool RenameFileHandler(Dictionary<string, object>? payload)

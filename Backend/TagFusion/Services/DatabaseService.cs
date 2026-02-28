@@ -318,6 +318,83 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
+    public async Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            var conditions = new List<string>();
+            using var command = _connection.CreateCommand();
+
+            if (minRating.HasValue && minRating.Value > 0)
+            {
+                conditions.Add("i.Rating >= @MinRating");
+                command.Parameters.AddWithValue("@MinRating", minRating.Value);
+            }
+
+            if (tags != null && tags.Count > 0)
+            {
+                var tagPlaceholders = string.Join(",", tags.Select((_, idx) => $"@tag{idx}"));
+                conditions.Add($@"i.Id IN (
+                    SELECT it.ImageId FROM ImageTags it
+                    JOIN Tags t ON it.TagId = t.Id
+                    WHERE t.Name IN ({tagPlaceholders})
+                    GROUP BY it.ImageId
+                    HAVING COUNT(DISTINCT t.Name) = @tagCount)");
+                for (int i = 0; i < tags.Count; i++)
+                    command.Parameters.AddWithValue($"@tag{i}", tags[i]);
+                command.Parameters.AddWithValue("@tagCount", tags.Count);
+            }
+
+            var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+            command.CommandText = $@"
+                SELECT i.Id, i.Path, i.LastModified, i.Rating, i.Width, i.Height, i.DateTaken
+                FROM Images i
+                {whereClause}
+                ORDER BY i.LastModified DESC
+                LIMIT @Limit";
+            command.Parameters.AddWithValue("@Limit", limit);
+
+            var results = new List<ImageFile>();
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            var imageIds = new List<(long id, ImageFile image)>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var imageId = reader.GetInt64(0);
+                var image = new ImageFile
+                {
+                    Path = reader.GetString(1),
+                    FileName = System.IO.Path.GetFileName(reader.GetString(1)),
+                    Extension = System.IO.Path.GetExtension(reader.GetString(1)),
+                    DateModified = DateTime.Parse(reader.GetString(2)),
+                    Rating = reader.GetInt32(3),
+                    Width = reader.GetInt32(4),
+                    Height = reader.GetInt32(5),
+                };
+                if (!reader.IsDBNull(6))
+                    image.DateTaken = DateTime.Parse(reader.GetString(6));
+
+                imageIds.Add((imageId, image));
+                results.Add(image);
+            }
+            reader.Close();
+
+            // Load tags for each image
+            foreach (var (id, image) in imageIds)
+            {
+                image.Tags = await GetTagsInternalAsync(id, cancellationToken);
+            }
+
+            return results;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
     public async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
     {
         await _semaphore.WaitAsync(cancellationToken);

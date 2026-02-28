@@ -64,6 +64,7 @@ public partial class App : Application
         services.AddSingleton<ExifToolService>();
         services.AddSingleton<FileSystemService>();
         services.AddSingleton<ImageEditService>();
+        services.AddSingleton<DiagnosticsService>();
 
         Services = services.BuildServiceProvider();
         _appLogger = Services.GetRequiredService<ILogger<App>>();

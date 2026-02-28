@@ -209,6 +209,35 @@ class BridgeService {
     return this.send<void>('openInExplorer', { path });
   }
 
+  // Health Check / Diagnostics
+  async healthCheck(): Promise<{
+    allOk: boolean;
+    checkedAt: string;
+    databaseOk: boolean;
+    databaseError?: string;
+    exifToolOk: boolean;
+    exifToolPath?: string;
+    diskOk: boolean;
+    diskFreeBytes: number;
+    diskTotalBytes: number;
+  }> {
+    return this.send('healthCheck');
+  }
+
+  // Search / Filter images by tags and/or rating
+  async searchImages(
+    tags?: string[],
+    minRating?: number,
+    limit?: number,
+  ): Promise<ImageFile[]> {
+    return this.send<ImageFile[]>('searchImages', { tags, minRating, limit });
+  }
+
+  // Batch tag operations — write same tags to multiple images
+  async writeBatchTags(paths: string[], tags: string[]): Promise<Record<string, boolean>> {
+    return this.send<Record<string, boolean>>('writeBatchTags', { paths, tags });
+  }
+
   async getProperties(path: string): Promise<{
     name: string;
     path: string;
@@ -273,6 +302,21 @@ class BridgeService {
           { name: 'landscape', usageCount: 42, isFavorite: true },
           { name: 'nature', usageCount: 38, isFavorite: false },
         ];
+      case 'healthCheck':
+        return {
+          allOk: true,
+          checkedAt: new Date().toISOString(),
+          databaseOk: true,
+          exifToolOk: true,
+          exifToolPath: 'Tools/exiftool.exe',
+          diskOk: true,
+          diskFreeBytes: 200 * 1024 ** 3,
+          diskTotalBytes: 500 * 1024 ** 3,
+        };
+      case 'searchImages':
+        return [];
+      case 'writeBatchTags':
+        return {};
       default:
         return null;
     }

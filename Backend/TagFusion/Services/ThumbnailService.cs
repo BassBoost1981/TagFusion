@@ -19,6 +19,7 @@ public class ThumbnailService
     private readonly int _thumbnailSize;
     private readonly int _jpegQuality;
     private readonly int _maxParallel;
+    private readonly long _maxCacheSizeBytes;
     private readonly string _cacheDirectory;
     private readonly ILogger<ThumbnailService> _logger;
 
@@ -29,6 +30,7 @@ public class ThumbnailService
         _thumbnailSize = settings.Size;
         _jpegQuality = settings.JpegQuality;
         _maxParallel = settings.MaxParallel;
+        _maxCacheSizeBytes = settings.MaxCacheSizeMb * 1024L * 1024L;
         var appDir = AppContext.BaseDirectory ?? string.Empty;
         _cacheDirectory = Path.Combine(appDir, "cache", "thumbnails");
 
@@ -467,6 +469,57 @@ public class ThumbnailService
     {
         var cachePath = Path.Combine(_cacheDirectory, $"{cacheKey}.thumb");
         await File.WriteAllBytesAsync(cachePath, data, cancellationToken);
+
+        // Trigger eviction check in background (non-blocking)
+        if (_maxCacheSizeBytes > 0)
+            _ = Task.Run(EvictOldestIfOverLimit, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Evict oldest cache files if total size exceeds MaxCacheSizeMb.
+    /// Entfernt älteste Cache-Dateien wenn die maximale Cache-Größe überschritten wird.
+    /// </summary>
+    private void EvictOldestIfOverLimit()
+    {
+        try
+        {
+            if (!Directory.Exists(_cacheDirectory)) return;
+
+            var files = new DirectoryInfo(_cacheDirectory)
+                .GetFiles("*.thumb")
+                .OrderBy(f => f.LastAccessTimeUtc)
+                .ToList();
+
+            var totalSize = files.Sum(f => f.Length);
+            if (totalSize <= _maxCacheSizeBytes) return;
+
+            // Target: evict down to 80% of max to avoid frequent eviction
+            var targetSize = (long)(_maxCacheSizeBytes * 0.8);
+            var evicted = 0;
+
+            foreach (var file in files)
+            {
+                if (totalSize <= targetSize) break;
+                try
+                {
+                    totalSize -= file.Length;
+                    file.Delete();
+                    evicted++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to evict cache file: {FilePath}", file.FullName);
+                }
+            }
+
+            if (evicted > 0)
+                _logger.LogInformation("Thumbnail cache eviction: removed {Count} files, size now ~{SizeMb}MB",
+                    evicted, totalSize / (1024 * 1024));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Thumbnail cache eviction failed");
+        }
     }
 
     /// <summary>

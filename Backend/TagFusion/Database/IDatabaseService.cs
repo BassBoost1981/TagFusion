@@ -31,6 +31,12 @@ public interface IDatabaseService
     /// Check database health and connectivity
     /// </summary>
     Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Search images by tags and/or minimum rating.
+    /// Suche nach Bildern anhand von Tags und/oder Mindestbewertung.
+    /// </summary>
+    Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

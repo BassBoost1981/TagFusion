@@ -140,6 +140,7 @@ public partial class MainWindow : Window
             var databaseService = _serviceProvider.GetRequiredService<IDatabaseService>();
             var imageEditService = _serviceProvider.GetRequiredService<ImageEditService>();
             var fileOperationService = _serviceProvider.GetRequiredService<FileOperationService>();
+            var diagnosticsService = _serviceProvider.GetRequiredService<DiagnosticsService>();
 
             // Initialize bridge for C# <-> React communication
             var bridgeLogger = _serviceProvider.GetRequiredService<ILogger<WebViewBridge>>();
@@ -151,6 +152,7 @@ public partial class MainWindow : Window
                 databaseService,
                 imageEditService,
                 fileOperationService,
+                diagnosticsService,
                 bridgeLogger);
 
             // Set up virtual host for wwwroot
