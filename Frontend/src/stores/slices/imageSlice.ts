@@ -2,6 +2,30 @@ import { StateCreator } from 'zustand';
 import type { ImageFile, GridItem } from '../../types';
 import { bridge } from '../../services/bridge';
 
+// ============================================================================
+// DRY HELPERS — Extracted from duplicated logic across loadImages/refreshImages/updateImage*
+// ============================================================================
+
+/** Extract normalized ImageFile[] from raw GridItems */
+const extractImages = (items: GridItem[]): ImageFile[] =>
+    items
+        .filter(i => !i.isFolder && i.imageData)
+        .map(i => ({
+            ...i.imageData!,
+            tags: i.imageData!.tags || [],
+            rating: i.imageData!.rating || 0
+        }));
+
+/** Sync gridItems with an updated images array via Map lookup */
+export const normalizeGridItems = (items: GridItem[], images: ImageFile[]): GridItem[] => {
+    const imageMap = new Map(images.map(img => [img.path, img]));
+    return items.map(item => {
+        if (item.isFolder) return item;
+        const img = imageMap.get(item.path);
+        return img ? { ...item, imageData: img } : item;
+    });
+};
+
 export interface ImageSlice {
     gridItems: GridItem[];
     images: ImageFile[];
@@ -39,23 +63,10 @@ export const createImageSlice: StateCreator<
             set({ isLoadingImages: true, currentFolder: folderPath });
             get().setCurrentFolder(folderPath);
             const items = await bridge.getFolderContents(folderPath);
-
-            const images = items
-                .filter(i => !i.isFolder && i.imageData)
-                .map(i => ({
-                    ...i.imageData!,
-                    tags: i.imageData!.tags || [],
-                    rating: i.imageData!.rating || 0
-                }));
-
-            const normalizedGridItems = items.map(item => {
-                if (item.isFolder) return item;
-                const img = images.find(i => i.path === item.path);
-                return { ...item, imageData: img };
-            });
+            const images = extractImages(items);
 
             set({
-                gridItems: normalizedGridItems,
+                gridItems: normalizeGridItems(items, images),
                 images,
                 selectedImages: new Set(),
                 lastSelectedImage: null,
@@ -73,25 +84,12 @@ export const createImageSlice: StateCreator<
             const selectedPaths = get().selectedImages;
             try {
                 const items = await bridge.getFolderContents(currentFolder);
-
-                const images = items
-                    .filter(i => !i.isFolder && i.imageData)
-                    .map(i => ({
-                        ...i.imageData!,
-                        tags: i.imageData!.tags || [],
-                        rating: i.imageData!.rating || 0
-                    }));
-
-                const normalizedGridItems = items.map(item => {
-                    if (item.isFolder) return item;
-                    const img = images.find(i => i.path === item.path);
-                    return { ...item, imageData: img };
-                });
-
+                const images = extractImages(items);
+                const imagePathSet = new Set(images.map(img => img.path));
                 const validSelection = new Set(
-                    Array.from(selectedPaths).filter(path => images.some(img => img.path === path))
+                    Array.from(selectedPaths).filter(path => imagePathSet.has(path))
                 );
-                set({ gridItems: normalizedGridItems, images, selectedImages: validSelection });
+                set({ gridItems: normalizeGridItems(items, images), images, selectedImages: validSelection });
             } catch (error) {
                 console.error('refreshImages error:', error);
             }
@@ -151,18 +149,10 @@ export const createImageSlice: StateCreator<
         try {
             await bridge.writeTags(imagePath, tags);
             const { images, gridItems } = get();
-
             const updatedImages = images.map(img =>
                 img.path === imagePath ? { ...img, tags } : img
             );
-
-            const updatedGridItems = gridItems.map(item => {
-                if (item.isFolder) return item;
-                const updatedImg = updatedImages.find(img => img.path === item.path);
-                return updatedImg ? { ...item, imageData: updatedImg } : item;
-            });
-
-            set({ images: updatedImages, gridItems: updatedGridItems });
+            set({ images: updatedImages, gridItems: normalizeGridItems(gridItems, updatedImages) });
         } catch (error) {
             get().setError((error as Error).message);
         }
@@ -172,18 +162,10 @@ export const createImageSlice: StateCreator<
         try {
             await bridge.setRating(imagePath, rating);
             const { images, gridItems } = get();
-
             const updatedImages = images.map(img =>
                 img.path === imagePath ? { ...img, rating } : img
             );
-
-            const updatedGridItems = gridItems.map(item => {
-                if (item.isFolder) return item;
-                const updatedImg = updatedImages.find(img => img.path === item.path);
-                return updatedImg ? { ...item, imageData: updatedImg } : item;
-            });
-
-            set({ images: updatedImages, gridItems: updatedGridItems });
+            set({ images: updatedImages, gridItems: normalizeGridItems(gridItems, updatedImages) });
         } catch (error) {
             get().setError((error as Error).message);
         }

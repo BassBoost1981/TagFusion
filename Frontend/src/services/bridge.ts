@@ -1,4 +1,4 @@
-import type { BridgeMessage, BridgeResponse, BridgeEvent, ImageFile, FolderItem, Tag, GridItem } from '../types';
+import type { BridgeMessage, BridgeResponse, BridgeEvent, ImageFile, FolderItem, Tag, GridItem, TagLibrary } from '../types';
 
 type EventCallback = (data: unknown) => void;
 
@@ -154,11 +154,11 @@ class BridgeService {
     return this.send<Tag[]>('getAllTags');
   }
 
-  async getTagLibrary(): Promise<unknown> {
-    return this.send<unknown>('getTagLibrary');
+  async getTagLibrary(): Promise<TagLibrary> {
+    return this.send<TagLibrary>('getTagLibrary');
   }
 
-  async saveTagLibrary(library: unknown): Promise<boolean> {
+  async saveTagLibrary(library: TagLibrary): Promise<boolean> {
     return this.send<boolean>('saveTagLibrary', { library });
   }
 

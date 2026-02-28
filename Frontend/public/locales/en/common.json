@@ -48,6 +48,7 @@
     },
     "common": {
         "loading": "Loading...",
+        "loadingItems": "Loading items...",
         "error": "Error",
         "save": "Save",
         "cancel": "Cancel",
@@ -57,8 +58,34 @@
         "parentFolder": "Parent folder"
     },
     "emptyState": {
+        "noResults": "No results",
+        "noResultsHint": "Try different search terms or filters",
+        "resetFilters": "Reset filters",
         "folderEmpty": "Folder is empty",
-        "noImages": "This folder contains no subfolders or supported image files."
+        "noImages": "This folder contains no subfolders or supported image files.",
+        "noTags": "No tags available",
+        "noTagsHint": "Select images and assign tags",
+        "openTagManager": "Open Tag Manager"
+    },
+    "imageCard": {
+        "ratingSet": "Rating:",
+        "ratingFailed": "Failed to save rating"
+    },
+    "lightbox": {
+        "close": "Close (ESC)",
+        "previous": "Previous (←)",
+        "next": "Next (→)",
+        "info": "Info (I)",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "zoomOut": "Zoom out (-)",
+        "zoomIn": "Zoom in (+)",
+        "filmstrip": "Filmstrip"
+    },
+    "mainContent": {
+        "selectedTags": "Selection tags"
     },
     "statusBar": {
         "images": "images",
@@ -77,11 +104,6 @@
         "title": "Welcome to TagFusion",
         "subtitle": "Organize your image collection with modern tagging, lightning-fast search, and intuitive controls.",
         "drives": "Devices and Drives",
-        "savedTags": "Saved Tags",
-        "imagesIndexed": "Images Indexed",
-        "collections": "Collections",
-        "popularTags": "Popular Tags",
-        "noTagsFound": "No tags found",
         "freeOf": "free of"
     }
 }

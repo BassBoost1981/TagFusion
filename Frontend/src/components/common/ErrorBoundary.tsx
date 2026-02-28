@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
 
 interface Props {
     children: ReactNode;
@@ -41,6 +42,15 @@ export class ErrorBoundary extends Component<Props, State> {
             error: null,
             errorInfo: null
         });
+    };
+
+    handleFullReset = (): void => {
+        // Zustand Store zurücksetzen (ohne page reload)
+        const state = useAppStore.getState();
+        state.clearSelection();
+        state.setError(null);
+        // Error Boundary zurücksetzen
+        this.handleReset();
     };
 
     render(): ReactNode {
@@ -109,7 +119,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             </button>
 
                             <button
-                                onClick={() => window.location.reload()}
+                                onClick={this.handleFullReset}
                                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-white/5 text-slate-300 hover:bg-white/10 transition-all duration-300 border border-white/10"
                             >
                                 App Neustarten

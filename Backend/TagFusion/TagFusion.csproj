@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+
     <ApplicationIcon>..\..\assets\Logo.ico</ApplicationIcon>
     <AssemblyName>TagFusion</AssemblyName>
     <RootNamespace>TagFusion</RootNamespace>
@@ -23,6 +24,10 @@
     <PackageReference Include="System.Data.SQLite" Version="1.0.118" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
 
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TagFusion.Tests" />
   </ItemGroup>
 
   <ItemGroup>

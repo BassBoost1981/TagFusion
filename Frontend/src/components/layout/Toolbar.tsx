@@ -5,7 +5,7 @@ import { Popover } from '@base-ui-components/react/popover';
 import { motion } from 'framer-motion';
 import { Search, SortAsc, SortDesc, Star, X, ChevronDown, FileImage, Tag, Home, RotateCcw, RotateCw, FlipHorizontal, FlipVertical, RefreshCw } from 'lucide-react';
 import { Spinner } from '@heroui/react';
-import { useAppStore } from '../../stores/appStore';
+import { useFilterSort, useImages, useTags, useSelectedImages, useClearSelection, useSetCurrentFolder, useRefreshImages, useSetError } from '../../stores/appStore';
 import { bridge } from '../../services/bridge';
 import { GlassIconButton } from '../ui/glass';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -28,16 +28,14 @@ export function Toolbar() {
     { value: 'rating', label: t('toolbar.sort.rating') },
   ] as const;
 
-  const {
-    searchQuery, setSearchQuery,
-    sortBy, setSortBy,
-    sortOrder, toggleSortOrder,
-    filterRating, setFilterRating,
-    clearFilters,
-    images, tags,
-    setCurrentFolder, clearSelection,
-    selectedImages, refreshImages
-  } = useAppStore();
+  const { searchQuery, setSearchQuery, sortBy, setSortBy, sortOrder, toggleSortOrder, filterRating, setFilterRating, clearFilters } = useFilterSort();
+  const images = useImages();
+  const tags = useTags();
+  const selectedImages = useSelectedImages();
+  const clearSelection = useClearSelection();
+  const setCurrentFolder = useSetCurrentFolder();
+  const refreshImages = useRefreshImages();
+  const setError = useSetError();
 
 
 
@@ -53,7 +51,7 @@ export function Toolbar() {
       await bridge.rotateImages(paths, angle);
       await refreshImages();
     } catch (error) {
-      console.error('Rotate failed:', error);
+      setError((error as Error).message);
     } finally {
       setIsEditing(false);
     }
@@ -67,7 +65,7 @@ export function Toolbar() {
       await bridge.flipImages(paths, horizontal);
       await refreshImages();
     } catch (error) {
-      console.error('Flip failed:', error);
+      setError((error as Error).message);
     } finally {
       setIsEditing(false);
     }
@@ -207,9 +205,9 @@ export function Toolbar() {
                           <Tag size={14} className="text-cyan-500" />
                         )}
                         <span className="truncate">{suggestion.label}</span>
-<span className="ml-auto text-xs text-[var(--color-text-muted)]">
-                            {suggestion.type === 'file' ? t('toolbar.file') : t('toolbar.tag')}
-                          </span>
+                        <span className="ml-auto text-xs text-[var(--color-text-muted)]">
+                          {suggestion.type === 'file' ? t('toolbar.file') : t('toolbar.tag')}
+                        </span>
                       </Combobox.Item>
                     ))
                   ) : searchQuery.length > 0 ? (
@@ -359,7 +357,6 @@ export function Toolbar() {
                   </GlassIconButton>
                 </>
               )}
-              <span className="text-xs text-[var(--color-text-secondary)] ml-2">{selectedImages.size} {t('toolbar.selected')}</span>
             </div>
           </>
         )}

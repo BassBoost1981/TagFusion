@@ -2,15 +2,16 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tag, FolderOpen, Settings2, FolderTree, GripVertical, ChevronDown, Search } from 'lucide-react';
-import { useAppStore } from '../../stores/appStore';
+import { useTagPanelState } from '../../stores/appStore';
 import { useTagStore } from '../../stores/tagStore';
 import { AnimatedCounter, GlassTag, GlassIconButton, GlassInput } from '../ui';
 import { TagTreeView } from '../tags';
 import { useTranslation } from 'react-i18next';
+import { TAG_PANEL_WIDTH_MIN, TAG_PANEL_WIDTH_MAX } from '../../constants/ui';
 
 export function TagPanel() {
   const { t } = useTranslation();
-  const { images, tagPanelWidth, setTagPanelWidth, filterTags, setFilterTags } = useAppStore();
+  const { images, tagPanelWidth, setTagPanelWidth, filterTags, setFilterTags } = useTagPanelState();
   const { openModal, categories } = useTagStore();
   const [isResizing, setIsResizing] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
@@ -35,7 +36,7 @@ export function TagPanel() {
 
     const handleMouseMove = (e: MouseEvent) => {
       const diff = startX - e.clientX;
-      const newWidth = Math.min(600, Math.max(200, startWidth + diff));
+      const newWidth = Math.min(TAG_PANEL_WIDTH_MAX, Math.max(TAG_PANEL_WIDTH_MIN, startWidth + diff));
       setTagPanelWidth(newWidth);
     };
 
@@ -88,7 +89,7 @@ export function TagPanel() {
             <div className="absolute inset-x-0 top-0 h-[1px] glass-specular" />
             {/* Clickable Header */}
             <button
-              onClick={() => setIsFolderTagsCollapsed(!isFolderTagsCollapsed)}
+              onClick={() => setIsFolderTagsCollapsed(prev => !prev)}
               className={`flex items-center gap-2 w-full text-left cursor-pointer group ${!isFolderTagsCollapsed ? 'mb-3' : ''}`}
             >
               <FolderOpen size={14} className="text-cyan-400" />

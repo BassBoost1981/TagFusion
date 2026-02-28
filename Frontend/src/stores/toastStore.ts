@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { TOAST_DURATION_DEFAULT, TOAST_DURATION_ERROR, TOAST_DURATION_WARNING } from '../constants/ui';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -23,7 +24,7 @@ interface ToastState {
 export const useToastStore = create<ToastState>((set) => ({
     toasts: [],
 
-    addToast: (type, message, duration = 4000) => {
+    addToast: (type, message, duration = TOAST_DURATION_DEFAULT) => {
         const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         set((state) => ({
@@ -54,7 +55,7 @@ export const useToastStore = create<ToastState>((set) => ({
 
     error: (message) => {
         const { addToast } = useToastStore.getState();
-        addToast('error', message, 6000); // Errors stay longer
+        addToast('error', message, TOAST_DURATION_ERROR);
     },
 
     info: (message) => {
@@ -64,6 +65,6 @@ export const useToastStore = create<ToastState>((set) => ({
 
     warning: (message) => {
         const { addToast } = useToastStore.getState();
-        addToast('warning', message, 5000);
+        addToast('warning', message, TOAST_DURATION_WARNING);
     },
 }));

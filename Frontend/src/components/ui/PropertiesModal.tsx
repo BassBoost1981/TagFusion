@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GlassModal, GlassButton } from './glass';
-import { useModalStore } from '../../stores/modalStore';
+import { useModalStore, type PropertiesData } from '../../stores/modalStore';
 import { bridge } from '../../services/bridge';
 import { FileText, Folder, Calendar, HardDrive, Image } from 'lucide-react';
 import { Spinner } from '@heroui/react';
@@ -41,7 +41,7 @@ export function PropertiesModal() {
   const [error, setError] = useState<string | null>(null);
 
   const isOpen = type === 'properties';
-  const propData = data as { path: string } | null;
+  const propData = data as PropertiesData | null;
 
   useEffect(() => {
     if (isOpen && propData) {

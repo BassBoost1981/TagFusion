@@ -1,212 +1,187 @@
-# TagFusion 🏷️
-
 <p align="center">
-  <img src="assets/Logo.png" alt="TagFusion Logo" width="150">
+  <img src="assets/Logo.png" alt="TagFusion Logo" width="180">
 </p>
 
-**TagFusion** ist ein modernes, natives Windows-Tool zur professionellen Bild-Verwaltung und -Verschlagwortung (Tagging). Das Tool schreibt Tags direkt in die Metadaten der Bilddateien (EXIF/IPTC/XMP), sodass die Verschlagwortung portabel und kompatibel mit Adobe-Produkten sowie dem Windows Explorer ist.
+<h1 align="center">TagFusion</h1>
+
+<p align="center">
+  <strong>Professionelles Bild-Tagging und Metadaten-Management für Windows</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet" alt=".NET 8">
+  <img src="https://img.shields.io/badge/React-18.2-61DAFB?logo=react" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows" alt="Windows">
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
+</p>
 
 ---
 
-## ✨ Features
+**TagFusion** ist ein modernes, natives Windows-Tool zur professionellen Bild-Verwaltung und -Verschlagwortung. Tags werden direkt in die Bild-Metadaten geschrieben (EXIF/IPTC/XMP) — portabel, standardkonform und kompatibel mit Adobe Lightroom, Bridge, Photoshop und dem Windows Explorer.
 
-### 🖼️ Bildverwaltung
-- **3-Spalten-Layout**: Vertraut wie der Windows Explorer
-  - **Linke Spalte**: Laufwerksbaum und Favoriten-Navigation
-  - **Mitte**: Bildraster mit Thumbnails
-  - **Rechte Spalte**: Tag-Panel für schnelles Zuweisen
-- **Sortierung**: Nach Name, Datum, Bewertung
-- **Zoom-Steuerung**: Flexible Thumbnail-Größenanpassung (50%-200%)
-- **Lightbox**: Vollbildansicht für detaillierte Betrachtung
-- **Ordner-Navigation**: Durchsuchen lokaler Laufwerke und NAS-Systeme
+---
 
-### 🏷️ Tagging-System
-- **Metadaten-konforme Tags**: Schreibt in XMP, IPTC und Windows System.Keywords
-- **Hierarchische Tag-Bibliothek**: Kategorien und Unterkategorien
-- **Batch-Tagging**: Mehrere Bilder gleichzeitig taggen
-- **⭐ 5-Sterne-Bewertung**: Bewertungen direkt in Bild-Metadaten speichern
+## Features
 
-### 🎨 Modernes UI
-- **Glasmorphismus-Design**: Premium-Look mit Transparenz-Effekten
-- **Dark Mode**: Augenfreundlich auch bei langer Nutzung
-- **Animationen**: Flüssige Übergänge mit Framer Motion
-- **Cyan-Akzentfarbe**: Konsistentes, modernes Farbschema
+### Bildverwaltung
+- **3-Spalten-Layout** — Vertraute Explorer-Ansicht mit Ordnerbaum, Bildraster und Tag-Panel
+- **Sortierung** — Nach Name, Datum, Größe oder Bewertung
+- **Zoom-Steuerung** — Flexible Thumbnail-Größe (50% – 200%)
+- **Lightbox** — Vollbildansicht für detaillierte Betrachtung
+- **Ordner-Navigation** — Lokale Laufwerke und NAS-Systeme durchsuchen
 
-### 📁 Datei-Operationen
-- **Kontextmenü**: Rechtsklick für schnellen Zugriff
-- **Kopieren/Ausschneiden/Einfügen**: Volle Zwischenablage-Unterstützung
-- **Umbenennen**: F2 oder über Kontextmenü
-- **Löschen**: Mit Bestätigungsdialog
-- **Im Explorer öffnen**: Schnellzugriff auf den Dateispeicherort
-- **Eigenschaften anzeigen**: Detaillierte Dateiinformationen
+### Tagging-System
+- **Metadaten-konform** — Schreibt in XMP, IPTC und Windows System.Keywords via ExifTool
+- **Hierarchische Tag-Bibliothek** — Kategorien, Unterkategorien und Tags mit Drag & Drop
+- **Batch-Tagging** — Mehrere Bilder gleichzeitig taggen
+- **5-Sterne-Bewertung** — Bewertungen direkt in Bild-Metadaten speichern
 
-### ⌨️ Tastaturkürzel
+### Datei-Operationen
+- **Kontextmenü** — Rechtsklick für Kopieren, Ausschneiden, Einfügen, Umbenennen, Löschen
+- **Im Explorer öffnen** — Schnellzugriff auf den Dateispeicherort
+- **Eigenschaften** — Detaillierte Dateiinformationen inkl. Bildmaße
+
+### UI / UX
+- **Glasmorphismus-Design** — Premium-Look mit Transparenz-Effekten und Cyan-Akzent
+- **Dark Mode** — Augenfreundlich für lange Sessions
+- **Animationen** — Flüssige Übergänge mit Framer Motion
+- **Mehrsprachig** — Deutsch und Englisch (i18n)
+
+### Tastaturkürzel
+
 | Kürzel | Aktion |
 |--------|--------|
 | `Strg+A` | Alle auswählen |
-| `Strg+C` | Kopieren |
-| `Strg+X` | Ausschneiden |
-| `Strg+V` | Einfügen |
+| `Strg+C` / `Strg+X` / `Strg+V` | Kopieren / Ausschneiden / Einfügen |
 | `F2` | Umbenennen |
 | `Del` | Löschen |
 | `Alt+Enter` | Eigenschaften |
 | `Escape` | Auswahl aufheben |
-| `Strg++` | Vergrößern |
-| `Strg+-` | Verkleinern |
-| `Strg+0` | Zoom zurücksetzen |
+| `Strg+` / `Strg-` / `Strg+0` | Zoom: Vergrößern / Verkleinern / Zurücksetzen |
 
 ---
 
-## 🏗️ Architektur
+## Architektur
 
-TagFusion verwendet eine hybride Architektur:
+TagFusion verwendet eine hybride Architektur — ein .NET 8 WPF-Host mit eingebettetem WebView2 (Chromium), der ein React-Frontend rendert:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   TagFusion.exe                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │              WPF Host Application               │   │
-│  │  (.NET 8, Windows Desktop)                      │   │
-│  │                                                  │   │
-│  │  ┌───────────────────────────────────────────┐  │   │
-│  │  │            WebView2 Control               │  │   │
-│  │  │  ┌─────────────────────────────────────┐  │  │   │
-│  │  │  │       React Frontend (Vite)         │  │  │   │
-│  │  │  │  TypeScript + TailwindCSS + Motion  │  │  │   │
-│  │  │  └─────────────────────────────────────┘  │  │   │
-│  │  └───────────────────────────────────────────┘  │   │
-│  │                     ↕ Bridge                    │   │
-│  │  ┌───────────────────────────────────────────┐  │   │
-│  │  │            C# Backend Services            │  │   │
-│  │  │  • FileSystemService (Ordner, Dateien)    │  │   │
-│  │  │  • ExifToolService (Metadaten R/W)        │  │   │
-│  │  │  • ThumbnailService (Vorschaubilder)      │  │   │
-│  │  │  • TagService (Tag-Bibliothek)            │  │   │
-│  │  │  • DatabaseService (SQLite Cache)          │  │   │
-│  │  │  • ImageEditService (Drehen, Spiegeln)    │  │   │
-│  │  │  • FileOperationService (Kopieren, etc.)  │  │   │
-│  │  └───────────────────────────────────────────┘  │   │
-│  └─────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                   TagFusion.exe                       │
+│                                                       │
+│   ┌───────────────────────────────────────────────┐  │
+│   │            WebView2 (Chromium)                │  │
+│   │   ┌───────────────────────────────────────┐   │  │
+│   │   │     React + TypeScript + Tailwind     │   │  │
+│   │   │     Zustand · Framer Motion · i18n    │   │  │
+│   │   └───────────────────────────────────────┘   │  │
+│   └───────────────────────────────────────────────┘  │
+│                       ↕ Bridge (JSON)                 │
+│   ┌───────────────────────────────────────────────┐  │
+│   │          C# Backend Services (.NET 8)         │  │
+│   │                                               │  │
+│   │  ExifToolService     FileSystemService        │  │
+│   │  ThumbnailService    TagService               │  │
+│   │  DatabaseService     ImageEditService         │  │
+│   │  FileOperationService                         │  │
+│   └───────────────────────────────────────────────┘  │
+│                       ↕                               │
+│   ┌───────────────────────────────────────────────┐  │
+│   │  SQLite Cache  ·  ExifTool  ·  Dateisystem    │  │
+│   └───────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────┘
 ```
 
-### Backend (C# / .NET 8 WPF)
-- **MainWindow.xaml.cs**: Host für WebView2 mit Splash-Screen
-- **WebViewBridge.cs**: Bidirektionale Kommunikation Frontend ↔ Backend
-- **Services**: Alle Geschäftslogik (siehe oben)
-- **Models**: Datenmodelle (ImageFile, FolderItem, Tag, etc.)
-
-### Frontend (React + TypeScript)
-- **Vite** als Build-Tool
-- **TailwindCSS** für Styling
-- **Framer Motion** für Animationen
-- **Zustand** für State Management
-- **Lucide React** für Icons
+**Datenfluss:** UI-Interaktion → Zustand Store → Bridge Service → C# Backend → Dateisystem/Metadaten → JSON Response → UI-Update
 
 ---
 
-## 📁 Projektstruktur
+## Technologie-Stack
 
-```
-TagFusion/
-├── assets/                    # Logo und Icons
-│   ├── Logo.ico
-│   └── Logo.png
-├── Backend/
-│   ├── TagFusion/
-│   │   ├── Bridge/            # WebView2 ↔ React Kommunikation
-│   │   │   └── WebViewBridge.cs
-│   │   ├── Database/          # SQLite Datenbank
-│   │   ├── Models/            # Datenmodelle
-│   │   │   ├── FolderItem.cs
-│   │   │   ├── GridItem.cs
-│   │   │   ├── ImageFile.cs
-│   │   │   ├── Settings.cs
-│   │   │   └── Tag.cs
-│   │   ├── Services/          # Business Logic
-│   │   │   ├── DatabaseService.cs
-│   │   │   ├── ExifToolService.cs
-│   │   │   ├── FileOperationService.cs
-│   │   │   ├── FileSystemService.cs
-│   │   │   ├── ImageEditService.cs
-│   │   │   ├── TagService.cs
-│   │   │   └── ThumbnailService.cs
-│   │   ├── wwwroot/           # Kompiliertes Frontend (Produktion)
-│   │   ├── App.xaml(.cs)
-│   │   ├── MainWindow.xaml(.cs)
-│   │   └── TagFusion.csproj
-│   └── TagFusion.sln
-├── Frontend/
-│   ├── public/                # Statische Assets
-│   ├── src/
-│   │   ├── components/        # React-Komponenten
-│   │   │   ├── dashboard/     # Dashboard-Widgets
-│   │   │   ├── images/        # ImageGrid, ImageCard, FolderCard
-│   │   │   ├── layout/        # Sidebar, MainContent, TagPanel, Toolbar
-│   │   │   ├── lightbox/      # Vollbild-Ansicht
-│   │   │   ├── tags/          # Tag-Manager
-│   │   │   └── ui/            # Wiederverwendbare UI-Komponenten
-│   │   │       └── glass/     # Glasmorphismus-Komponenten
-│   │   ├── hooks/             # React Hooks
-│   │   ├── services/          # Frontend-Services
-│   │   ├── stores/            # Zustand State Management
-│   │   │   ├── appStore.ts
-│   │   │   ├── clipboardStore.ts
-│   │   │   ├── contextMenuStore.ts
-│   │   │   ├── lightboxStore.ts
-│   │   │   ├── modalStore.ts
-│   │   │   ├── settingsStore.ts
-│   │   │   └── tagStore.ts
-│   │   ├── styles/            # CSS Dateien
-│   │   ├── types/             # TypeScript Typen
-│   │   ├── utils/             # Hilfsfunktionen
-│   │   ├── App.tsx            # Haupt-App-Komponente
-│   │   └── main.tsx           # Entry Point
-│   ├── package.json
-│   ├── tailwind.config.js
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── Tools/                     # ExifTool und andere Tools
-├── build_release.ps1          # Release Build Script
-└── README.md
-```
+### Backend
+
+| Technologie | Version | Zweck |
+|---|---|---|
+| .NET | 8.0 | Framework |
+| WPF | — | Windows UI Host |
+| WebView2 | 1.0.2592.51 | Chromium Browser Control |
+| SQLite | 1.0.118 | Thumbnail-Cache & Datenbank |
+| System.Drawing.Common | 8.0.0 | Bildverarbeitung |
+| DI + Logging | MS.Extensions | Dependency Injection & Logging |
+
+### Frontend
+
+| Technologie | Version | Zweck |
+|---|---|---|
+| React | 18.2.0 | UI Framework |
+| TypeScript | 5.3.0 | Typsicherheit |
+| Vite | 5.0.0 | Build Tool & Dev Server |
+| TailwindCSS | 3.4.0 | Utility-First Styling |
+| HeroUI | 2.8.5 | UI-Komponentenbibliothek |
+| Framer Motion | 12.23.25 | Animationen |
+| Zustand | 4.4.7 | State Management |
+| i18next | 25.8.0 | Internationalisierung |
+| Lucide React | 0.292.0 | Icons |
+| React Virtuoso | 4.18.1 | Virtualisierte Listen |
+
+### Testing
+
+| Tool | Bereich |
+|---|---|
+| Vitest | Frontend Unit/Component Tests |
+| Playwright | Frontend E2E Tests |
+| NUnit + FsCheck + Moq | Backend Unit/Integration Tests |
 
 ---
 
-## 🚀 Installation & Entwicklung
+## Installation & Entwicklung
 
 ### Voraussetzungen
+
 - **Windows 10/11** (64-bit)
-- **.NET 8 SDK** ([Download](https://dotnet.microsoft.com/download/dotnet/8.0))
-- **Node.js 18+** ([Download](https://nodejs.org/))
-- **WebView2 Runtime** (auf Windows 10/11 meist vorinstalliert)
+- **.NET 8 SDK** — [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **Node.js 18+** — [Download](https://nodejs.org/)
+- **WebView2 Runtime** — Auf Windows 10/11 meist vorinstalliert
 
 ### Development Setup
 
-1. **Repository klonen**
-   ```bash
-   git clone <repository-url>
-   cd TagFusion
-   ```
+**1. Repository klonen**
+```bash
+git clone <repository-url>
+cd TagFusion
+```
 
-2. **Frontend starten**
-   ```bash
-   cd Frontend
-   npm install
-   npm run dev
-   ```
-   Das Frontend läuft nun auf `http://localhost:5173`
+**2. Frontend starten** (Terminal 1)
+```bash
+cd Frontend
+npm install
+npm run dev
+```
+Das Frontend läuft auf `http://localhost:5173`
 
-3. **Backend starten** (in einem neuen Terminal)
-   ```bash
-   cd Backend/TagFusion
-   dotnet run
-   ```
-   Das Backend öffnet automatisch ein Fenster mit dem Frontend.
+**3. Backend starten** (Terminal 2)
+```bash
+cd Backend/TagFusion
+dotnet run
+```
+Das Backend öffnet ein Fenster und lädt das Frontend aus dem Vite Dev Server.
+
+### Tests ausführen
+
+```bash
+# Frontend
+cd Frontend
+npm run test                # Vitest (Watch-Modus)
+npm run test:coverage       # Mit Coverage-Report
+npm run test:e2e            # Playwright E2E (headless)
+
+# Backend
+cd Backend
+dotnet test TagFusion.sln   # Alle NUnit Tests
+```
 
 ### Production Build
-
-Verwende das mitgelieferte Build-Script:
 
 ```powershell
 ./build_release.ps1
@@ -214,63 +189,70 @@ Verwende das mitgelieferte Build-Script:
 
 Das Script:
 1. Baut das Frontend (`npm run build`)
-2. Kopiert das Frontend in `Backend/TagFusion/wwwroot`
-3. Publiziert das Backend als Single-File EXE
-4. Ausgabe: `Backend/TagFusion/bin/Release/net8.0-windows/win-x64/publish/TagFusion.exe`
+2. Kopiert das Ergebnis nach `Backend/TagFusion/wwwroot/`
+3. Publiziert das Backend als eigenständige Windows-EXE
 
-**Wichtig**: Die `wwwroot`-Ordner muss sich neben der EXE befinden!
+**Ausgabe:** `Backend/TagFusion/bin/Release/net8.0-windows/win-x64/publish/TagFusion.exe`
 
----
-
-## 🛠️ Technologie-Stack
-
-### Backend
-| Technologie | Version | Zweck |
-|------------|---------|-------|
-| .NET | 8.0 | Framework |
-| WPF | - | Windows UI Host |
-| WebView2 | 1.0.2592.51 | Chromium Browser Control |
-| Newtonsoft.Json | 13.0.3 | JSON Serialisierung |
-| SQLite | 1.0.118 | Lokale Datenbank/Cache |
-| System.Drawing.Common | 8.0.0 | Bildverarbeitung |
-
-### Frontend
-| Technologie | Version | Zweck |
-|------------|---------|-------|
-| React | 18.2.0 | UI Framework |
-| TypeScript | 5.3.0 | Typsicherheit |
-| Vite | 5.0.0 | Build Tool |
-| TailwindCSS | 3.4.0 | Styling |
-| Framer Motion | 12.23.25 | Animationen |
-| Zustand | 4.4.7 | State Management |
-| Lucide React | 0.292.0 | Icons |
+> **Wichtig:** Der `wwwroot/`-Ordner muss sich im selben Verzeichnis wie die EXE befinden.
 
 ---
 
-## 🎯 Roadmap
+## Projektstruktur
 
-- [ ] Drag & Drop für Tags
-- [ ] Mehrsprachigkeit (i18n)
+```
+TagFusion/
+├── Backend/
+│   ├── TagFusion/
+│   │   ├── Bridge/           # WebView2 ↔ React IPC
+│   │   ├── Database/         # SQLite Datenbank-Interface
+│   │   ├── Models/           # Datenmodelle (ImageFile, Tag, etc.)
+│   │   ├── Services/         # Business Logic (7 Services)
+│   │   ├── wwwroot/          # Kompiliertes Frontend (Produktion)
+│   │   └── MainWindow.xaml   # WPF Host + WebView2
+│   ├── TagFusion.Tests/      # NUnit Backend-Tests
+│   └── TagFusion.sln
+├── Frontend/
+│   ├── src/
+│   │   ├── components/       # React-Komponenten (nach Feature)
+│   │   ├── hooks/            # Custom React Hooks
+│   │   ├── services/         # Bridge Client (C# Kommunikation)
+│   │   ├── stores/           # Zustand State Management
+│   │   ├── types/            # Shared TypeScript Interfaces
+│   │   ├── styles/           # CSS & Animationen
+│   │   └── utils/            # Hilfsfunktionen
+│   ├── public/locales/       # i18n Übersetzungen (de, en)
+│   └── tests/e2e/            # Playwright E2E Tests
+├── Tools/
+│   └── exiftool.exe          # ExifTool Binary (Metadaten R/W)
+├── assets/                   # Logo und Icons
+└── build_release.ps1         # Release Build Script
+```
+
+---
+
+## Roadmap
+
 - [ ] Export/Import der Tag-Bibliothek
-- [ ] PDF-Matrix-Export
+- [ ] PDF-Matrix-Export (Kontaktabzug)
 - [ ] Bildvergleich (Side-by-Side)
-- [ ] Gesichtserkennung (AI)
+- [ ] Gesichtserkennung (AI-basiert)
 - [ ] Cloud-Sync (OneDrive, Google Drive)
 
 ---
 
-## 📄 Lizenz
+## Lizenz
 
-Dieses Projekt ist unter der MIT-Lizenz lizenziert.
+Dieses Projekt ist unter der [MIT-Lizenz](LICENSE) lizenziert.
 
 ---
 
-## 🤝 Beitragen
+## Beitragen
 
-Beiträge sind willkommen! Bitte erstelle einen Pull Request oder öffne ein Issue für Bugs und Feature-Requests.
+Beiträge sind willkommen! Erstelle einen Pull Request oder öffne ein Issue für Bugs und Feature-Requests.
 
 ---
 
 <p align="center">
-  <b>Made with ❤️ for photographers and digital asset managers</b>
+  <sub>Made with ♥ for photographers and digital asset managers</sub>
 </p>

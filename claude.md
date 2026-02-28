@@ -1,239 +1,108 @@
-# **System Handbook: How This Architecture Operates**
+# CLAUDE.md
 
-## **The GOTCHA Framework**
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-This system uses the **GOTCHA Framework** — a 6-layer architecture for agentic systems:
+## Project Overview
 
-**GOT** (The Engine):
-- **Goals** (`goals/`) — What needs to happen (process definitions)
-- **Orchestration** — The AI manager (you) that coordinates execution
-- **Tools** (`tools/`) — Deterministic scripts that do the actual work
+TagFusion is a Windows desktop app for professional image management and metadata tagging. It writes tags directly into image metadata (EXIF/IPTC/XMP) via ExifTool, making tags portable and compatible with Adobe products and Windows Explorer.
 
-**CHA** (The Context):
-- **Context** (`context/`) — Reference material and domain knowledge
-- **Hard prompts** (`hardprompts/`) — Reusable instruction templates
-- **Args** (`args/`) — Behavior settings that shape how the system acts
+**Architecture:** Hybrid app — WPF (.NET 8) hosts a WebView2 control that renders a React frontend. All filesystem and metadata operations happen in C#; the UI is pure React/TypeScript.
 
-You're the manager of a multi-layer agentic system. LLMs are probabilistic (educated guesses). Business logic is deterministic (must work the same way every time).
-This structure exists to bridge that gap through **separation of concerns**.
+## Build & Development Commands
 
----
-
-## **Why This Structure Exists**
-
-When AI tries to do everything itself, errors compound fast.
-90% accuracy per step sounds good until you realize that's ~59% accuracy over 5 steps.
-
-The solution:
-
-* Push **reliability** into deterministic code (tools)
-* Push **flexibility and reasoning** into the LLM (manager)
-* Push **process clarity** into goals
-* Push **behavior settings** into args files
-* Push **domain knowledge** into the context layer
-* Keep each layer focused on a single responsibility
-
-You make smart decisions. Tools execute perfectly.
-
----
-
-# **The Layered Structure**
-
-## **1. Process Layer — Goals (`goals/`)**
-
-* Task-specific instructions in clear markdown
-* Each goal defines: objective, inputs, which tools to use, expected outputs, edge cases
-* Written like you're briefing someone competent
-* Only modified with explicit permission
-* Goals tell the system **what** to achieve, not how it should behave today
-
----
-
-## **2. Orchestration Layer — Manager (AI Role)**
-
-* Reads the relevant goal
-* Decides which tools (scripts) to use and in what order
-* Applies args settings to shape behavior
-* References context for domain knowledge (voice, ICP, examples, etc.)
-* Handles errors, asks clarifying questions, makes judgment calls
-* Never executes work — it delegates intelligently
-* Example: Don't scrape websites yourself. Read `goals/research_lead.md`, understand requirements, then call `tools/lead_gen/scrape_linkedin.py` with the correct parameters.
-
----
-
-## **3. Execution Layer — Tools (`tools/`)**
-
-* Python scripts organized by workflow
-* Each has **one job**: API calls, data processing, file operations, database work, etc.
-* Fast, documented, testable, deterministic
-* They don't think. They don't decide. They just execute.
-* Credentials + environment variables handled via `.env`
-* All tools must be listed in `tools/manifest.md` with a one-sentence description
-
----
-
-## **4. Args Layer — Behavior (`args/`)**
-
-* YAML/JSON files controlling how the system behaves right now
-* Examples: daily themes, frameworks, modes, lengths, schedules, model choices
-* Changing args changes behavior without editing goals or tools
-* The manager reads args before running any workflow
-
----
-
-## **5. Context Layer — Domain Knowledge (`context/`)**
-
-* Static reference material the system uses to reason
-* Examples: tone rules, writing samples, ICP descriptions, case studies, negative examples
-* Shapes quality and style — not process or behavior
-
----
-
-## **6. Hard Prompts Layer — Instruction Templates (`hardprompts/`)**
-
-* Reusable text templates for LLM sub-tasks
-* Example: outline → post, rewrite in voice, summarize transcript, create visual brief
-* Hard prompts are fixed instructions, not context or goals
-
----
-
-# **How to Operate**
-
-### **1. Check for existing goals first**
-
-Before starting a task, check `goals/manifest.md` for a relevant workflow.
-If a goal exists, follow it — goals define the full process for common tasks.
-
----
-
-### **2. Check for existing tools**
-
-Before writing new code, read `tools/manifest.md`.
-This is the index of all available tools.
-
-If a tool exists, use it.
-If you create a new tool script, you **must** add it to the manifest with a 1-sentence description.
-
----
-
-### **3. When tools fail, fix and document**
-
-* Read the error and stack trace carefully
-* Update the tool to handle the issue (ask if API credits are required)
-* Add what you learned to the goal (rate limits, batching rules, timing quirks)
-* Example: tool hits 429 → find batch endpoint → refactor → test → update goal
-* If a goal exceeds a reasonable length, propose splitting it into a primary goal + technical reference
-
----
-
-### **4. Treat goals as living documentation**
-
-* Update only when better approaches or API constraints emerge
-* Never modify/create goals without explicit permission
-* Goals are the instruction manual for the entire system
-
----
-
-### **5. Communicate clearly when stuck**
-
-If you can't complete a task with existing tools and goals:
-
-* Explain what's missing
-* Explain what you need
-* Do not guess or invent capabilities
-
----
-
-### **6. Guardrails — Learned Behaviors**
-
-Document Claude-specific mistakes here (not script bugs—those go in goals):
-
-* Always check `tools/manifest.md` before writing a new script
-* Verify tool output format before chaining into another tool
-* Don't assume APIs support batch operations—check first
-* When a workflow fails mid-execution, preserve intermediate outputs before retrying
-* Read the full goal before starting a task—don't skim
-* **NEVER DELETE YOUTUBE VIDEOS** — Video deletion is irreversible. The MCP server blocks this intentionally. If deletion is ever truly needed, ask the user 3 times and get 3 confirmations before proceeding. Direct user to YouTube Studio instead.
-
-*(Add new guardrails as mistakes happen. Keep this under 15 items.)*
-
----
-
-### **7. Memory Protocol**
-
-The system has persistent memory across sessions. At session start, read the memory context:
-
-**Load Memory:**
-1. Read `memory/MEMORY.md` for curated facts and preferences
-2. Read today's log: `memory/logs/YYYY-MM-DD.md`
-3. Read yesterday's log for continuity
-
+### Frontend (run from `Frontend/`)
 ```bash
-python tools/memory/memory_read.py --format markdown
+npm install              # Install dependencies
+npm run dev              # Vite dev server on localhost:5173
+npm run build            # TypeScript check + production build
+npm run lint             # ESLint (zero warnings tolerance)
+npm run test             # Vitest watch mode
+npm run test -- ImageCard.test.tsx    # Single test file
+npm run test:coverage    # Coverage report
+npm run test:e2e         # Playwright E2E (headless)
+npm run test:e2e:ui      # Playwright E2E with UI
 ```
 
-**During Session:**
-- Append notable events to today's log: `python tools/memory/memory_write.py --content "event" --type event`
-- Add facts to the database: `python tools/memory/memory_write.py --content "fact" --type fact --importance 7`
-- For truly persistent facts (always loaded), update MEMORY.md: `python tools/memory/memory_write.py --update-memory --content "New preference" --section user_preferences`
+### Backend (run from `Backend/`)
+```bash
+dotnet build TagFusion.sln              # Debug build
+dotnet build TagFusion.sln -c Release   # Release build
+dotnet run --project TagFusion          # Run app (loads frontend from localhost:5173 in dev)
+dotnet test TagFusion.sln               # Run all NUnit tests
+dotnet test --filter "FullyQualifiedName~IntegrationTests"  # Single test class
+dotnet test --filter "Name~SaveAndRetrieveImage"            # Single test method
+```
 
-**Search Memory:**
-- Keyword search: `python tools/memory/memory_db.py --action search --query "keyword"`
-- Semantic search: `python tools/memory/semantic_search.py --query "related concept"`
-- Hybrid search (best): `python tools/memory/hybrid_search.py --query "what does user prefer"`
+### Full Release Build
+```powershell
+./build_release.ps1   # Builds Frontend → copies to wwwroot → publishes .NET self-contained exe
+```
+Output: `Backend/TagFusion/bin/Release/net8.0-windows/win-x64/publish/TagFusion.exe` (wwwroot must be adjacent to exe).
 
-**Memory Types:**
-- `fact` - Objective information
-- `preference` - User preferences
-- `event` - Something that happened
-- `insight` - Learned pattern or realization
-- `task` - Something to do
-- `relationship` - Connection between entities
+## Architecture & Key Patterns
 
----
+### Bridge Communication (Critical Contract)
 
-# **The Continuous Improvement Loop**
+The WebView2 bridge is the core integration point. **Do not break existing message signatures.**
 
-Every failure strengthens the system:
+**Frontend → Backend:** `bridge.call('actionName', { payload })` → returns `Promise<T>`
+- Defined in `Frontend/src/services/bridge.ts` (BridgeService class)
+- Uses `window.chrome.webview.postMessage` / `addEventListener`
+- Includes mock responses for browser-only development (no WebView2 needed)
+- 120s timeout per request (for slow network drives)
 
-1. Identify what broke and why
-2. Fix the tool script
-3. Test until it works reliably
-4. Update the goal with new knowledge
-5. Next time → automatic success
+**Backend handler:** `WebViewBridge.cs` dispatches actions via switch expression → calls appropriate service
+- New bridge actions: add method in `bridge.ts`, add case in `WebViewBridge.cs`
 
----
+**Message format:** `{ id, action, payload }` → Response: `{ id, success, data/error }`
 
-# **File Structure**
+### State Management
 
-**Where Things Live:**
+Zustand stores in `Frontend/src/stores/`:
+- `appStore.ts` — Global app state with slices (`imageSlice`, `navigationSlice`, `uiSlice`)
+- Feature stores: `tagStore`, `clipboardStore`, `contextMenuStore`, `lightboxStore`, `settingsStore`, `modalStore`, `toastStore`
+- Keep component state local unless it needs to be shared across components
 
-* `goals/` — Process Layer (what to achieve)
-* `tools/` — Execution Layer (organized by workflow)
-* `args/` — Args Layer (behavior settings)
-* `context/` — Context Layer (domain knowledge)
-* `hardprompts/` — Hard Prompts Layer (instruction templates)
-* `.tmp/` — Temporary work (scrapes, raw data, intermediate files). Disposable.
-* `.env` — API keys + environment variables
-* `credentials.json`, `token.json` — OAuth credentials (ignored by Git)
-* `goals/manifest.md` — Index of available goal workflows
-* `tools/manifest.md` — Master list of tools and their functions
+### Backend Services (DI via constructor injection)
 
----
+All services in `Backend/TagFusion/Services/`:
+- `ExifToolService` — Metadata read/write (wraps `Tools/exiftool.exe`)
+- `FileSystemService` — Drive enumeration, folder navigation
+- `ThumbnailService` — Thumbnail generation + SQLite caching
+- `TagService` — Tag library management
+- `DatabaseService` — SQLite persistence layer
+- `ImageEditService` — Rotate, flip operations
+- `FileOperationService` — Copy, move, delete, rename
 
-## **Deliverables vs Scratch**
+### Frontend Structure
 
-* **Deliverables**: outputs needed by the user (Sheets, Slides, processed data, etc.)
-* **Scratch Work**: temp files (raw scrapes, CSVs, research). Always disposable.
-* Never store important data in `.tmp/`.
+- `src/components/` organized by feature: `dashboard/`, `images/`, `layout/`, `lightbox/`, `tags/`, `ui/glass/`
+- Path alias: `@/*` → `src/*`
+- Types: `src/types/index.ts` (shared interfaces: `ImageFile`, `FolderItem`, `Tag`, `GridItem`, `TagLibrary`)
+- Hooks: `useAppInit`, `useKeyboardShortcuts`, `useThumbnailManager`
+- i18n: i18next with translations in `public/locales/`
 
----
+## Code Conventions
 
-# **Your Job in One Sentence**
+### Language Rules
+- **UI text / error messages:** German (app language)
+- **Code & comments:** English + German (dual)
+- **Commit messages:** English + German
 
-You sit between what needs to happen (goals) and getting it done (tools).
-Read instructions, apply args, use context, delegate well, handle failures, and strengthen the system with each run.
+### TypeScript/React
+- Strict mode (`noUnusedLocals`, `noUnusedParameters`)
+- Components: PascalCase files. Hooks: `use` prefix. Handlers: `handle` prefix. Constants: UPPER_SNAKE_CASE.
+- Libraries: TailwindCSS + HeroUI for styling, Lucide for icons, Framer Motion for animation
+- Component structure: hooks → effects → render
 
-Be direct.
-Be reliable.
-Get shit done.
+### C# / .NET 8
+- C# 12 features. Interfaces: `I` prefix. Async methods: `Async` suffix. Private fields: `_camelCase`.
+- All I/O must be async/await. Use `SemaphoreSlim` for thread safety (never `lock`).
+- DTOs as `record` types (immutable).
+
+## Environment
+
+- **Windows 10/11 only** (WPF + WebView2)
+- WebView2 Runtime required (pre-installed on modern Windows)
+- Uses Windows-specific APIs (DWM for dark title bar)
+- `Tools/exiftool.exe` — bundled ExifTool binary for metadata operations

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { GlassModal, GlassInput, GlassButton } from './glass';
-import { useModalStore } from '../../stores/modalStore';
+import { useModalStore, type RenameData } from '../../stores/modalStore';
 import { bridge } from '../../services/bridge';
 import { Folder, Image } from 'lucide-react';
 
@@ -12,7 +12,7 @@ export function RenameModal() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isOpen = type === 'rename';
-  const renameData = data as { path: string; name: string; isFolder: boolean } | null;
+  const renameData = data as RenameData | null;
 
   useEffect(() => {
     if (isOpen && renameData) {

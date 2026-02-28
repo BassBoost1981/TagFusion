@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { Check, Tag } from 'lucide-react';
 import { Card, CardFooter } from '@heroui/react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../../stores/appStore';
 import { useLightboxStore } from '../../stores/lightboxStore';
 import { useToastStore } from '../../stores/toastStore';
-import { bridge } from '../../services/bridge';
 import type { ImageFile } from '../../types';
 import { ImageThumbnail } from './ImageThumbnail';
 import { StarRating } from './StarRating';
 import { useImageContextMenu } from './useImageContextMenu';
+import { useThumbnail, requestThumbnail } from '../../hooks/useThumbnailManager';
 
 interface ImageCardProps {
   image: ImageFile;
@@ -18,14 +18,13 @@ interface ImageCardProps {
 }
 
 export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardProps) {
+  const { t } = useTranslation();
   const { selectedImages, selectImage, images: storeImages, updateImageRating } = useAppStore();
   const { open: openLightbox } = useLightboxStore();
-  const [thumbnail, setThumbnail] = useState<string | null>(image.thumbnailBase64 || null);
-  const [isLoading, setIsLoading] = useState(!image.thumbnailBase64 && !image.thumbnailUrl);
+  const [thumbnail, isLoading] = useThumbnail(image.path, image.thumbnailBase64);
   const [rating, setRating] = useState(image.rating || 0);
   const [isSaving, setIsSaving] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+
 
   const isSelected = selectedImages.has(image.path);
   const tagCount = image.tags?.length || 0;
@@ -36,47 +35,9 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
     setRating(image.rating || 0);
   }, [image.rating]);
 
-  // Lazy loading with IntersectionObserver
+  // VirtuosoGrid only renders visible items — request thumbnail on mount
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '300px' } // Load 300px before becoming visible for faster perceived loading
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
-  // Load thumbnail when visible - with minimal delay to allow batching
-  useEffect(() => {
-    if (isVisible && !thumbnail && !image.thumbnailUrl) {
-      // Small random delay to spread out requests and prevent all loading at once
-      const delay = Math.random() * 50;
-      const timer = setTimeout(() => {
-        loadThumbnail();
-      }, delay);
-      return () => clearTimeout(timer);
-    }
-  }, [isVisible, image.path, image.thumbnailUrl]);
-
-  const loadThumbnail = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const base64 = await bridge.getThumbnail(image.path);
-      setThumbnail(base64);
-    } catch (error) {
-      console.error('Failed to load thumbnail:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    requestThumbnail(image.path);
   }, [image.path]);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -98,11 +59,11 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
     setIsSaving(true);
     try {
       await updateImageRating(image.path, newRating);
-      useToastStore.getState().success(`Bewertung: ${'★'.repeat(newRating)}${'☆'.repeat(5 - newRating)}`);
+      useToastStore.getState().success(`${t('imageCard.ratingSet')} ${'★'.repeat(newRating)}${'☆'.repeat(5 - newRating)}`);
     } catch (error) {
       console.error('Failed to save rating:', error);
       setRating(image.rating || 0); // Revert on error
-      useToastStore.getState().error('Bewertung konnte nicht gespeichert werden');
+      useToastStore.getState().error(t('imageCard.ratingFailed'));
     } finally {
       setIsSaving(false);
     }
@@ -123,23 +84,30 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
   };
 
   return (
-    <motion.div
-      ref={cardRef}
-      whileHover={{
-        scale: 1.03,
-        y: -4,
-      }}
-      whileTap={{ scale: 0.98 }}
-      transition={{
-        type: 'spring',
-        stiffness: 400,
-        damping: 25,
-      }}
+    <div
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      tabIndex={0}
+      role="gridcell"
+      aria-selected={isSelected}
+      aria-label={`${image.fileName}${tagCount > 0 ? `, ${tagCount} tags` : ''}${rating > 0 ? `, ${rating} stars` : ''}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const imageList = allImages.length > 0 ? allImages : storeImages;
+          openLightbox(image, imageList);
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          selectImage(image.path, e.ctrlKey || e.metaKey, e.shiftKey);
+        }
+      }}
       className={`
-        relative group cursor-pointer rounded-xl overflow-hidden
+        relative group cursor-pointer rounded-xl overflow-hidden w-full h-full
+        transition-transform duration-200 ease-out outline-none
+        hover:scale-[1.03] hover:-translate-y-1
+        active:scale-[0.98]
+        focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-primary)]
         ${isSelected ? 'ring-2 ring-cyan-400/70 ring-offset-2 ring-offset-[var(--color-bg-primary)]' : ''}
       `}
       style={{
@@ -151,7 +119,7 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
       {/* Card Container - HeroUI with Blurred Footer */}
       <Card
         isFooterBlurred
-        className="relative rounded-xl overflow-hidden border-none bg-[var(--glass-bg)]"
+        className="relative rounded-xl overflow-hidden border-none bg-[var(--glass-bg)] w-full h-full"
       >
         {/* Thumbnail */}
         <ImageThumbnail
@@ -160,43 +128,35 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
           fileName={image.fileName}
           isLoading={isLoading}
           thumbnailSize={thumbnailSize}
-          onThumbnailError={() => { if (!thumbnail) loadThumbnail(); }}
+          onThumbnailError={() => { if (!thumbnail) requestThumbnail(image.path); }}
         />
 
         {/* Overlays on top of thumbnail */}
         <div className="absolute inset-0 pointer-events-none" style={{ bottom: 'auto', height: thumbnailSize ? `${thumbnailSize}px` : '100%' }}>
           {/* Tag count badge */}
           {tagCount > 0 && (
-            <motion.div
+            <div
               className="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-full bg-cyan-500/95 text-white text-xs font-bold flex items-center gap-1.5 shadow-depth-near"
               style={{
-                transform: 'translateZ(25px)',
                 boxShadow: '0 4px 12px rgba(6,182,212,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
               }}
-              whileHover={{ scale: 1.1, y: -2 }}
             >
               <Tag size={11} />
               {tagCount}
-            </motion.div>
+            </div>
           )}
 
           {/* Selection indicator */}
-          <motion.div
-            initial={false}
-            animate={{
-              opacity: isSelected ? 1 : 0,
-              scale: isSelected ? 1 : 0.5,
-              rotateZ: isSelected ? 0 : -180,
-            }}
-            className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center"
+          <div
+            className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center transition-all duration-200"
             style={{
-              transform: 'translateZ(30px)',
+              opacity: isSelected ? 1 : 0,
+              transform: `scale(${isSelected ? 1 : 0.5}) rotate(${isSelected ? 0 : -180}deg)`,
               boxShadow: '0 6px 20px rgba(6,182,212,0.5), inset 0 1px 0 rgba(255,255,255,0.4)',
             }}
-            whileHover={{ scale: 1.15, rotate: 5 }}
           >
             <Check size={16} className="text-white" strokeWidth={3} />
-          </motion.div>
+          </div>
 
           {/* Hover overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--glass-bg)] via-[var(--glass-bg)]/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -215,7 +175,7 @@ export function ImageCard({ image, thumbnailSize, allImages = [] }: ImageCardPro
           />
         </CardFooter>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { FolderTree, X } from 'lucide-react';
 import { useTagStore } from '../../stores/tagStore';
-import { useAppStore } from '../../stores/appStore';
+import { useSelectedImages, useImages, useUpdateImageTags } from '../../stores/appStore';
 
 interface TagTreeViewProps {
   onTagClick?: (tag: string) => void;
@@ -10,13 +10,20 @@ interface TagTreeViewProps {
 
 export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) {
   const { categories } = useTagStore();
-  const { selectedImages, images, updateImageTags } = useAppStore();
+  const selectedImages = useSelectedImages();
+  const images = useImages();
+  const updateImageTags = useUpdateImageTags();
+
+  // O(1) lookup map for images by path
+  const imageMap = useMemo(() => new Map(images.map(img => [img.path, img])), [images]);
 
   // Get all unique tags from selected images
   const selectedImagesTags = useMemo(() => {
-    const selectedImgs = images.filter(img => selectedImages.has(img.path));
-    return new Set(selectedImgs.flatMap(img => img.tags));
-  }, [images, selectedImages]);
+    const selectedImgs = Array.from(selectedImages)
+      .map(path => imageMap.get(path))
+      .filter(Boolean);
+    return new Set(selectedImgs.flatMap(img => img!.tags));
+  }, [imageMap, selectedImages]);
 
   // Filter categories based on search query
   const filteredCategories = useMemo(() => {
@@ -47,7 +54,7 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
     if (selectedImages.size === 0) return;
 
     for (const imagePath of selectedImages) {
-      const image = images.find(img => img.path === imagePath);
+      const image = imageMap.get(imagePath);
       if (image && !image.tags.includes(tag)) {
         await updateImageTags(imagePath, [...image.tags, tag]);
       }
@@ -60,7 +67,7 @@ export function TagTreeView({ onTagClick, searchQuery = '' }: TagTreeViewProps) 
     if (selectedImages.size === 0) return;
 
     for (const imagePath of selectedImages) {
-      const image = images.find(img => img.path === imagePath);
+      const image = imageMap.get(imagePath);
       if (image && image.tags.includes(tag)) {
         await updateImageTags(imagePath, image.tags.filter(t => t !== tag));
       }

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import { NavigationSlice, createNavigationSlice } from './slices/navigationSlice';
 import { ImageSlice, createImageSlice } from './slices/imageSlice';
@@ -6,11 +7,16 @@ import { UISlice, createUISlice } from './slices/uiSlice';
 
 type AppStore = NavigationSlice & ImageSlice & UISlice;
 
-export const useAppStore = create<AppStore>()((...a) => ({
-  ...createNavigationSlice(...a),
-  ...createImageSlice(...a),
-  ...createUISlice(...a),
-}));
+export const useAppStore = create<AppStore>()(
+  devtools(
+    (...a) => ({
+      ...createNavigationSlice(...a),
+      ...createImageSlice(...a),
+      ...createUISlice(...a),
+    }),
+    { name: 'TagFusion AppStore', enabled: import.meta.env.DEV }
+  )
+);
 
 // ============================================================================
 // OPTIMIZED SELECTORS
@@ -20,8 +26,14 @@ export const useAppStore = create<AppStore>()((...a) => ({
 
 // Navigation selectors
 export const useCurrentFolder = () => useAppStore((state) => state.currentFolder);
+export const useSetCurrentFolder = () => useAppStore((state) => state.setCurrentFolder);
 export const useNavigateToFolder = () => useAppStore((state) => state.navigateToFolder);
 export const useNavigateUp = () => useAppStore((state) => state.navigateUp);
+export const useDrives = () => useAppStore((state) => state.drives);
+export const useLoadDrives = () => useAppStore((state) => state.loadDrives);
+export const useLoadFolders = () => useAppStore((state) => state.loadFolders);
+export const useLoadImages = () => useAppStore((state) => state.loadImages);
+export const useAddCurrentFolderToFavorites = () => useAppStore((state) => state.addCurrentFolderToFavorites);
 
 // Grid/Image selectors
 export const useGridItems = () => useAppStore((state) => state.gridItems);
@@ -61,6 +73,9 @@ export const useFilterSort = () => useAppStore(
     clearFilters: state.clearFilters
   }))
 );
+
+// Image action selectors
+export const useRefreshImages = () => useAppStore((state) => state.refreshImages);
 
 // Tags selectors
 export const useTags = () => useAppStore((state) => state.tags);

@@ -94,7 +94,7 @@ export function FolderCard({ item }: FolderCardProps) {
             whileTap={{ scale: 0.98 }}
             onDoubleClick={handleDoubleClick}
             onContextMenu={handleContextMenu}
-            className="relative group cursor-pointer rounded-xl overflow-hidden"
+            className="relative group cursor-pointer rounded-xl overflow-hidden w-full h-full"
             style={{
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
             }}
@@ -105,7 +105,6 @@ export function FolderCard({ item }: FolderCardProps) {
                 style={{
                     background: 'var(--glass-bg)',
                     border: '1px solid rgba(6, 182, 212, 0.15)',
-                    aspectRatio: '1/1' // Maintain square aspect ratio
                 }}
             >
                 {/* Icon Area */}

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { bridge } from '../services/bridge';
+import { useAppStore } from './appStore';
 
 interface ClipboardItem {
   path: string;
@@ -39,7 +40,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
         clear(); // Clear clipboard after moving
       }
     } catch (error) {
-      console.error('Paste operation failed:', error);
+      useAppStore.getState().setError((error as Error).message);
       throw error;
     }
   },

@@ -1,24 +1,55 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-  RotateCcw, RotateCw, Star, Tag, Info, FlipHorizontal, FlipVertical
+  RotateCcw, RotateCw, Star, Tag, Info, FlipHorizontal, FlipVertical, Film
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useLightboxStore } from '../../stores/lightboxStore';
-import { useAppStore } from '../../stores/appStore';
+import { useAppStore, useSetError } from '../../stores/appStore';
 import { bridge } from '../../services/bridge';
+import { LIGHTBOX_ZOOM_DEFAULT } from '../../constants/ui';
+import { GlassIconButton as GlassIconButtonBase } from '../ui/glass';
 
 export function Lightbox() {
   const {
     isOpen, currentImage, currentIndex, images, zoomLevel,
-    close, next, previous, zoomIn, zoomOut, resetZoom
+    close, next, previous, zoomIn, zoomOut, resetZoom, setZoom, goToIndex
   } = useLightboxStore();
   const { refreshImages } = useAppStore();
+  const setError = useSetError();
+  const { t } = useTranslation();
 
   const [fullImage, setFullImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showFilmstrip, setShowFilmstrip] = useState(true);
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  const activeThumbRef = useRef<HTMLButtonElement>(null);
+
+  // Pan state
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+
+  const isZoomed = zoomLevel > LIGHTBOX_ZOOM_DEFAULT;
+
+  // Reset pan when image changes or zoom resets
+  useEffect(() => {
+    setPanX(0);
+    setPanY(0);
+  }, [currentImage?.path]);
+
+  // Reset pan when zoom goes back to default
+  useEffect(() => {
+    if (zoomLevel <= LIGHTBOX_ZOOM_DEFAULT) {
+      setPanX(0);
+      setPanY(0);
+    }
+  }, [zoomLevel]);
 
   // Load full resolution image
   useEffect(() => {
@@ -33,7 +64,7 @@ export function Lightbox() {
           setIsLoading(false);
         })
         .catch((err) => {
-          console.error('Failed to load full image:', err);
+          setError((err as Error).message);
           // Fallback to thumbnail
           setFullImage(currentImage.thumbnailBase64 || null);
           setIsLoading(false);
@@ -58,6 +89,56 @@ export function Lightbox() {
       }
     });
   }, [isOpen, currentIndex, images]);
+
+  // Auto-scroll filmstrip to active thumbnail (React docs pattern)
+  useEffect(() => {
+    if (activeThumbRef.current && showFilmstrip) {
+      activeThumbRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [currentIndex, showFilmstrip]);
+
+  // Scroll-wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -10 : 10;
+    const newZoom = zoomLevel + delta;
+    setZoom(newZoom);
+  }, [zoomLevel, setZoom]);
+
+  // Drag-to-pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!isZoomed) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, panX, panY };
+  }, [isZoomed, panX, panY]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setPanX(dragStart.current.panX + dx);
+    setPanY(dragStart.current.panY + dy);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Double-click to toggle fit ↔ 100%
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (zoomLevel === LIGHTBOX_ZOOM_DEFAULT) {
+      setZoom(200);
+    } else {
+      resetZoom();
+    }
+  }, [zoomLevel, setZoom, resetZoom]);
 
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -106,7 +187,7 @@ export function Lightbox() {
       // Refresh thumbnails in grid
       refreshImages();
     } catch (err) {
-      console.error('Failed to rotate:', err);
+      setError((err as Error).message);
     } finally {
       setIsProcessing(false);
     }
@@ -124,7 +205,7 @@ export function Lightbox() {
       // Refresh thumbnails in grid
       refreshImages();
     } catch (err) {
-      console.error('Failed to flip:', err);
+      setError((err as Error).message);
     } finally {
       setIsProcessing(false);
     }
@@ -147,6 +228,9 @@ export function Lightbox() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${t('lightbox.info')}: ${currentImage.fileName}`}
           onClick={close}
         >
           {/* Backdrop with heavy blur */}
@@ -160,12 +244,22 @@ export function Lightbox() {
 
           {/* Main Image Container - Fullscreen optimized */}
           <motion.div
+            ref={imageContainerRef}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="relative z-10 w-[95vw] h-[90vh] flex items-center justify-center"
+            className="relative z-10 w-[95vw] h-[90vh] flex items-center justify-center overflow-hidden"
+            style={{
+              cursor: isZoomed ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            }}
             onClick={(e) => e.stopPropagation()}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
           >
             {/* Loading/Processing Spinner */}
             {(isLoading || isProcessing) && (
@@ -178,15 +272,16 @@ export function Lightbox() {
               </div>
             )}
 
-            {/* Image - Maximized */}
+            {/* Image - Maximized with Pan & Zoom */}
             <motion.img
               src={imageUrl}
               alt={currentImage.fileName}
               className="w-full h-full object-contain select-none"
               style={{
-                transform: `scale(${zoomLevel / 100})`,
+                transform: `translate(${panX}px, ${panY}px) scale(${zoomLevel / 100})`,
                 opacity: (isLoading || isProcessing) ? 0.3 : 1,
                 filter: isProcessing ? 'blur(2px)' : 'none',
+                transition: isDragging ? 'none' : 'transform 0.15s ease-out',
               }}
               draggable={false}
               initial={{ opacity: 0 }}
@@ -213,7 +308,7 @@ export function Lightbox() {
               </span>
             </div>
             {/* Close Button */}
-            <GlassIconButton onClick={close} title="Schließen (ESC)">
+            <GlassIconButton onClick={close} title={t('lightbox.close')}>
               <X size={20} />
             </GlassIconButton>
           </motion.div>
@@ -234,7 +329,7 @@ export function Lightbox() {
                 }}
                 whileHover={{ background: 'rgba(6,182,212,0.3)' }}
                 whileTap={{ scale: 0.95 }}
-                title="Vorheriges (←)"
+                title={t('lightbox.previous')}
               >
                 <ChevronLeft size={28} className="text-white" />
               </motion.button>
@@ -252,11 +347,70 @@ export function Lightbox() {
                 }}
                 whileHover={{ background: 'rgba(6,182,212,0.3)' }}
                 whileTap={{ scale: 0.95 }}
-                title="Nächstes (→)"
+                title={t('lightbox.next')}
               >
                 <ChevronRight size={28} className="text-white" />
               </motion.button>
             </>
+          )}
+
+          {/* Filmstrip / Thumbnail Navigation — absolute, above bottom bar */}
+          {showFilmstrip && images.length > 1 && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ delay: 0.1 }}
+              className="absolute bottom-14 left-0 right-0 z-20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                ref={filmstripRef}
+                className="flex gap-1 overflow-x-auto py-1.5 px-4 mx-auto max-w-[90vw]"
+                style={{
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
+                {images.map((img, idx) => {
+                  const isActive = idx === currentIndex;
+                  const thumbSrc = img.thumbnailBase64
+                    ? `data:image/jpeg;base64,${img.thumbnailBase64}`
+                    : img.thumbnailUrl || '';
+                  return (
+                    <button
+                      key={img.path}
+                      ref={isActive ? activeThumbRef : null}
+                      onClick={() => goToIndex(idx)}
+                      title={img.fileName}
+                      className={`
+                        flex-shrink-0 rounded overflow-hidden transition-all duration-150
+                        outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
+                        ${isActive
+                          ? 'ring-2 ring-cyan-400 opacity-100 brightness-110'
+                          : 'opacity-40 hover:opacity-75'
+                        }
+                      `}
+                      style={{ width: 56, height: 40 }}
+                    >
+                      {thumbSrc ? (
+                        <img
+                          src={thumbSrc}
+                          alt={img.fileName}
+                          className="w-full h-full object-cover"
+                          draggable={false}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-slate-700 flex items-center justify-center">
+                          <span className="text-[8px] text-slate-400 truncate px-0.5">{img.fileName}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
           )}
 
           {/* Bottom Bar - Controls & Info */}
@@ -315,38 +469,41 @@ export function Lightbox() {
 
               {/* Controls */}
               <div className="flex items-center gap-2">
-                <GlassIconButton onClick={() => setShowInfo(p => !p)} title="Info (I)">
+                <GlassIconButton onClick={() => setShowFilmstrip(p => !p)} title={t('lightbox.filmstrip')}>
+                  <Film size={18} className={showFilmstrip ? 'text-cyan-400' : ''} />
+                </GlassIconButton>
+                <GlassIconButton onClick={() => setShowInfo(p => !p)} title={t('lightbox.info')}>
                   <Info size={18} className={showInfo ? 'text-cyan-400' : ''} />
                 </GlassIconButton>
 
                 <div className="w-px h-6 bg-white/20 mx-2" />
 
                 {/* Rotate Controls */}
-                <GlassIconButton onClick={() => handleRotate(-90)} title="Links drehen" disabled={isProcessing}>
+                <GlassIconButton onClick={() => handleRotate(-90)} title={t('lightbox.rotateLeft')} disabled={isProcessing}>
                   <RotateCcw size={18} />
                 </GlassIconButton>
-                <GlassIconButton onClick={() => handleRotate(90)} title="Rechts drehen" disabled={isProcessing}>
+                <GlassIconButton onClick={() => handleRotate(90)} title={t('lightbox.rotateRight')} disabled={isProcessing}>
                   <RotateCw size={18} />
                 </GlassIconButton>
 
                 <div className="w-px h-6 bg-white/20 mx-1" />
 
                 {/* Flip Controls */}
-                <GlassIconButton onClick={() => handleFlip(true)} title="Horizontal spiegeln" disabled={isProcessing}>
+                <GlassIconButton onClick={() => handleFlip(true)} title={t('lightbox.flipHorizontal')} disabled={isProcessing}>
                   <FlipHorizontal size={18} />
                 </GlassIconButton>
-                <GlassIconButton onClick={() => handleFlip(false)} title="Vertikal spiegeln" disabled={isProcessing}>
+                <GlassIconButton onClick={() => handleFlip(false)} title={t('lightbox.flipVertical')} disabled={isProcessing}>
                   <FlipVertical size={18} />
                 </GlassIconButton>
 
                 <div className="w-px h-6 bg-white/20 mx-2" />
 
                 {/* Zoom Controls */}
-                <GlassIconButton onClick={zoomOut} title="Verkleinern (-)">
+                <GlassIconButton onClick={zoomOut} title={t('lightbox.zoomOut')}>
                   <ZoomOut size={18} />
                 </GlassIconButton>
                 <span className="text-white text-sm min-w-[50px] text-center">{zoomLevel}%</span>
-                <GlassIconButton onClick={zoomIn} title="Vergrößern (+)">
+                <GlassIconButton onClick={zoomIn} title={t('lightbox.zoomIn')}>
                   <ZoomIn size={18} />
                 </GlassIconButton>
               </div>
@@ -358,7 +515,7 @@ export function Lightbox() {
   );
 }
 
-// Helper Component
+// Lightbox-specific wrapper for consistent dark-backdrop styling
 function GlassIconButton({
   children,
   onClick,
@@ -371,23 +528,16 @@ function GlassIconButton({
   disabled?: boolean;
 }) {
   return (
-    <motion.button
+    <GlassIconButtonBase
       onClick={disabled ? undefined : onClick}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${disabled
-          ? 'text-white/30 cursor-not-allowed'
-          : 'text-white/80 hover:text-white'
-        }`}
-      style={{
-        background: disabled ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255,255,255,0.15)',
-      }}
-      whileHover={disabled ? {} : { scale: 1.05, background: 'rgba(6,182,212,0.3)' }}
-      whileTap={disabled ? {} : { scale: 0.95 }}
+      disabled={disabled}
+      variant="ghost"
+      size="sm"
+      className="!text-white/80 hover:!text-white !bg-white/10 hover:!bg-cyan-500/30 !border-white/15 !backdrop-blur-md"
     >
       {children}
-    </motion.button>
+    </GlassIconButtonBase>
   );
 }
 

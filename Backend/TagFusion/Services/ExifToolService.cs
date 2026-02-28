@@ -170,50 +170,64 @@ public class ExifToolService : IDisposable
         Log($"WriteTagsAsync called for: {imagePath}");
         Log($"Tags to write: [{string.Join(", ", tags)}]");
 
-        // Build arguments for each tag separately for proper handling
+        // Deduplicate tags (case-insensitive, trim whitespace)
+        var uniqueTags = tags
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        if (uniqueTags.Count != tags.Count)
+            Log($"Deduplicated tags: {tags.Count} → {uniqueTags.Count}");
+
+        // Build argument list directly (no string→parse round-trip)
         var args = new List<string>();
 
-        // Clear existing tags first
-        args.Add("-Keywords=");
-        args.Add("-XMP:Subject=");
-
-        // Add each tag
-        foreach (var tag in tags)
+        if (uniqueTags.Count == 0)
         {
-            var escapedTag = tag.Replace("\"", "\\\"");
-            args.Add($"-Keywords+=\"{escapedTag}\"");
-            args.Add($"-XMP:Subject+=\"{escapedTag}\"");
+            // Clear all tags
+            args.Add("-Keywords=");
+            args.Add("-XMP:Subject=");
+        }
+        else
+        {
+            // Use -sep with a separator that won't appear in tag names,
+            // then set all keywords at once with direct assignment (replaces existing)
+            args.Add("-sep");
+            args.Add(";;");
+            args.Add($"-Keywords={string.Join(";;", uniqueTags)}");
+            args.Add($"-XMP:Subject={string.Join(";;", uniqueTags)}");
         }
 
         args.Add("-overwrite_original");
-        args.Add($"\"{imagePath}\"");
+        args.Add(imagePath);
 
-        var argsString = string.Join(" ", args);
-        Log($"Command args: {argsString}");
-        
-        var output = await RunExifToolAsync(argsString, cancellationToken);
+        Log($"Sending {args.Count} args directly to ExifTool");
+
+        var output = await RunExifToolAsync(args, cancellationToken);
         Log($"WriteTagsAsync output: '{output}'");
-        
+
         // Check for errors in output (warnings are often harmless, only throw on actual errors)
         if (output.Contains("Error", StringComparison.OrdinalIgnoreCase))
         {
             Log("WriteTagsAsync ERROR detected in output!");
             throw new InvalidOperationException($"ExifTool error: {output}");
         }
-        
+
         // Log warnings but don't fail
         if (output.Contains("Warning", StringComparison.OrdinalIgnoreCase))
         {
             Log($"WriteTagsAsync Warning (non-fatal): {output}");
         }
-        
+
         // Check if file was updated (ExifTool reports "1 image files updated")
         if (!output.Contains("1 image files updated", StringComparison.OrdinalIgnoreCase) &&
             !output.Contains("1 image file updated", StringComparison.OrdinalIgnoreCase))
         {
             Log("WriteTagsAsync - No 'image files updated' confirmation found in output");
         }
-        
+
         return true;
     }
 
@@ -472,12 +486,56 @@ public class ExifToolService : IDisposable
             _semaphore.Release();
         }
     }
-    
+
+
+    /// <summary>
+    /// Run ExifTool with pre-parsed arguments (no string→parse round-trip).
+    /// Used by WriteTagsAsync to avoid quoting issues with tag values.
+    /// </summary>
+    private async Task<string> RunExifToolAsync(List<string> args, CancellationToken cancellationToken = default)
+    {
+        await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            EnsureProcessRunning();
+
+            if (_commandWriter == null || _outputReader == null)
+                throw new InvalidOperationException("ExifTool process not initialized");
+
+            Log($"RunExifToolAsync (List): Sending {args.Count} arguments:");
+            foreach (var arg in args)
+            {
+                Log($"  > {arg}");
+                await _commandWriter.WriteLineAsync(arg.AsMemory(), cancellationToken).ConfigureAwait(false);
+            }
+            await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
+            await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            // Read output until {ready}
+            var sb = new StringBuilder();
+            string? line;
+            while ((line = await _outputReader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
+            {
+                if (line.Trim() == "{ready}")
+                    break;
+                sb.AppendLine(line);
+            }
+            var output = sb.ToString();
+            Log($"RunExifToolAsync (List): Output received: '{output.Trim()}'");
+
+            return output;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
     /// <summary>
     /// Parse a command-line style argument string into individual arguments.
     /// Handles quoted strings with spaces correctly.
     /// </summary>
-    private static List<string> ParseArguments(string arguments)
+    internal static List<string> ParseArguments(string arguments)
     {
         var result = new List<string>();
         var current = new StringBuilder();
@@ -527,6 +585,40 @@ public class ExifToolService : IDisposable
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Deduplicate tags (case-insensitive, trimmed) and build the ExifTool argument list.
+    /// Extracted as internal static for testability.
+    /// </summary>
+    internal static (List<string> uniqueTags, List<string> args) BuildWriteTagArgs(List<string> tags, string imagePath)
+    {
+        var uniqueTags = tags
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
+
+        var args = new List<string>();
+
+        if (uniqueTags.Count == 0)
+        {
+            args.Add("-Keywords=");
+            args.Add("-XMP:Subject=");
+        }
+        else
+        {
+            args.Add("-sep");
+            args.Add(";;");
+            args.Add($"-Keywords={string.Join(";;", uniqueTags)}");
+            args.Add($"-XMP:Subject={string.Join(";;", uniqueTags)}");
+        }
+
+        args.Add("-overwrite_original");
+        args.Add(imagePath);
+
+        return (uniqueTags, args);
     }
 
     public void Dispose()

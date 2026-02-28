@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -46,7 +47,7 @@ public class WebViewBridge
 
         _webView.WebMessageReceived += OnWebMessageReceived;
 
-        System.Diagnostics.Debug.WriteLine("WebViewBridge initialized");
+        Debug.WriteLine("WebViewBridge initialized");
     }
 
     private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -55,23 +56,23 @@ public class WebViewBridge
         {
             // Use TryGetWebMessageAsString instead of WebMessageAsJson to avoid double-parsing
             var json = e.TryGetWebMessageAsString();
-            Console.WriteLine($"[Bridge] Received: {json}");
+            Debug.WriteLine($"[Bridge] Received: {json}");
 
             var message = JsonSerializer.Deserialize<BridgeMessage>(json, _jsonOptions);
 
             if (message == null)
             {
-                Console.WriteLine("[Bridge] ERROR: Invalid message format");
+                Debug.WriteLine("[Bridge] ERROR: Invalid message format");
                 SendError(null, "Invalid message format");
                 return;
             }
 
-            Console.WriteLine($"[Bridge] Processing action: {message.Action}");
+            Debug.WriteLine($"[Bridge] Processing action: {message.Action}");
             await ProcessMessageAsync(message);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Bridge] ERROR: {ex.Message}");
+            Debug.WriteLine($"[Bridge] ERROR: {ex.Message}");
             SendError(null, ex.Message);
         }
     }
@@ -210,7 +211,7 @@ public class WebViewBridge
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Bridge] Background metadata load failed: {ex.Message}");
+                Debug.WriteLine($"[Bridge] Background metadata load failed: {ex.Message}");
             }
         });
     }
@@ -222,9 +223,14 @@ public class WebViewBridge
         var imagePath = GetPayloadString(payload, "imagePath");
         var tagsObj = payload.GetValueOrDefault("tags");
 
-        List<string> tags = ExtractStringArray(tagsObj);
+        List<string> tags = ExtractStringArray(tagsObj)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToList();
 
-        Console.WriteLine($"[Bridge] WriteTagsAsync: path={imagePath}, tags=[{string.Join(", ", tags)}]");
+        Debug.WriteLine($"[Bridge] WriteTagsAsync: path={imagePath}, tags=[{string.Join(", ", tags)}]");
 
         var success = await _exifToolService.WriteTagsAsync(imagePath, tags);
         if (success)
@@ -243,7 +249,7 @@ public class WebViewBridge
                 Rating = await _exifToolService.ReadRatingAsync(imagePath)
             };
             await _databaseService.SaveImageAsync(image);
-            Console.WriteLine($"[Bridge] WriteTagsAsync: DB updated with {tags.Count} tags");
+            Debug.WriteLine($"[Bridge] WriteTagsAsync: DB updated with {tags.Count} tags");
         }
         return success;
     }
@@ -317,7 +323,7 @@ public class WebViewBridge
         return await _imageEditService.FlipImagesAsync(paths, horizontal);
     }
 
-    private List<string> ExtractStringArray(object? obj)
+    internal static List<string> ExtractStringArray(object? obj)
     {
         if (obj == null) return new List<string>();
 
@@ -336,7 +342,7 @@ public class WebViewBridge
         return new List<string>();
     }
 
-    private int ExtractInt(object? obj, int defaultValue = 0)
+    internal static int ExtractInt(object? obj, int defaultValue = 0)
     {
         if (obj == null) return defaultValue;
         if (obj is long l) return (int)l;
@@ -347,7 +353,7 @@ public class WebViewBridge
         return defaultValue;
     }
 
-    private string[] GetPayloadStringArray(Dictionary<string, object>? payload, string key)
+    private static string[] GetPayloadStringArray(Dictionary<string, object>? payload, string key)
     {
         if (payload == null) return Array.Empty<string>();
 
@@ -355,7 +361,7 @@ public class WebViewBridge
         return ExtractStringArray(obj).ToArray();
     }
 
-    private string GetPayloadString(Dictionary<string, object>? payload, string key)
+    internal static string GetPayloadString(Dictionary<string, object>? payload, string key)
     {
         if (payload == null) return string.Empty;
         if (payload.TryGetValue(key, out var value))
@@ -402,7 +408,7 @@ public class WebViewBridge
     private void SendToFrontend(object message)
     {
         var json = JsonSerializer.Serialize(message, _jsonOptions);
-        Console.WriteLine($"[Bridge] Sending: {json.Substring(0, Math.Min(200, json.Length))}...");
+        Debug.WriteLine($"[Bridge] Sending: {json.Substring(0, Math.Min(200, json.Length))}...");
 
         // Ensure we're on the UI thread
         Application.Current.Dispatcher.Invoke(() =>

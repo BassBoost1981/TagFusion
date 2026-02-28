@@ -26,15 +26,24 @@ export default defineConfig({
       exclude: ['src/test/**', 'src/types/**']
     }
   },
+  optimizeDeps: {
+    include: ['lucide-react', '@heroui/react'],
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
+    // Oxc ist der Default-Minifier in Vite — 30-90x schneller als Terser
+    target: 'esnext',
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
           motion: ['framer-motion'],
+          heroui: ['@heroui/react'],
+          virtuoso: ['react-virtuoso'],
+          icons: ['lucide-react'],
+          i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          state: ['zustand'],
         },
       },
     },

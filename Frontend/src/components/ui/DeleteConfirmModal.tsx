@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GlassModal, GlassButton } from './glass';
-import { useModalStore } from '../../stores/modalStore';
+import { useModalStore, type DeleteConfirmData } from '../../stores/modalStore';
 import { useToastStore } from '../../stores/toastStore';
 import { bridge } from '../../services/bridge';
 import { Trash2, AlertTriangle } from 'lucide-react';
@@ -11,7 +11,7 @@ export function DeleteConfirmModal() {
   const [error, setError] = useState<string | null>(null);
 
   const isOpen = type === 'deleteConfirm';
-  const deleteData = data as { paths: string[] } | null;
+  const deleteData = data as DeleteConfirmData | null;
 
   const handleDelete = async () => {
     if (!deleteData?.paths.length) return;

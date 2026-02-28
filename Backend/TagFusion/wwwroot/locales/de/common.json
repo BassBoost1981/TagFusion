@@ -48,6 +48,7 @@
     },
     "common": {
         "loading": "Laden...",
+        "loadingItems": "Lade Elemente...",
         "error": "Fehler",
         "save": "Speichern",
         "cancel": "Abbrechen",
@@ -57,8 +58,34 @@
         "parentFolder": "Übergeordneter Ordner"
     },
     "emptyState": {
+        "noResults": "Keine Treffer",
+        "noResultsHint": "Versuche andere Suchbegriffe oder Filter",
+        "resetFilters": "Filter zurücksetzen",
         "folderEmpty": "Ordner ist leer",
-        "noImages": "Dieser Ordner enthält keine Unterordner oder unterstützten Bilddateien."
+        "noImages": "Dieser Ordner enthält keine Unterordner oder unterstützten Bilddateien.",
+        "noTags": "Keine Tags vorhanden",
+        "noTagsHint": "Wähle Bilder aus und vergebe Tags",
+        "openTagManager": "Tag-Manager öffnen"
+    },
+    "imageCard": {
+        "ratingSet": "Bewertung:",
+        "ratingFailed": "Bewertung konnte nicht gespeichert werden"
+    },
+    "lightbox": {
+        "close": "Schließen (ESC)",
+        "previous": "Vorheriges (←)",
+        "next": "Nächstes (→)",
+        "info": "Info (I)",
+        "rotateLeft": "Links drehen",
+        "rotateRight": "Rechts drehen",
+        "flipHorizontal": "Horizontal spiegeln",
+        "flipVertical": "Vertikal spiegeln",
+        "zoomOut": "Verkleinern (-)",
+        "zoomIn": "Vergrößern (+)",
+        "filmstrip": "Filmstreifen"
+    },
+    "mainContent": {
+        "selectedTags": "Tags der Auswahl"
     },
     "statusBar": {
         "images": "Bilder",
@@ -77,11 +104,6 @@
         "title": "Willkommen bei TagFusion",
         "subtitle": "Organisiere deine Bildersammlung mit modernem Tagging, blitzschneller Suche und intuitiver Bedienung.",
         "drives": "Geräte und Laufwerke",
-        "savedTags": "Gespeicherte Tags",
-        "imagesIndexed": "Bilder Indexiert",
-        "collections": "Sammlungen",
-        "popularTags": "Beliebte Tags",
-        "noTagsFound": "Keine Tags gefunden",
         "freeOf": "frei von"
     }
 }

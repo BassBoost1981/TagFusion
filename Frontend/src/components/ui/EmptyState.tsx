@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { FolderOpen, Tags, SearchX } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassButton } from './glass';
 
 export type EmptyStateType = 'no-results' | 'empty-folder' | 'no-tags';
@@ -9,37 +10,39 @@ interface EmptyStateProps {
     onAction?: () => void;
 }
 
-const configs: Record<EmptyStateType, {
-    icon: React.ReactNode;
-    iconClass: string;
-    title: string;
-    subtitle: string;
-    actionLabel?: string;
-}> = {
-    'no-results': {
-        icon: <SearchX className="w-16 h-16" />,
-        iconClass: 'text-cyan-400/50',
-        title: 'Keine Treffer',
-        subtitle: 'Versuche andere Suchbegriffe oder Filter',
-        actionLabel: 'Filter zurücksetzen'
-    },
-    'empty-folder': {
-        icon: <FolderOpen className="w-16 h-16" />,
-        iconClass: 'text-cyan-400/40',
-        title: 'Ordner ist leer',
-        subtitle: 'Dieser Ordner enthält keine Bilder',
-        actionLabel: undefined
-    },
-    'no-tags': {
-        icon: <Tags className="w-16 h-16" />,
-        iconClass: 'text-cyan-400/40',
-        title: 'Keine Tags vorhanden',
-        subtitle: 'Wähle Bilder aus und vergebe Tags',
-        actionLabel: 'Tag-Manager öffnen'
-    }
-};
-
 export function EmptyState({ type, onAction }: EmptyStateProps) {
+    const { t } = useTranslation();
+
+    const configs: Record<EmptyStateType, {
+        icon: React.ReactNode;
+        iconClass: string;
+        title: string;
+        subtitle: string;
+        actionLabel?: string;
+    }> = {
+        'no-results': {
+            icon: <SearchX className="w-16 h-16" />,
+            iconClass: 'text-cyan-400/50',
+            title: t('emptyState.noResults'),
+            subtitle: t('emptyState.noResultsHint'),
+            actionLabel: t('emptyState.resetFilters')
+        },
+        'empty-folder': {
+            icon: <FolderOpen className="w-16 h-16" />,
+            iconClass: 'text-cyan-400/40',
+            title: t('emptyState.folderEmpty'),
+            subtitle: t('emptyState.noImages'),
+            actionLabel: undefined
+        },
+        'no-tags': {
+            icon: <Tags className="w-16 h-16" />,
+            iconClass: 'text-cyan-400/40',
+            title: t('emptyState.noTags'),
+            subtitle: t('emptyState.noTagsHint'),
+            actionLabel: t('emptyState.openTagManager')
+        }
+    };
+
     const config = configs[type];
 
     return (

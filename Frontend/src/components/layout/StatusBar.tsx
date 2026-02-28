@@ -2,19 +2,14 @@ import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, CheckSquare, Tag, ZoomIn, ZoomOut, Star } from 'lucide-react';
 import { AnimatedCounter } from '../ui';
-import { useAppStore } from '../../stores/appStore';
+import { useImages, useSelectedImages, useZoomControls } from '../../stores/appStore';
 import { useTranslation } from 'react-i18next';
 
 export const StatusBar = () => {
     const { t } = useTranslation();
-    const {
-        images,
-        selectedImages,
-        zoomLevel,
-        setZoomLevel,
-        zoomIn,
-        zoomOut
-    } = useAppStore();
+    const images = useImages();
+    const selectedImages = useSelectedImages();
+    const { zoomLevel, setZoomLevel, zoomIn, zoomOut } = useZoomControls();
 
     // Calculate total unique tags
     const totalTags = useMemo(() => {

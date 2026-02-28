@@ -1,29 +1,39 @@
 import { create } from 'zustand';
 
-export type ModalType = 'rename' | 'deleteConfirm' | 'properties' | null;
+// ============================================================================
+// DISCRIMINATED UNION — Type-safe modal data via ModalDataMap
+// openModal('rename', { ... }) enforces correct data shape at call-site
+// ============================================================================
 
-interface RenameData {
+export interface RenameData {
   path: string;
   name: string;
   isFolder: boolean;
 }
 
-interface DeleteConfirmData {
+export interface DeleteConfirmData {
   paths: string[];
 }
 
-interface PropertiesData {
+export interface PropertiesData {
   path: string;
 }
 
-export type ModalData = RenameData | DeleteConfirmData | PropertiesData | null;
+/** Maps each modal type to its required data shape */
+export interface ModalDataMap {
+  rename: RenameData;
+  deleteConfirm: DeleteConfirmData;
+  properties: PropertiesData;
+}
+
+export type ModalType = keyof ModalDataMap;
 
 interface ModalState {
-  type: ModalType;
-  data: ModalData;
+  type: ModalType | null;
+  data: ModalDataMap[ModalType] | null;
 
-  // Actions
-  openModal: (type: ModalType, data: ModalData) => void;
+  // Type-safe openModal — ensures data matches modal type
+  openModal: <T extends ModalType>(type: T, data: ModalDataMap[T]) => void;
   closeModal: () => void;
 }
 

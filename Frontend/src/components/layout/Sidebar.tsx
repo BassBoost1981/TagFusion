@@ -1,41 +1,67 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Collapsible } from '@base-ui-components/react/collapsible';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion } from 'framer-motion';
 import { HardDrive, FolderClosed, ChevronDown, FolderOpen, Loader2, Star, Plus, X, Monitor } from 'lucide-react';
-import { useAppStore } from '../../stores/appStore';
+import { useSidebarState, useCurrentFolder, useLoadImages, useNavigateToFolder, useAddCurrentFolderToFavorites } from '../../stores/appStore';
 import type { FolderItem } from '../../types';
 import { GlassIconButton } from '../ui/glass';
+import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
+import { SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX } from '../../constants/ui';
 
 export function Sidebar() {
   const { t } = useTranslation();
-  const {
-    drives,
-    currentFolder,
-    sidebarWidth,
-    expandedPaths,
-    folderCache,
-    loadingPaths,
-    favorites,
-    loadDrives,
-    toggleFolder,
-    loadImages,
-    navigateToFolder,
-    addCurrentFolderToFavorites,
-    removeFavorite
-  } = useAppStore();
+  const { drives, favorites, expandedPaths, folderCache, loadingPaths, sidebarWidth, isLoadingDrives, setSidebarWidth, loadDrives, toggleFolder, removeFavorite } = useSidebarState();
+  const currentFolder = useCurrentFolder();
+  const loadImages = useLoadImages();
+  const navigateToFolder = useNavigateToFolder();
+  const addCurrentFolderToFavorites = useAddCurrentFolderToFavorites();
+  const [isResizing, setIsResizing] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     loadDrives();
   }, [loadDrives]);
 
+  // Handle resize (drag right edge)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const diff = e.clientX - startX;
+      const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, startWidth + diff));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [sidebarWidth, setSidebarWidth]);
+
   return (
     <aside
-      className="h-full flex flex-col glass-sidebar"
+      ref={panelRef}
+      className="h-full flex flex-col glass-sidebar relative"
       style={{ width: sidebarWidth }}
       data-testid="sidebar"
     >
+      {/* Resize Handle (right edge) */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize group hover:bg-cyan-500/30 transition-colors z-10 ${isResizing ? 'bg-cyan-500/40' : ''}`}
+      >
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-[var(--glass-border)] group-hover:bg-cyan-500/50 transition-colors" />
+      </div>
       {/* Favorites Section - Fixed at top */}
       <div className="p-2 m-2 mb-0 flex-shrink-0 glass-section">
         {/* Glass Specular Highlight */}
@@ -57,7 +83,7 @@ export function Sidebar() {
             <Plus size={14} />
           </GlassIconButton>
         </div>
-        <ul className="space-y-0.5">
+        <ul aria-label={t('sidebar.favorites')} className="space-y-0.5">
           {favorites.map((fav) => (
             <FavoriteItem
               key={fav.path}
@@ -88,20 +114,38 @@ export function Sidebar() {
                 {t('sidebar.recentFolders')}
               </h3>
             </div>
-            <ul className="space-y-0.5">
-              {drives.map((drive) => (
-                <TreeNode
-                  key={drive.path}
-                  item={drive}
-                  level={0}
-                  currentFolder={currentFolder}
-                  expandedPaths={expandedPaths}
-                  folderCache={folderCache}
-                  loadingPaths={loadingPaths}
-                  onToggle={toggleFolder}
-                  onSelect={loadImages}
-                />
-              ))}
+            <ul role="tree" aria-label={t('sidebar.recentFolders')} className="space-y-0.5">
+              {isLoadingDrives ? (
+                /* Skeleton placeholders while drives load */
+                <div className="space-y-1.5 px-2 py-1">
+                  {[...Array(4)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.08, duration: 0.3 }}
+                      className="flex items-center gap-2"
+                    >
+                      <Skeleton className="w-4 h-4 rounded" />
+                      <Skeleton className={`h-3 rounded ${i % 2 === 0 ? 'w-3/4' : 'w-1/2'}`} />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                drives.map((drive) => (
+                  <TreeNode
+                    key={drive.path}
+                    item={drive}
+                    level={0}
+                    currentFolder={currentFolder}
+                    expandedPaths={expandedPaths}
+                    folderCache={folderCache}
+                    loadingPaths={loadingPaths}
+                    onToggle={toggleFolder}
+                    onSelect={loadImages}
+                  />
+                ))
+              )}
             </ul>
           </div>
         </ScrollArea.Viewport>
@@ -275,14 +319,22 @@ function TreeNode({
 
   return (
     <Collapsible.Root open={isExpanded}>
-      <li>
+      <li
+        role="treeitem"
+        aria-expanded={item.hasSubfolders ? isExpanded : undefined}
+        aria-selected={isActive}
+        aria-level={level + 1}
+        aria-label={item.name}
+      >
         <motion.div
           ref={itemRef}
           whileHover={{ x: 3 }}
           transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+          tabIndex={0}
           className={`
             flex items-center gap-1 py-1.5 px-2 rounded-lg cursor-pointer text-sm
-            transition-colors duration-150
+            transition-colors duration-150 outline-none
+            focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent
             ${isActive
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
               : 'text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--color-text-primary)] border border-transparent'
@@ -290,6 +342,18 @@ function TreeNode({
           `}
           style={{ paddingLeft: `calc(var(--sidebar-indent-base) + ${level} * var(--sidebar-indent-step))` }}
           onClick={handleSelect}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSelect();
+            } else if (e.key === 'ArrowRight' && item.hasSubfolders && !isExpanded) {
+              e.preventDefault();
+              onToggle(item.path);
+            } else if (e.key === 'ArrowLeft' && isExpanded) {
+              e.preventDefault();
+              onToggle(item.path);
+            }
+          }}
         >
           {/* Expand/Collapse Arrow with 3D rotation */}
           <motion.button
@@ -322,7 +386,7 @@ function TreeNode({
         {/* Children - Base UI Collapsible */}
         {children.length > 0 && (
           <Collapsible.Panel className="overflow-hidden transition-all duration-200 data-[ending-style]:h-0 data-[ending-style]:opacity-0 data-[starting-style]:h-0 data-[starting-style]:opacity-0">
-            <ul>
+            <ul role="group">
               {children.map((child) => (
                 <TreeNode
                   key={child.path}

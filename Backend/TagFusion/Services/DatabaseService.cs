@@ -6,25 +6,44 @@ using TagFusion.Models;
 
 namespace TagFusion.Services;
 
-public class DatabaseService : IDatabaseService
+public class DatabaseService : IDatabaseService, IDisposable
 {
-    private readonly string _connectionString;
+    private readonly SQLiteConnection _connection;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private bool _disposed;
 
     public DatabaseService()
     {
         var appDir = AppContext.BaseDirectory ?? string.Empty;
         var dbPath = Path.Combine(appDir, "tagfusion.db");
-        _connectionString = $"Data Source={dbPath};Version=3;";
-        
+        var connectionString = $"Data Source={dbPath};Version=3;";
+
+        _connection = new SQLiteConnection(connectionString);
+        _connection.Open();
+
+        // WAL mode: better concurrency — readers don't block writers
+        using (var walCmd = _connection.CreateCommand())
+        {
+            walCmd.CommandText = "PRAGMA journal_mode = WAL;";
+            walCmd.ExecuteNonQuery();
+        }
+
+        InitializeDatabase();
+    }
+
+    /// <summary>
+    /// Internal constructor for testing — accepts custom connection string (e.g. in-memory DB).
+    /// </summary>
+    internal DatabaseService(string connectionString)
+    {
+        _connection = new SQLiteConnection(connectionString);
+        _connection.Open();
         InitializeDatabase();
     }
 
     private void InitializeDatabase()
     {
-        using var connection = new SQLiteConnection(_connectionString);
-        connection.Open();
-
-        using var command = connection.CreateCommand();
+        using var command = _connection.CreateCommand();
         command.CommandText = @"
             CREATE TABLE IF NOT EXISTS Images (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +67,7 @@ public class DatabaseService : IDatabaseService
                 FOREIGN KEY (ImageId) REFERENCES Images(Id) ON DELETE CASCADE,
                 FOREIGN KEY (TagId) REFERENCES Tags(Id) ON DELETE CASCADE
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_images_path ON Images(Path);
             CREATE INDEX IF NOT EXISTS idx_tags_name ON Tags(Name);
         ";
@@ -57,43 +76,49 @@ public class DatabaseService : IDatabaseService
 
     public async Task<ImageFile?> GetImageAsync(string path, CancellationToken cancellationToken = default)
     {
-        using var connection = new SQLiteConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "SELECT * FROM Images WHERE Path = @Path";
-        command.Parameters.AddWithValue("@Path", path);
-
-        using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (await reader.ReadAsync(cancellationToken))
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            var image = new ImageFile
-            {
-                Path = reader.GetString(reader.GetOrdinal("Path")),
-                Rating = reader.GetInt32(reader.GetOrdinal("Rating")),
-                Width = reader.GetInt32(reader.GetOrdinal("Width")),
-                Height = reader.GetInt32(reader.GetOrdinal("Height")),
-                DateModified = DateTime.Parse(reader.GetString(reader.GetOrdinal("LastModified")))
-            };
+            using var command = _connection.CreateCommand();
+            command.CommandText = "SELECT * FROM Images WHERE Path = @Path";
+            command.Parameters.AddWithValue("@Path", path);
 
-            if (!reader.IsDBNull(reader.GetOrdinal("DateTaken")))
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
             {
-                image.DateTaken = DateTime.Parse(reader.GetString(reader.GetOrdinal("DateTaken")));
+                var image = new ImageFile
+                {
+                    Path = reader.GetString(reader.GetOrdinal("Path")),
+                    Rating = reader.GetInt32(reader.GetOrdinal("Rating")),
+                    Width = reader.GetInt32(reader.GetOrdinal("Width")),
+                    Height = reader.GetInt32(reader.GetOrdinal("Height")),
+                    DateModified = DateTime.Parse(reader.GetString(reader.GetOrdinal("LastModified")))
+                };
+
+                if (!reader.IsDBNull(reader.GetOrdinal("DateTaken")))
+                {
+                    image.DateTaken = DateTime.Parse(reader.GetString(reader.GetOrdinal("DateTaken")));
+                }
+
+                var imageId = reader.GetInt64(reader.GetOrdinal("Id"));
+                reader.Close(); // Close reader before next command on same connection
+                image.Tags = await GetTagsInternalAsync(imageId, cancellationToken);
+
+                return image;
             }
 
-            // Load tags
-            image.Tags = await GetTagsForImageAsync(connection, reader.GetInt64(reader.GetOrdinal("Id")), cancellationToken);
-
-            return image;
+            return null;
         }
-
-        return null;
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
-    private async Task<List<string>> GetTagsForImageAsync(SQLiteConnection connection, long imageId, CancellationToken cancellationToken = default)
+    private async Task<List<string>> GetTagsInternalAsync(long imageId, CancellationToken cancellationToken = default)
     {
         var tags = new List<string>();
-        using var command = connection.CreateCommand();
+        using var command = _connection.CreateCommand();
         command.CommandText = @"
             SELECT t.Name
             FROM Tags t
@@ -111,14 +136,24 @@ public class DatabaseService : IDatabaseService
 
     public async Task SaveImageAsync(ImageFile image, CancellationToken cancellationToken = default)
     {
-        using var connection = new SQLiteConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        using var transaction = connection.BeginTransaction();
+        await _semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            await SaveImageInternalAsync(image, cancellationToken);
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    private async Task SaveImageInternalAsync(ImageFile image, CancellationToken cancellationToken = default)
+    {
+        using var transaction = _connection.BeginTransaction();
 
         try
         {
-            // Insert or Update Image
-            using (var cmd = connection.CreateCommand())
+            using (var cmd = _connection.CreateCommand())
             {
                 cmd.CommandText = @"
                     INSERT INTO Images (Path, LastModified, Rating, Width, Height, DateTaken)
@@ -143,23 +178,27 @@ public class DatabaseService : IDatabaseService
 
                 if (imageId == 0) throw new Exception("Failed to insert/update image");
 
-                // Update Tags
-                // First, clear existing tags for this image
-                using (var deleteCmd = connection.CreateCommand())
+                using (var deleteCmd = _connection.CreateCommand())
                 {
                     deleteCmd.CommandText = "DELETE FROM ImageTags WHERE ImageId = @ImageId";
                     deleteCmd.Parameters.AddWithValue("@ImageId", imageId);
                     await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
                 }
 
-                // Insert new tags
-                foreach (var tag in image.Tags)
+                // Deduplicate tags before inserting (case-insensitive)
+                var uniqueTags = image.Tags
+                    .Where(t => !string.IsNullOrWhiteSpace(t))
+                    .Select(t => t.Trim())
+                    .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+                foreach (var tag in uniqueTags)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Ensure tag exists
                     long tagId;
-                    using (var tagCmd = connection.CreateCommand())
+                    using (var tagCmd = _connection.CreateCommand())
                     {
                         tagCmd.CommandText = "INSERT OR IGNORE INTO Tags (Name) VALUES (@Name); SELECT Id FROM Tags WHERE Name = @Name;";
                         tagCmd.Parameters.AddWithValue("@Name", tag);
@@ -169,10 +208,9 @@ public class DatabaseService : IDatabaseService
 
                     if (tagId == 0) continue;
 
-                    // Link tag
-                    using (var linkCmd = connection.CreateCommand())
+                    using (var linkCmd = _connection.CreateCommand())
                     {
-                        linkCmd.CommandText = "INSERT INTO ImageTags (ImageId, TagId) VALUES (@ImageId, @TagId)";
+                        linkCmd.CommandText = "INSERT OR IGNORE INTO ImageTags (ImageId, TagId) VALUES (@ImageId, @TagId)";
                         linkCmd.Parameters.AddWithValue("@ImageId", imageId);
                         linkCmd.Parameters.AddWithValue("@TagId", tagId);
                         await linkCmd.ExecuteNonQueryAsync(cancellationToken);
@@ -194,70 +232,82 @@ public class DatabaseService : IDatabaseService
         var result = new Dictionary<string, ImageMetadata>();
         if (paths.Count == 0) return result;
 
-        using var connection = new SQLiteConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        // Process in chunks of 500 to avoid parameter limits
-        const int chunkSize = 500;
-        for (int i = 0; i < paths.Count; i += chunkSize)
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var chunk = paths.Skip(i).Take(chunkSize).ToList();
-            var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
-
-            using var command = connection.CreateCommand();
-            command.CommandText = $@"
-                SELECT i.Path, i.Rating, GROUP_CONCAT(t.Name, '||') as TagList,
-                       i.LastModified, i.Width, i.Height, i.DateTaken
-                FROM Images i
-                LEFT JOIN ImageTags it ON i.Id = it.ImageId
-                LEFT JOIN Tags t ON it.TagId = t.Id
-                WHERE i.Path IN ({placeholders})
-                GROUP BY i.Id, i.Path, i.Rating, i.LastModified, i.Width, i.Height, i.DateTaken";
-
-            for (int j = 0; j < chunk.Count; j++)
+            // Process in chunks of 500 to avoid parameter limits
+            const int chunkSize = 500;
+            for (int i = 0; i < paths.Count; i += chunkSize)
             {
-                command.Parameters.AddWithValue($"@p{j}", chunk[j]);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var chunk = paths.Skip(i).Take(chunkSize).ToList();
+                var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
+
+                using var command = _connection.CreateCommand();
+                command.CommandText = $@"
+                    SELECT i.Path, i.Rating, GROUP_CONCAT(t.Name, '||') as TagList,
+                           i.LastModified, i.Width, i.Height, i.DateTaken
+                    FROM Images i
+                    LEFT JOIN ImageTags it ON i.Id = it.ImageId
+                    LEFT JOIN Tags t ON it.TagId = t.Id
+                    WHERE i.Path IN ({placeholders})
+                    GROUP BY i.Id, i.Path, i.Rating, i.LastModified, i.Width, i.Height, i.DateTaken";
+
+                for (int j = 0; j < chunk.Count; j++)
+                {
+                    command.Parameters.AddWithValue($"@p{j}", chunk[j]);
+                }
+
+                using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    var path = reader.GetString(0);
+                    var rating = reader.GetInt32(1);
+                    var tagList = reader.IsDBNull(2) ? null : reader.GetString(2);
+                    var lastModified = DateTime.Parse(reader.GetString(3));
+                    var width = reader.GetInt32(4);
+                    var height = reader.GetInt32(5);
+                    var dateTaken = reader.IsDBNull(6) ? (DateTime?)null : DateTime.Parse(reader.GetString(6));
+
+                    var tags = tagList?.Split("||", StringSplitOptions.RemoveEmptyEntries)?.ToList()
+                        ?? new List<string>();
+
+                    result[path] = new ImageMetadata(tags, rating, lastModified, width, height, dateTaken);
+                }
             }
 
-            using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var path = reader.GetString(0);
-                var rating = reader.GetInt32(1);
-                var tagList = reader.IsDBNull(2) ? null : reader.GetString(2);
-                var lastModified = DateTime.Parse(reader.GetString(3));
-                var width = reader.GetInt32(4);
-                var height = reader.GetInt32(5);
-                var dateTaken = reader.IsDBNull(6) ? (DateTime?)null : DateTime.Parse(reader.GetString(6));
-
-                var tags = tagList?.Split("||", StringSplitOptions.RemoveEmptyEntries)?.ToList()
-                    ?? new List<string>();
-
-                result[path] = new ImageMetadata(tags, rating, lastModified, width, height, dateTaken);
-            }
+            return result;
         }
-
-        return result;
+        finally
+        {
+            _semaphore.Release();
+        }
     }
 
     public async Task SaveImagesBatchAsync(List<ImageFile> images, CancellationToken cancellationToken = default)
     {
-        foreach (var image in images)
+        await _semaphore.WaitAsync(cancellationToken);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            await SaveImageAsync(image, cancellationToken);
+            foreach (var image in images)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await SaveImageInternalAsync(image, cancellationToken);
+            }
+        }
+        finally
+        {
+            _semaphore.Release();
         }
     }
 
     public async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
     {
+        await _semaphore.WaitAsync(cancellationToken);
         try
         {
-            using var connection = new SQLiteConnection(_connectionString);
-            await connection.OpenAsync(cancellationToken);
-            using var command = connection.CreateCommand();
+            using var command = _connection.CreateCommand();
             command.CommandText = "SELECT 1";
             await command.ExecuteScalarAsync(cancellationToken);
             return true;
@@ -267,5 +317,18 @@ public class DatabaseService : IDatabaseService
             Debug.WriteLine($"[Database] Health check failed: {ex.Message}");
             return false;
         }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _semaphore?.Dispose();
+        _connection?.Close();
+        _connection?.Dispose();
+        _disposed = true;
     }
 }

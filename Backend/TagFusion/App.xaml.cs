@@ -34,5 +34,12 @@ public partial class App : Application
         var mainWindow = new MainWindow(Services);
         mainWindow.Show();
     }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // Dispose ServiceProvider → ruft Dispose() auf allen IDisposable-Singletons (z.B. DatabaseService)
+        (Services as IDisposable)?.Dispose();
+        base.OnExit(e);
+    }
 }
 

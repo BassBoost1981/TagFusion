@@ -17,8 +17,9 @@ test.describe('Tag Assignment', () => {
     });
 
     test('should display tag library section', async ({ page }) => {
-        // Verify the Tag Bibliothek section exists
-        await expect(page.getByText('Tag Bibliothek')).toBeVisible();
+        // Heading text comes from t('tagPanel.title') = "Tags"
+        const tagPanel = page.getByTestId('tag-panel');
+        await expect(tagPanel.getByRole('heading', { name: 'Tags' })).toBeVisible();
     });
 
     test('should have search input for tags', async ({ page }) => {
@@ -29,8 +30,9 @@ test.describe('Tag Assignment', () => {
     });
 
     test('should have settings button to open tag manager', async ({ page }) => {
-        // Verify the settings button exists in the tag panel
-        const settingsButton = page.getByTitle('Tag Manager öffnen');
+        // Button title comes from t('common.edit') = "Bearbeiten"
+        const tagPanel = page.getByTestId('tag-panel');
+        const settingsButton = tagPanel.getByTitle('Bearbeiten');
         await expect(settingsButton).toBeVisible();
     });
 });

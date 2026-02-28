@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { TagCategory, TagSubcategory, TagLibrary, RawImportCategory, RawImportSubcategory } from '../types';
 import { bridge } from '../services/bridge';
+import { useAppStore } from './appStore';
 
 // Generate unique ID
 const generateId = () => crypto.randomUUID();
@@ -37,10 +38,9 @@ const saveTagLibrary = (categories: TagCategory[]) => {
     categories,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-
   // Save to backend (fire and forget)
   bridge.saveTagLibrary(library).catch(err => {
-    console.error('Failed to save tag library to backend:', err);
+    useAppStore.getState().setError((err as Error).message);
   });
 };
 
@@ -94,7 +94,7 @@ export const useTagStore = create<TagStore>((set, get) => ({
           get().importLibrary(JSON.stringify(library));
         }
       } catch (error) {
-        console.error('Failed to initialize tag library from backend:', error);
+        useAppStore.getState().setError((error as Error).message);
       }
     }
   },
@@ -277,7 +277,7 @@ export const useTagStore = create<TagStore>((set, get) => ({
       set({ categories });
       return true;
     } catch (e) {
-      console.error('Failed to import library:', e);
+      useAppStore.getState().setError((e as Error).message);
       return false;
     }
   },

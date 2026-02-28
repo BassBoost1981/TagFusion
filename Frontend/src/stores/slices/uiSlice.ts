@@ -1,7 +1,8 @@
 import { StateCreator } from 'zustand';
-import { ImageSlice } from './imageSlice';
+import { ImageSlice, normalizeGridItems } from './imageSlice';
 import type { Tag, GridItem, ImageFile } from '../../types';
 import { bridge } from '../../services/bridge';
+import { GRID_ZOOM_MIN, GRID_ZOOM_MAX, GRID_ZOOM_STEP, GRID_ZOOM_DEFAULT, SIDEBAR_WIDTH_DEFAULT, TAG_PANEL_WIDTH_DEFAULT } from '../../constants/ui';
 
 export interface UISlice {
     tags: Tag[];
@@ -43,9 +44,9 @@ export const createUISlice: StateCreator<
 > = (set, get) => ({
     tags: [],
     error: null,
-    sidebarWidth: 280,
-    tagPanelWidth: 320,
-    zoomLevel: 100,
+    sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
+    tagPanelWidth: TAG_PANEL_WIDTH_DEFAULT,
+    zoomLevel: GRID_ZOOM_DEFAULT,
     searchQuery: '',
     sortBy: 'name',
     sortOrder: 'asc',
@@ -64,14 +65,14 @@ export const createUISlice: StateCreator<
     setSidebarWidth: (width) => set({ sidebarWidth: width }),
     setTagPanelWidth: (width) => set({ tagPanelWidth: width }),
     setError: (error) => set({ error }),
-    setZoomLevel: (level) => set({ zoomLevel: Math.min(200, Math.max(50, level)) }),
+    setZoomLevel: (level) => set({ zoomLevel: Math.min(GRID_ZOOM_MAX, Math.max(GRID_ZOOM_MIN, level)) }),
 
     zoomIn: () => set((state) => ({
-        zoomLevel: Math.min(200, state.zoomLevel + 10)
+        zoomLevel: Math.min(GRID_ZOOM_MAX, state.zoomLevel + GRID_ZOOM_STEP)
     })),
 
     zoomOut: () => set((state) => ({
-        zoomLevel: Math.max(50, state.zoomLevel - 10)
+        zoomLevel: Math.max(GRID_ZOOM_MIN, state.zoomLevel - GRID_ZOOM_STEP)
     })),
 
     setSearchQuery: (query) => set({ searchQuery: query }),
@@ -109,13 +110,10 @@ export const createUISlice: StateCreator<
             });
 
             if (hasChanges) {
-                const updatedGridItems = gridItems.map(item => {
-                    if (item.isFolder) return item;
-                    const updatedImg = updatedImages.find(img => img.path === item.path);
-                    return updatedImg ? { ...item, imageData: updatedImg } : item;
-                });
-                // We use a cast here because this slice doesn't "know" about the combined state's precise structure
-                set({ images: updatedImages, gridItems: updatedGridItems } as unknown as Partial<ImageSlice & UISlice>);
+                set({
+                    images: updatedImages,
+                    gridItems: normalizeGridItems(gridItems, updatedImages)
+                } as unknown as Partial<ImageSlice & UISlice>);
             }
         });
     },

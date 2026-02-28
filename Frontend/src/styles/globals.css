@@ -326,9 +326,8 @@ body {
     transform-style: preserve-3d;
   }
 
-  /* GPU Acceleration */
+  /* GPU Acceleration — translateZ(0) triggers compositing without permanent GPU memory reservation */
   .gpu-accelerated {
-    will-change: transform;
     transform: translateZ(0);
     backface-visibility: hidden;
   }

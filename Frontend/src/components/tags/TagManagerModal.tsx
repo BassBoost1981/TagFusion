@@ -10,6 +10,8 @@ import {
 import { useTagStore } from '../../stores/tagStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTranslation } from 'react-i18next';
+import { useAppStore } from '../../stores/appStore';
+import { useToastStore } from '../../stores/toastStore';
 import { Button, Input } from '../ui';
 
 export function TagManagerModal() {
@@ -48,9 +50,9 @@ export function TagManagerModal() {
     reader.onload = (ev) => {
       const json = ev.target?.result as string;
       if (importLibrary(json)) {
-        alert(t('tagManager.importSuccess', 'Import successful!'));
+        useToastStore.getState().success(t('tagManager.importSuccess', 'Import successful!'));
       } else {
-        alert(t('tagManager.importFailed', 'Import failed!'));
+        useAppStore.getState().setError(t('tagManager.importFailed', 'Import failed!'));
       }
     };
     reader.readAsText(file);

@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FolderOpen, Image as ImageIcon, Tag, HardDrive } from 'lucide-react';
+import { HardDrive } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { StatsCard } from './StatsCard';
-import { TagCloud } from './TagCloud';
 import { DriveCard } from './DriveCard';
-import { useAppStore } from '../../stores/appStore';
+import { useDrives, useLoadDrives, useLoadFolders, useLoadImages } from '../../stores/appStore';
 import type { FolderItem } from '../../types';
 
 export function HeroSection() {
   const { t } = useTranslation();
-  const { tags, images, drives, loadDrives, loadFolders, loadImages } = useAppStore();
+  const drives = useDrives();
+  const loadDrives = useLoadDrives();
+  const loadFolders = useLoadFolders();
+  const loadImages = useLoadImages();
 
   useEffect(() => {
     loadDrives();
@@ -21,14 +22,8 @@ export function HeroSection() {
     await loadImages(drive.path);
   };
 
-  // Calculate stats
-  const totalImages = images.length;
-  const totalTags = tags.length;
-
   return (
     <div className="flex-1 overflow-y-auto p-8 relative">
-      {/* Background Elements - Removed blur effect */}
-
       <div className="relative z-10 max-w-6xl mx-auto space-y-12">
         {/* Hero Header */}
         <div className="text-center space-y-6 py-12">
@@ -87,37 +82,6 @@ export function HeroSection() {
             </div>
           </motion.div>
         )}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatsCard
-            title={t('hero.savedTags')}
-            value={totalTags}
-            icon={<Tag size={20} />}
-            delay={0.8}
-          />
-          <StatsCard
-            title={t('hero.imagesIndexed')}
-            value={totalImages > 0 ? totalImages : "-"}
-            icon={<ImageIcon size={20} />}
-            delay={0.9}
-          />
-          <StatsCard
-            title={t('hero.collections')}
-            value="0"
-            icon={<FolderOpen size={20} />}
-            delay={1.0}
-          />
-        </div>
-
-        {/* Tag Cloud Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
-        >
-          <TagCloud tags={tags} />
-        </motion.div>
       </div>
     </div>
   );
