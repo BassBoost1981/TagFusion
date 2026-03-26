@@ -11,7 +11,9 @@ namespace TagFusion.Services;
 public class DatabaseService : IDatabaseService, IDisposable
 {
     private readonly SQLiteConnection _connection;
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly SQLiteConnection _readConnection;
+    private readonly SemaphoreSlim _writeSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _readSemaphore = new(4, 4);
     private readonly ILogger<DatabaseService> _logger;
     private readonly int _chunkSize;
     private bool _disposed;
@@ -28,11 +30,31 @@ public class DatabaseService : IDatabaseService, IDisposable
         _connection = new SQLiteConnection(connectionString);
         _connection.Open();
 
-        // WAL mode: better concurrency — readers don't block writers
-        using (var walCmd = _connection.CreateCommand())
+        // === PERF: Batch all PRAGMAs in one command for faster init ===
+        // WAL mode + performance tuning — reduces startup I/O significantly
+        using (var pragmaCmd = _connection.CreateCommand())
         {
-            walCmd.CommandText = "PRAGMA journal_mode = WAL;";
-            walCmd.ExecuteNonQuery();
+            pragmaCmd.CommandText = @"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA mmap_size = 268435456;
+                PRAGMA cache_size = -8000;";
+            pragmaCmd.ExecuteNonQuery();
+        }
+
+        // Separate read connection for concurrent reads (WAL supports this)
+        _readConnection = new SQLiteConnection(connectionString);
+        _readConnection.Open();
+        using (var readPragma = _readConnection.CreateCommand())
+        {
+            readPragma.CommandText = @"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA mmap_size = 268435456;
+                PRAGMA cache_size = -8000;";
+            readPragma.ExecuteNonQuery();
         }
 
         InitializeDatabase();
@@ -53,6 +75,20 @@ public class DatabaseService : IDatabaseService, IDisposable
         _chunkSize = 500;
         _connection = new SQLiteConnection(connectionString);
         _connection.Open();
+
+        // For in-memory DBs (:memory:), a second connection creates a separate DB.
+        // Use shared cache URI so both connections access the same in-memory DB.
+        if (connectionString.Contains(":memory:", StringComparison.OrdinalIgnoreCase))
+        {
+            _readConnection = _connection; // Share connection for in-memory testing
+            _readSemaphore = _writeSemaphore; // Serialize to avoid concurrent access on same connection
+        }
+        else
+        {
+            _readConnection = new SQLiteConnection(connectionString);
+            _readConnection.Open();
+        }
+
         InitializeDatabase();
         new MigrationRunner(_connection, _logger).ApplyMigrations();
     }
@@ -92,10 +128,10 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<ImageFile?> GetImageAsync(string path, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        await _readSemaphore.WaitAsync(cancellationToken);
         try
         {
-            using var command = _connection.CreateCommand();
+            using var command = _readConnection.CreateCommand();
             command.CommandText = "SELECT * FROM Images WHERE Path = @Path";
             command.Parameters.AddWithValue("@Path", path);
 
@@ -118,7 +154,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
                 var imageId = reader.GetInt64(reader.GetOrdinal("Id"));
                 reader.Close(); // Close reader before next command on same connection
-                image.Tags = await GetTagsInternalAsync(imageId, cancellationToken);
+                image.Tags = await GetTagsInternalAsync(imageId, _readConnection, cancellationToken);
 
                 return image;
             }
@@ -127,14 +163,14 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         finally
         {
-            _semaphore.Release();
+            _readSemaphore.Release();
         }
     }
 
-    private async Task<List<string>> GetTagsInternalAsync(long imageId, CancellationToken cancellationToken = default)
+    private async Task<List<string>> GetTagsInternalAsync(long imageId, SQLiteConnection connection, CancellationToken cancellationToken = default)
     {
         var tags = new List<string>();
-        using var command = _connection.CreateCommand();
+        using var command = connection.CreateCommand();
         command.CommandText = @"
             SELECT t.Name
             FROM Tags t
@@ -152,14 +188,14 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task SaveImageAsync(ImageFile image, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        await _writeSemaphore.WaitAsync(cancellationToken);
         try
         {
             await SaveImageInternalAsync(image, cancellationToken);
         }
         finally
         {
-            _semaphore.Release();
+            _writeSemaphore.Release();
         }
     }
 
@@ -248,7 +284,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         var result = new Dictionary<string, ImageMetadata>();
         if (paths.Count == 0) return result;
 
-        await _semaphore.WaitAsync(cancellationToken);
+        await _readSemaphore.WaitAsync(cancellationToken);
         try
         {
             // Process in chunks to avoid parameter limits
@@ -260,7 +296,7 @@ public class DatabaseService : IDatabaseService, IDisposable
                 var chunk = paths.Skip(i).Take(chunkSize).ToList();
                 var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
 
-                using var command = _connection.CreateCommand();
+                using var command = _readConnection.CreateCommand();
                 command.CommandText = $@"
                     SELECT i.Path, i.Rating, GROUP_CONCAT(t.Name, '||') as TagList,
                            i.LastModified, i.Width, i.Height, i.DateTaken
@@ -297,13 +333,13 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         finally
         {
-            _semaphore.Release();
+            _readSemaphore.Release();
         }
     }
 
     public async Task SaveImagesBatchAsync(List<ImageFile> images, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        await _writeSemaphore.WaitAsync(cancellationToken);
         try
         {
             foreach (var image in images)
@@ -314,17 +350,17 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         finally
         {
-            _semaphore.Release();
+            _writeSemaphore.Release();
         }
     }
 
     public async Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        await _readSemaphore.WaitAsync(cancellationToken);
         try
         {
             var conditions = new List<string>();
-            using var command = _connection.CreateCommand();
+            using var command = _readConnection.CreateCommand();
 
             if (minRating.HasValue && minRating.Value > 0)
             {
@@ -384,23 +420,23 @@ public class DatabaseService : IDatabaseService, IDisposable
             // Load tags for each image
             foreach (var (id, image) in imageIds)
             {
-                image.Tags = await GetTagsInternalAsync(id, cancellationToken);
+                image.Tags = await GetTagsInternalAsync(id, _readConnection, cancellationToken);
             }
 
             return results;
         }
         finally
         {
-            _semaphore.Release();
+            _readSemaphore.Release();
         }
     }
 
     public async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
     {
-        await _semaphore.WaitAsync(cancellationToken);
+        await _readSemaphore.WaitAsync(cancellationToken);
         try
         {
-            using var command = _connection.CreateCommand();
+            using var command = _readConnection.CreateCommand();
             command.CommandText = "SELECT 1";
             await command.ExecuteScalarAsync(cancellationToken);
             return true;
@@ -412,7 +448,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         finally
         {
-            _semaphore.Release();
+            _readSemaphore.Release();
         }
     }
 
@@ -421,7 +457,16 @@ public class DatabaseService : IDatabaseService, IDisposable
         if (_disposed) return;
         try
         {
-            _semaphore?.Dispose();
+            _writeSemaphore?.Dispose();
+            // Only dispose read semaphore if it's a separate instance
+            if (_readSemaphore != _writeSemaphore)
+                _readSemaphore?.Dispose();
+            // Only close read connection if it's a separate instance
+            if (_readConnection != _connection)
+            {
+                _readConnection?.Close();
+                _readConnection?.Dispose();
+            }
             _connection?.Close();
             _connection?.Dispose();
         }

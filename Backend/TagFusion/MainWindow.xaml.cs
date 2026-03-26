@@ -107,46 +107,63 @@ public partial class MainWindow : Window
         await InitializeWebViewAsync();
     }
 
+    /// <summary>
+    /// Resolves all services from DI on a background thread (parallel to WebView2 init).
+    /// Löst alle Services im Hintergrund auf (parallel zur WebView2-Initialisierung).
+    /// </summary>
+    private (ExifToolService, FileSystemService, TagService, IDatabaseService, ImageEditService,
+        FileOperationService, DiagnosticsService, FolderWatcherService, TagExportService,
+        DuplicateDetectionService, ILoggerFactory) ResolveServices()
+    {
+        return (
+            _serviceProvider.GetRequiredService<ExifToolService>(),
+            _serviceProvider.GetRequiredService<FileSystemService>(),
+            _serviceProvider.GetRequiredService<TagService>(),
+            _serviceProvider.GetRequiredService<IDatabaseService>(),
+            _serviceProvider.GetRequiredService<ImageEditService>(),
+            _serviceProvider.GetRequiredService<FileOperationService>(),
+            _serviceProvider.GetRequiredService<DiagnosticsService>(),
+            _serviceProvider.GetRequiredService<FolderWatcherService>(),
+            _serviceProvider.GetRequiredService<TagExportService>(),
+            _serviceProvider.GetRequiredService<DuplicateDetectionService>(),
+            _serviceProvider.GetRequiredService<ILoggerFactory>()
+        );
+    }
+
     private async Task InitializeWebViewAsync()
     {
         try
         {
-            // Create WebView2 environment with user data folder and GPU acceleration
             var userDataFolder = Path.Combine(_appDirectory, "WebView2Data");
 
-            // Enable hardware acceleration via environment options
             var options = new CoreWebView2EnvironmentOptions
             {
-                // Enable GPU acceleration and disable software rendering fallback
                 AdditionalBrowserArguments = _uiSettings.BrowserArgs
             };
 
-            var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
+            // === PERF: Resolve DI services on background thread WHILE WebView2 initializes ===
+            // Service-Auflösung parallel zur WebView2-Erstellung starten
+            var serviceTask = Task.Run(ResolveServices);
 
+            var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
             await webView.EnsureCoreWebView2Async(env);
 
             // Configure WebView2 settings
-            webView.CoreWebView2.Settings.IsScriptEnabled = true;
-            webView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = true;
-            webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
-            webView.CoreWebView2.Settings.AreDevToolsEnabled = true; // Disable in production
-            webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            var s = webView.CoreWebView2.Settings;
+            s.IsScriptEnabled = true;
+            s.AreDefaultScriptDialogsEnabled = true;
+            s.IsWebMessageEnabled = true;
+            s.AreDevToolsEnabled = System.Diagnostics.Debugger.IsAttached;
+            s.IsStatusBarEnabled = false;
+            s.AreDefaultContextMenusEnabled = false;
 
-            // Resolve services from DI container
-            var exifToolService = _serviceProvider.GetRequiredService<ExifToolService>();
-            var fileSystemService = _serviceProvider.GetRequiredService<FileSystemService>();
-            var tagService = _serviceProvider.GetRequiredService<TagService>();
-            var databaseService = _serviceProvider.GetRequiredService<IDatabaseService>();
-            var imageEditService = _serviceProvider.GetRequiredService<ImageEditService>();
-            var fileOperationService = _serviceProvider.GetRequiredService<FileOperationService>();
-            var diagnosticsService = _serviceProvider.GetRequiredService<DiagnosticsService>();
-            var folderWatcherService = _serviceProvider.GetRequiredService<FolderWatcherService>();
-            var tagExportService = _serviceProvider.GetRequiredService<TagExportService>();
-            var duplicateDetectionService = _serviceProvider.GetRequiredService<DuplicateDetectionService>();
+            // Wait for services (should already be done by now)
+            var (exifToolService, fileSystemService, tagService, databaseService,
+                imageEditService, fileOperationService, diagnosticsService,
+                folderWatcherService, tagExportService, duplicateDetectionService,
+                bridgeLogger) = await serviceTask;
 
             // Initialize bridge for C# <-> React communication
-            var bridgeLogger = _serviceProvider.GetRequiredService<ILogger<WebViewBridge>>();
             _bridge = new WebViewBridge(
                 webView.CoreWebView2,
                 exifToolService,
@@ -169,6 +186,15 @@ public partial class MainWindow : Window
                     _wwwrootPath,
                     CoreWebView2HostResourceAccessKind.Allow);
             }
+
+            // Set up virtual host for thumbnail cache (serves .jpg files directly via HTTP)
+            var thumbnailCacheDir = Path.Combine(_appDirectory, "cache", "thumbnails");
+            if (!Directory.Exists(thumbnailCacheDir))
+                Directory.CreateDirectory(thumbnailCacheDir);
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "thumbs.tagfusion.local",
+                thumbnailCacheDir,
+                CoreWebView2HostResourceAccessKind.Allow);
 
             // Hide splash when navigation completes
             webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;

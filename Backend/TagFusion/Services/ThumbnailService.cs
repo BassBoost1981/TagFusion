@@ -12,10 +12,12 @@ using TagFusion.Configuration;
 namespace TagFusion.Services;
 
 /// <summary>
-/// Service for generating and caching thumbnails (Hybrid approach)
+/// Service for generating and caching thumbnails (Hybrid approach).
+/// Thumbnails are served via WebView2 virtual host (thumbs.tagfusion.local) to avoid base64 overhead.
 /// </summary>
 public class ThumbnailService
 {
+    private const string ThumbnailHostName = "thumbs.tagfusion.local";
     private readonly int _thumbnailSize;
     private readonly int _jpegQuality;
     private readonly int _maxParallel;
@@ -39,29 +41,16 @@ public class ThumbnailService
     }
 
     /// <summary>
-    /// Get thumbnail for an image as data URI (cached)
-    /// Returns null if thumbnail doesn't exist yet
+    /// Get HTTP URL for a cached thumbnail via virtual host.
+    /// Returns null if thumbnail doesn't exist in cache yet.
     /// </summary>
     public string? GetThumbnailUrl(string imagePath)
     {
         var cachePath = GetCachePath(imagePath);
         if (File.Exists(cachePath))
         {
-            var bytes = File.ReadAllBytes(cachePath);
-            
-            // Check if this is a valid JPEG (starts with FFD8) or old Base64 text format
-            if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8)
-            {
-                // Valid binary JPEG
-                var base64 = Convert.ToBase64String(bytes);
-                return $"data:image/jpeg;base64,{base64}";
-            }
-            else
-            {
-                // Old Base64 text format - delete and regenerate
-                try { File.Delete(cachePath); } catch (Exception ex) { _logger.LogDebug(ex, "Failed to delete old cache file"); }
-                return null;
-            }
+            var cacheKey = GetCacheKey(imagePath);
+            return $"https://{ThumbnailHostName}/{cacheKey}.jpg";
         }
         return null;
     }
@@ -100,7 +89,7 @@ public class ThumbnailService
     public string GetCachePath(string imagePath)
     {
         var cacheKey = GetCacheKey(imagePath);
-        return Path.Combine(_cacheDirectory, $"{cacheKey}.thumb");
+        return Path.Combine(_cacheDirectory, $"{cacheKey}.jpg");
     }
 
     public async Task<bool> EnsureThumbnailExistsAsync(string imagePath, string exifToolPath, CancellationToken cancellationToken = default)
@@ -132,18 +121,18 @@ public class ThumbnailService
         if (!File.Exists(imagePath))
             return null;
 
-        // Check cache first
         var cacheKey = GetCacheKey(imagePath);
-        var cachedThumbnail = await GetFromCacheAsync(cacheKey, cancellationToken);
-        if (cachedThumbnail != null)
-            return Convert.ToBase64String(cachedThumbnail);
+
+        // Check cache first — return URL to cached file
+        if (await GetFromCacheAsync(cacheKey, cancellationToken) != null)
+            return $"https://{ThumbnailHostName}/{cacheKey}.jpg";
 
         // Try to extract embedded thumbnail via ExifTool
         var embeddedThumbnail = await ExtractEmbeddedThumbnailBytesAsync(imagePath, exifToolPath, cancellationToken);
         if (embeddedThumbnail != null)
         {
             await SaveToCacheAsync(cacheKey, embeddedThumbnail, cancellationToken);
-            return Convert.ToBase64String(embeddedThumbnail);
+            return $"https://{ThumbnailHostName}/{cacheKey}.jpg";
         }
 
         // Generate thumbnail using System.Drawing
@@ -151,7 +140,7 @@ public class ThumbnailService
         if (generatedThumbnail != null)
         {
             await SaveToCacheAsync(cacheKey, generatedThumbnail, cancellationToken);
-            return Convert.ToBase64String(generatedThumbnail);
+            return $"https://{ThumbnailHostName}/{cacheKey}.jpg";
         }
 
         return null;
@@ -169,7 +158,7 @@ public class ThumbnailService
         var results = new ConcurrentDictionary<string, string?>();
         var uncachedPaths = new List<string>();
 
-        // === Phase 1: Check cache for all paths ===
+        // === Phase 1: Check cache for all paths — return URLs for cached files ===
         foreach (var path in imagePaths)
         {
             if (!File.Exists(path)) continue;
@@ -177,7 +166,7 @@ public class ThumbnailService
             var cacheKey = GetCacheKey(path);
             var cached = await GetFromCacheAsync(cacheKey, cancellationToken);
             if (cached != null)
-                results[path] = Convert.ToBase64String(cached);
+                results[path] = $"https://{ThumbnailHostName}/{cacheKey}.jpg";
             else
                 uncachedPaths.Add(path);
         }
@@ -195,7 +184,7 @@ public class ThumbnailService
             {
                 var cacheKey = GetCacheKey(path);
                 await SaveToCacheAsync(cacheKey, bytes, cancellationToken);
-                results[path] = Convert.ToBase64String(bytes);
+                results[path] = $"https://{ThumbnailHostName}/{cacheKey}.jpg";
             }
             else
             {
@@ -217,7 +206,7 @@ public class ThumbnailService
                     {
                         var cacheKey = GetCacheKey(path);
                         await SaveToCacheAsync(cacheKey, generated, cancellationToken);
-                        results[path] = Convert.ToBase64String(generated);
+                        results[path] = $"https://{ThumbnailHostName}/{cacheKey}.jpg";
                     }
                 }
                 finally { semaphore.Release(); }
@@ -342,10 +331,9 @@ public class ThumbnailService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Read file into memory first to avoid file locks
-                var imageBytes = File.ReadAllBytes(imagePath);
-                using var fileStream = new MemoryStream(imageBytes);
-                using var originalImage = Image.FromStream(fileStream);
+                // Stream image file — avoids loading entire file into memory (critical for large RAW files)
+                using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var originalImage = Image.FromStream(fileStream, useEmbeddedColorManagement: false, validateImageData: false);
 
                 // Calculate new dimensions maintaining aspect ratio
                 var ratioX = (double)_thumbnailSize / originalImage.Width;
@@ -388,10 +376,9 @@ public class ThumbnailService
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Read file into memory first to avoid file locks
-                var imageBytes = File.ReadAllBytes(imagePath);
-                using var fileStream = new MemoryStream(imageBytes);
-                using var originalImage = Image.FromStream(fileStream);
+                // Stream image file — avoids loading entire file into memory
+                using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var originalImage = Image.FromStream(fileStream, useEmbeddedColorManagement: false, validateImageData: false);
 
                 // If image is smaller than maxSize, return original
                 if (originalImage.Width <= maxSize && originalImage.Height <= maxSize)
@@ -457,7 +444,7 @@ public class ThumbnailService
 
     private async Task<byte[]?> GetFromCacheAsync(string cacheKey, CancellationToken cancellationToken = default)
     {
-        var cachePath = Path.Combine(_cacheDirectory, $"{cacheKey}.thumb");
+        var cachePath = Path.Combine(_cacheDirectory, $"{cacheKey}.jpg");
         if (File.Exists(cachePath))
         {
             return await File.ReadAllBytesAsync(cachePath, cancellationToken);
@@ -467,7 +454,7 @@ public class ThumbnailService
 
     private async Task SaveToCacheAsync(string cacheKey, byte[] data, CancellationToken cancellationToken = default)
     {
-        var cachePath = Path.Combine(_cacheDirectory, $"{cacheKey}.thumb");
+        var cachePath = Path.Combine(_cacheDirectory, $"{cacheKey}.jpg");
         await File.WriteAllBytesAsync(cachePath, data, cancellationToken);
 
         // Trigger eviction check in background (non-blocking)
@@ -486,7 +473,7 @@ public class ThumbnailService
             if (!Directory.Exists(_cacheDirectory)) return;
 
             var files = new DirectoryInfo(_cacheDirectory)
-                .GetFiles("*.thumb")
+                .GetFiles("*.jpg")
                 .OrderBy(f => f.LastAccessTimeUtc)
                 .ToList();
 
@@ -529,7 +516,7 @@ public class ThumbnailService
     {
         if (Directory.Exists(_cacheDirectory))
         {
-            foreach (var file in Directory.GetFiles(_cacheDirectory, "*.thumb"))
+            foreach (var file in Directory.GetFiles(_cacheDirectory, "*.jpg"))
             {
                 try { File.Delete(file); } catch (Exception ex) { _logger.LogDebug(ex, "Failed to delete cache file: {FilePath}", file); }
             }

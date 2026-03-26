@@ -1,4 +1,5 @@
-import { Image as ImageIcon } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 
 interface ImageThumbnailProps {
@@ -18,7 +19,26 @@ export function ImageThumbnail({
   thumbnailSize,
   onThumbnailError,
 }: ImageThumbnailProps) {
-  const imageSrc = thumbnail ? `data:image/jpeg;base64,${thumbnail}` : thumbnailUrl || null;
+  const [hasError, setHasError] = useState(false);
+  // Handle both URL (from virtual host) and base64 (legacy) thumbnail formats
+  const imageSrc = thumbnail
+    ? thumbnail.startsWith('http') ? thumbnail : `data:image/jpeg;base64,${thumbnail}`
+    : thumbnailUrl || null;
+
+  const handleError = useCallback(() => {
+    setHasError(true);
+    onThumbnailError();
+  }, [onThumbnailError]);
+
+  const handleRetry = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setHasError(false);
+      onThumbnailError();
+    },
+    [onThumbnailError]
+  );
 
   return (
     <div
@@ -32,7 +52,7 @@ export function ImageThumbnail({
       {isLoading && <div className="absolute inset-0 bg-[var(--glass-bg-hover)] animate-pulse" />}
 
       {/* Blurred background image for glass effect */}
-      {!isLoading && imageSrc && (
+      {!isLoading && imageSrc && !hasError && (
         <div
           className="absolute inset-0 scale-110 blur-xl opacity-50 saturate-150"
           style={{
@@ -50,25 +70,35 @@ export function ImageThumbnail({
         </div>
       )}
 
+      {/* Error state with retry button */}
+      {!isLoading && hasError && !imageSrc && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+          <ImageIcon size={24} className="text-red-400/60" />
+          <button
+            onClick={handleRetry}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200"
+            title="Erneut laden"
+          >
+            <RefreshCw size={12} />
+            <span>Retry</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Image - GPU accelerated */}
-      {!isLoading && thumbnailUrl ? (
+      {!isLoading && imageSrc && !hasError ? (
         <img
-          src={thumbnailUrl}
+          src={imageSrc}
           alt={fileName}
           className="relative z-[1] w-full h-full object-contain transition-opacity duration-300"
           style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
           loading="lazy"
-          onError={onThumbnailError}
-        />
-      ) : !isLoading && thumbnail ? (
-        <img
-          src={`data:image/jpeg;base64,${thumbnail}`}
-          alt={fileName}
-          className="relative z-[1] w-full h-full object-contain transition-opacity duration-300"
-          style={{ transform: 'translateZ(0)', backfaceVisibility: 'hidden' }}
+          decoding="async"
+          onError={handleError}
         />
       ) : (
-        !isLoading && (
+        !isLoading &&
+        !hasError && (
           <div className="absolute inset-0 flex items-center justify-center">
             <ImageIcon size={32} className="text-[var(--color-text-muted)]" />
           </div>
