@@ -237,13 +237,7 @@ public class DatabaseService : IDatabaseService, IDisposable
                     await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
                 }
 
-                // Deduplicate tags before inserting (case-insensitive)
-                var uniqueTags = image.Tags
-                    .Where(t => !string.IsNullOrWhiteSpace(t))
-                    .Select(t => t.Trim())
-                    .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.First())
-                    .ToList();
+                var uniqueTags = TagHelper.DeduplicateTags(image.Tags);
 
                 foreach (var tag in uniqueTags)
                 {

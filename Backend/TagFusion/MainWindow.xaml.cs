@@ -111,17 +111,17 @@ public partial class MainWindow : Window
     /// Resolves all services from DI on a background thread (parallel to WebView2 init).
     /// Löst alle Services im Hintergrund auf (parallel zur WebView2-Initialisierung).
     /// </summary>
-    private (ExifToolService, FileSystemService, TagService, IDatabaseService, ImageEditService,
-        FileOperationService, DiagnosticsService, FolderWatcherService, TagExportService,
+    private (IExifToolService, IFileSystemService, ITagService, IDatabaseService, IImageEditService,
+        IFileOperationService, DiagnosticsService, FolderWatcherService, TagExportService,
         DuplicateDetectionService, ILoggerFactory) ResolveServices()
     {
         return (
-            _serviceProvider.GetRequiredService<ExifToolService>(),
-            _serviceProvider.GetRequiredService<FileSystemService>(),
-            _serviceProvider.GetRequiredService<TagService>(),
+            _serviceProvider.GetRequiredService<IExifToolService>(),
+            _serviceProvider.GetRequiredService<IFileSystemService>(),
+            _serviceProvider.GetRequiredService<ITagService>(),
             _serviceProvider.GetRequiredService<IDatabaseService>(),
-            _serviceProvider.GetRequiredService<ImageEditService>(),
-            _serviceProvider.GetRequiredService<FileOperationService>(),
+            _serviceProvider.GetRequiredService<IImageEditService>(),
+            _serviceProvider.GetRequiredService<IFileOperationService>(),
             _serviceProvider.GetRequiredService<DiagnosticsService>(),
             _serviceProvider.GetRequiredService<FolderWatcherService>(),
             _serviceProvider.GetRequiredService<TagExportService>(),

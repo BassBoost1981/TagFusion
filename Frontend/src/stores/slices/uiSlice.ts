@@ -3,6 +3,7 @@ import { ImageSlice, normalizeGridItems } from './imageSlice';
 import type { Tag, ImageFile } from '../../types';
 import { bridge } from '../../services/bridge';
 import { NavigationSlice } from './navigationSlice';
+import { useToastStore } from '../toastStore';
 import {
   GRID_ZOOM_MIN,
   GRID_ZOOM_MAX,
@@ -11,6 +12,8 @@ import {
   SIDEBAR_WIDTH_DEFAULT,
   TAG_PANEL_WIDTH_DEFAULT,
 } from '../../constants/ui';
+
+let subscriptionsInitialized = false;
 
 export interface UISlice {
   tags: Tag[];
@@ -125,12 +128,30 @@ export const createUISlice: StateCreator<
   },
 
   setupSubscriptions: () => {
+    if (subscriptionsInitialized) return;
+    subscriptionsInitialized = true;
+
     // FileSystemWatcher: auto-refresh when files change in the watched folder
     bridge.on('folderChanged', () => {
       const { currentFolder } = get();
       if (currentFolder) {
         // Debounced refresh — the backend already debounces, but we add a small guard
         get().loadImages(currentFolder);
+      }
+    });
+
+    // Show toast when background metadata loading fails
+    bridge.on('metadataError', (data) => {
+      const { error } = data as { error: string };
+      useToastStore.getState().warning(`Metadaten-Laden fehlgeschlagen: ${error}`);
+    });
+
+    // Show progress for batch operations
+    bridge.on('batchProgress', (data) => {
+      const { current, total, operation } = data as { current: number; total: number; operation: string };
+      if (current === total) {
+        const label = operation === 'writeBatchTags' ? 'Batch-Tagging' : operation;
+        useToastStore.getState().success(`${label} abgeschlossen (${total} Dateien)`);
       }
     });
 

@@ -19,5 +19,24 @@ public class ImageFile
     public string? ThumbnailBase64 { get; set; }
     public string? ThumbnailUrl { get; set; }
     public bool IsSelected { get; set; }
+
+    /// <summary>
+    /// Create an ImageFile from a file path with tags and rating.
+    /// Populates FileName, Extension, FileSize, DateModified from FileInfo.
+    /// </summary>
+    public static ImageFile FromPath(string path, List<string> tags, int rating)
+    {
+        var fileInfo = new System.IO.FileInfo(path);
+        return new ImageFile
+        {
+            Path = path,
+            FileName = fileInfo.Name,
+            Extension = fileInfo.Extension.ToLowerInvariant(),
+            FileSize = fileInfo.Length,
+            DateModified = fileInfo.LastWriteTime,
+            Tags = tags,
+            Rating = rating
+        };
+    }
 }
 

@@ -143,28 +143,7 @@ public class ExifToolService : IExifToolService, IDisposable
             if (results.GetArrayLength() == 0)
                 return new List<string>();
 
-            var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var firstItem = results[0];
-
-            // Get IPTC Keywords
-            if (firstItem.TryGetProperty("Keywords", out var keywords))
-            {
-                if (keywords.ValueKind == JsonValueKind.Array)
-                    foreach (var tag in keywords.EnumerateArray()) tags.Add(tag.GetString() ?? "");
-                else if (keywords.ValueKind == JsonValueKind.String)
-                    tags.Add(keywords.GetString() ?? "");
-            }
-
-            // Get XMP Subject
-            if (firstItem.TryGetProperty("Subject", out var subject))
-            {
-                if (subject.ValueKind == JsonValueKind.Array)
-                    foreach (var tag in subject.EnumerateArray()) tags.Add(tag.GetString() ?? "");
-                else if (subject.ValueKind == JsonValueKind.String)
-                    tags.Add(subject.GetString() ?? "");
-            }
-
-            return tags.ToList();
+            return ParseTagsFromJson(results[0]).ToList();
         }
         catch (JsonException ex)
         {
@@ -184,13 +163,7 @@ public class ExifToolService : IExifToolService, IDisposable
         _logger.LogDebug("WriteTagsAsync called for: {ImagePath}", imagePath);
         _logger.LogDebug("Tags to write: [{Tags}]", string.Join(", ", tags));
 
-        // Deduplicate tags (case-insensitive, trim whitespace)
-        var uniqueTags = tags
-            .Where(t => !string.IsNullOrWhiteSpace(t))
-            .Select(t => t.Trim())
-            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
+        var uniqueTags = TagHelper.DeduplicateTags(tags);
 
         if (uniqueTags.Count != tags.Count)
             _logger.LogDebug("Deduplicated tags: {Original} → {Unique}", tags.Count, uniqueTags.Count);
@@ -319,25 +292,7 @@ public class ExifToolService : IExifToolService, IDisposable
                     // Normalize path (ExifTool may use forward slashes)
                     sourcePath = Path.GetFullPath(sourcePath);
 
-                    var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                    // Get IPTC Keywords
-                    if (item.TryGetProperty("Keywords", out var keywords))
-                    {
-                        if (keywords.ValueKind == JsonValueKind.Array)
-                            foreach (var tag in keywords.EnumerateArray()) tags.Add(tag.GetString() ?? "");
-                        else if (keywords.ValueKind == JsonValueKind.String)
-                            tags.Add(keywords.GetString() ?? "");
-                    }
-
-                    // Get XMP Subject
-                    if (item.TryGetProperty("Subject", out var subject))
-                    {
-                        if (subject.ValueKind == JsonValueKind.Array)
-                            foreach (var tag in subject.EnumerateArray()) tags.Add(tag.GetString() ?? "");
-                        else if (subject.ValueKind == JsonValueKind.String)
-                            tags.Add(subject.GetString() ?? "");
-                    }
+                    var tags = ParseTagsFromJson(item);
 
                     var rating = 0;
                     if (item.TryGetProperty("Rating", out var ratingProp) && ratingProp.ValueKind == JsonValueKind.Number)
@@ -475,26 +430,7 @@ public class ExifToolService : IExifToolService, IDisposable
             var data = results[0];
 
             // === Parse tags (IPTC Keywords + XMP Subject) ===
-            // Tags auslesen (IPTC Keywords + XMP Subject)
-            var tagSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            if (data.TryGetProperty("Keywords", out var keywords))
-            {
-                if (keywords.ValueKind == JsonValueKind.Array)
-                    foreach (var tag in keywords.EnumerateArray()) tagSet.Add(tag.GetString() ?? "");
-                else if (keywords.ValueKind == JsonValueKind.String)
-                    tagSet.Add(keywords.GetString() ?? "");
-            }
-
-            if (data.TryGetProperty("Subject", out var subject))
-            {
-                if (subject.ValueKind == JsonValueKind.Array)
-                    foreach (var tag in subject.EnumerateArray()) tagSet.Add(tag.GetString() ?? "");
-                else if (subject.ValueKind == JsonValueKind.String)
-                    tagSet.Add(subject.GetString() ?? "");
-            }
-
-            tags = tagSet.ToList();
+            tags = ParseTagsFromJson(data).ToList();
 
             // === Parse rating (XMP:Rating, clamped 0-5) ===
             // Bewertung auslesen (XMP:Rating, begrenzt auf 0-5)
@@ -650,6 +586,33 @@ public class ExifToolService : IExifToolService, IDisposable
     /// Parse a command-line style argument string into individual arguments.
     /// Handles quoted strings with spaces correctly.
     /// </summary>
+    /// <summary>
+    /// Parse Keywords and Subject tags from an ExifTool JSON element.
+    /// Handles both array and single-string ValueKind.
+    /// </summary>
+    private static HashSet<string> ParseTagsFromJson(JsonElement item)
+    {
+        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (item.TryGetProperty("Keywords", out var keywords))
+        {
+            if (keywords.ValueKind == JsonValueKind.Array)
+                foreach (var tag in keywords.EnumerateArray()) tags.Add(tag.GetString() ?? "");
+            else if (keywords.ValueKind == JsonValueKind.String)
+                tags.Add(keywords.GetString() ?? "");
+        }
+
+        if (item.TryGetProperty("Subject", out var subject))
+        {
+            if (subject.ValueKind == JsonValueKind.Array)
+                foreach (var tag in subject.EnumerateArray()) tags.Add(tag.GetString() ?? "");
+            else if (subject.ValueKind == JsonValueKind.String)
+                tags.Add(subject.GetString() ?? "");
+        }
+
+        return tags;
+    }
+
     internal static List<string> ParseArguments(string arguments)
     {
         var result = new List<string>();
@@ -708,12 +671,7 @@ public class ExifToolService : IExifToolService, IDisposable
     /// </summary>
     internal static (List<string> uniqueTags, List<string> args) BuildWriteTagArgs(List<string> tags, string imagePath)
     {
-        var uniqueTags = tags
-            .Where(t => !string.IsNullOrWhiteSpace(t))
-            .Select(t => t.Trim())
-            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .ToList();
+        var uniqueTags = TagHelper.DeduplicateTags(tags);
 
         var args = new List<string>();
 
