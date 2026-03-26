@@ -13,7 +13,7 @@ namespace TagFusion.Services;
 /// Wrapper for ExifTool to read and write image metadata.
 /// Uses -stay_open mode for persistent process (5-10x faster).
 /// </summary>
-public class ExifToolService : IDisposable
+public class ExifToolService : IExifToolService, IDisposable
 {
     private readonly string _exifToolPath;
     private readonly ThumbnailService _thumbnailService;
@@ -21,6 +21,7 @@ public class ExifToolService : IDisposable
     private readonly int _batchSize;
     private readonly int _maxImageSize;
     private readonly int _processStopTimeoutMs;
+    private readonly int _readTimeoutMs;
     private Process? _exifToolProcess;
     private StreamWriter? _commandWriter;
     private StreamReader? _outputReader;
@@ -37,34 +38,41 @@ public class ExifToolService : IDisposable
         _batchSize = settings.BatchSize;
         _maxImageSize = settings.MaxImageSize;
         _processStopTimeoutMs = settings.ProcessStopTimeoutMs;
+        _readTimeoutMs = settings.ReadTimeoutMs;
 
-        // Find ExifTool path relative to app directory
+        // === PERF: Try cached path first, then search ===
+        // Zuerst gecachten Pfad prüfen, dann suchen
         var appDir = AppContext.BaseDirectory ?? string.Empty;
-        _logger.LogDebug("AppContext.BaseDirectory: {AppDir}", appDir);
+        var cacheFile = Path.Combine(appDir, ".exiftool_path");
 
-        // Try different possible locations
+        // Try cached path from previous run
+        if (File.Exists(cacheFile))
+        {
+            var cached = File.ReadAllText(cacheFile).Trim();
+            if (File.Exists(cached))
+            {
+                _exifToolPath = cached;
+                _logger.LogInformation("ExifTool path (cached): {ExifToolPath}", _exifToolPath);
+                return;
+            }
+        }
+
+        // Fallback: search for exiftool.exe
         var possiblePaths = new[]
         {
-            // Development: relative to bin/Debug/net8.0-windows
+            Path.Combine(appDir, "Tools", "exiftool.exe"),
+            Path.Combine(appDir, "exiftool.exe"),
             Path.Combine(appDir, "..", "..", "..", "..", "..", "Tools", "exiftool.exe"),
             Path.Combine(appDir, "..", "..", "..", "..", "Tools", "exiftool.exe"),
-            // Production: Tools folder next to exe
-            Path.Combine(appDir, "Tools", "exiftool.exe"),
-            Path.Combine(appDir, "exiftool.exe")
         };
-
-        _logger.LogDebug("Searching for exiftool.exe in:");
-        foreach (var p in possiblePaths)
-        {
-            var fullPath = Path.GetFullPath(p);
-            var exists = File.Exists(fullPath);
-            _logger.LogDebug("  - {Path} (exists: {Exists})", fullPath, exists);
-        }
 
         _exifToolPath = possiblePaths.FirstOrDefault(File.Exists)
             ?? throw new FileNotFoundException($"ExifTool not found. Searched in: {string.Join(", ", possiblePaths.Select(Path.GetFullPath))}");
 
         _exifToolPath = Path.GetFullPath(_exifToolPath);
+
+        // Cache for next startup
+        try { File.WriteAllText(cacheFile, _exifToolPath); } catch { /* non-critical */ }
         _logger.LogInformation("ExifTool path: {ExifToolPath}", _exifToolPath);
     }
 
@@ -405,7 +413,9 @@ public class ExifToolService : IDisposable
     }
 
     /// <summary>
-    /// Get detailed metadata from an image
+    /// Get detailed metadata from an image.
+    /// Uses a single ExifTool call for tags, rating, dimensions, and date taken.
+    /// Liest alle Metadaten (Tags, Bewertung, Abmessungen, Aufnahmedatum) mit einem einzigen ExifTool-Aufruf.
     /// </summary>
     public async Task<ImageFile> GetImageMetadataAsync(string imagePath, CancellationToken cancellationToken = default)
     {
@@ -419,37 +429,101 @@ public class ExifToolService : IDisposable
             DateModified = fileInfo.LastWriteTime
         };
 
-        // Get tags and rating
-        image.Tags = await ReadTagsAsync(imagePath, cancellationToken);
-        image.Rating = await ReadRatingAsync(imagePath, cancellationToken);
+        // Single ExifTool call for ALL metadata (previously 3 separate calls)
+        // Ein einziger ExifTool-Aufruf fuer ALLE Metadaten (vorher 3 separate Aufrufe)
+        var metadata = await ReadFullMetadataAsync(imagePath, cancellationToken);
 
-        // Get additional metadata (dimensions, date taken)
-        var args = $"-ImageWidth -ImageHeight -DateTimeOriginal -j \"{imagePath}\"";
+        image.Tags = metadata.Tags;
+        image.Rating = metadata.Rating;
+        image.Width = metadata.Width;
+        image.Height = metadata.Height;
+        image.DateTaken = metadata.DateTaken;
+
+        return image;
+    }
+
+    /// <summary>
+    /// Read all metadata fields with a SINGLE ExifTool call: tags, rating, dimensions, date taken.
+    /// Replaces the previous approach of 3 separate calls (ReadTags + ReadRating + dimensions).
+    /// Liest alle Metadaten-Felder mit EINEM ExifTool-Aufruf: Tags, Bewertung, Abmessungen, Aufnahmedatum.
+    /// Ersetzt den bisherigen Ansatz mit 3 separaten Aufrufen.
+    /// </summary>
+    private async Task<(List<string> Tags, int Rating, int Width, int Height, DateTime? DateTaken)> ReadFullMetadataAsync(
+        string imagePath, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(imagePath))
+            throw new FileNotFoundException($"Image not found: {imagePath}");
+
+        // Combined args: tags + rating + dimensions + date in one call
+        // Kombinierte Argumente: Tags + Bewertung + Abmessungen + Datum in einem Aufruf
+        var args = $"-Keywords -XMP:Subject -XMP:Rating -ImageWidth -ImageHeight -DateTimeOriginal -j \"{imagePath}\"";
         var output = await RunExifToolAsync(args, cancellationToken);
+
+        var tags = new List<string>();
+        var rating = 0;
+        var width = 0;
+        var height = 0;
+        DateTime? dateTaken = null;
 
         try
         {
             using var doc = JsonDocument.Parse(output);
             var results = doc.RootElement;
-            if (results.GetArrayLength() > 0)
-            {
-                var data = results[0];
-                if (data.TryGetProperty("ImageWidth", out var widthProp) && widthProp.ValueKind == JsonValueKind.Number)
-                    image.Width = widthProp.GetInt32();
-                if (data.TryGetProperty("ImageHeight", out var heightProp) && heightProp.ValueKind == JsonValueKind.Number)
-                    image.Height = heightProp.GetInt32();
+            if (results.GetArrayLength() == 0)
+                return (tags, rating, width, height, dateTaken);
 
-                if (data.TryGetProperty("DateTimeOriginal", out var dateProp) && dateProp.ValueKind == JsonValueKind.String)
-                {
-                    var dateTaken = dateProp.GetString();
-                    if (!string.IsNullOrEmpty(dateTaken) && DateTime.TryParse(dateTaken, out var dt))
-                        image.DateTaken = dt;
-                }
+            var data = results[0];
+
+            // === Parse tags (IPTC Keywords + XMP Subject) ===
+            // Tags auslesen (IPTC Keywords + XMP Subject)
+            var tagSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (data.TryGetProperty("Keywords", out var keywords))
+            {
+                if (keywords.ValueKind == JsonValueKind.Array)
+                    foreach (var tag in keywords.EnumerateArray()) tagSet.Add(tag.GetString() ?? "");
+                else if (keywords.ValueKind == JsonValueKind.String)
+                    tagSet.Add(keywords.GetString() ?? "");
+            }
+
+            if (data.TryGetProperty("Subject", out var subject))
+            {
+                if (subject.ValueKind == JsonValueKind.Array)
+                    foreach (var tag in subject.EnumerateArray()) tagSet.Add(tag.GetString() ?? "");
+                else if (subject.ValueKind == JsonValueKind.String)
+                    tagSet.Add(subject.GetString() ?? "");
+            }
+
+            tags = tagSet.ToList();
+
+            // === Parse rating (XMP:Rating, clamped 0-5) ===
+            // Bewertung auslesen (XMP:Rating, begrenzt auf 0-5)
+            if (data.TryGetProperty("Rating", out var ratingProp) && ratingProp.ValueKind == JsonValueKind.Number)
+                rating = Math.Clamp(ratingProp.GetInt32(), 0, 5);
+
+            // === Parse dimensions ===
+            // Abmessungen auslesen
+            if (data.TryGetProperty("ImageWidth", out var widthProp) && widthProp.ValueKind == JsonValueKind.Number)
+                width = widthProp.GetInt32();
+            if (data.TryGetProperty("ImageHeight", out var heightProp) && heightProp.ValueKind == JsonValueKind.Number)
+                height = heightProp.GetInt32();
+
+            // === Parse date taken ===
+            // Aufnahmedatum auslesen
+            if (data.TryGetProperty("DateTimeOriginal", out var dateProp) && dateProp.ValueKind == JsonValueKind.String)
+            {
+                var dateStr = dateProp.GetString();
+                if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var dt))
+                    dateTaken = dt;
             }
         }
-        catch (JsonException ex) { _logger.LogWarning(ex, "Failed to parse image metadata JSON"); }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse full metadata JSON for {ImagePath} / " +
+                "JSON-Parsing der vollstaendigen Metadaten fehlgeschlagen fuer {ImagePath2}", imagePath, imagePath);
+        }
 
-        return image;
+        return (tags, rating, width, height, dateTaken);
     }
 
     private async Task<string> RunExifToolAsync(string arguments, CancellationToken cancellationToken = default)
@@ -474,14 +548,31 @@ public class ExifToolService : IDisposable
             await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
             await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            // Read output until {ready}
+            // Read output until {ready} — with timeout to prevent hanging on stuck process
+            using var readCts = _readTimeoutMs > 0
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_readTimeoutMs > 0)
+                readCts.CancelAfter(_readTimeoutMs);
+
             var sb = new StringBuilder();
             string? line;
-            while ((line = await _outputReader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
+            try
             {
-                if (line.Trim() == "{ready}")
-                    break;
-                sb.AppendLine(line);
+                while ((line = await _outputReader.ReadLineAsync(readCts.Token).ConfigureAwait(false)) != null)
+                {
+                    if (line.Trim() == "{ready}")
+                        break;
+                    sb.AppendLine(line);
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", _readTimeoutMs);
+                try { _exifToolProcess?.Kill(); } catch { /* best effort */ }
+                _exifToolProcess?.Dispose();
+                _exifToolProcess = null;
+                throw new TimeoutException($"ExifTool did not respond within {_readTimeoutMs}ms");
             }
             var output = sb.ToString();
             _logger.LogDebug("RunExifToolAsync: Output received: '{Output}'", output.Trim());
@@ -518,14 +609,31 @@ public class ExifToolService : IDisposable
             await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
             await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            // Read output until {ready}
+            // Read output until {ready} — with timeout to prevent hanging on stuck process
+            using var readCts = _readTimeoutMs > 0
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_readTimeoutMs > 0)
+                readCts.CancelAfter(_readTimeoutMs);
+
             var sb = new StringBuilder();
             string? line;
-            while ((line = await _outputReader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
+            try
             {
-                if (line.Trim() == "{ready}")
-                    break;
-                sb.AppendLine(line);
+                while ((line = await _outputReader.ReadLineAsync(readCts.Token).ConfigureAwait(false)) != null)
+                {
+                    if (line.Trim() == "{ready}")
+                        break;
+                    sb.AppendLine(line);
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", _readTimeoutMs);
+                try { _exifToolProcess?.Kill(); } catch { /* best effort */ }
+                _exifToolProcess?.Dispose();
+                _exifToolProcess = null;
+                throw new TimeoutException($"ExifTool did not respond within {_readTimeoutMs}ms");
             }
             var output = sb.ToString();
             _logger.LogDebug("RunExifToolAsync (List): Output received: '{Output}'", output.Trim());

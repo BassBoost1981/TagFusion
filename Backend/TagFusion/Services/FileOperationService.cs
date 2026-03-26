@@ -9,7 +9,7 @@ namespace TagFusion.Services
     /// <summary>
     /// Service for file system operations (copy, move, delete, rename)
     /// </summary>
-    public class FileOperationService
+    public class FileOperationService : IFileOperationService
     {
         private readonly ILogger<FileOperationService> _logger;
 
@@ -24,6 +24,7 @@ namespace TagFusion.Services
         /// </summary>
         public async Task<bool> CopyFilesAsync(string[] sourcePaths, string targetFolder, CancellationToken cancellationToken = default)
         {
+            ValidateFileOperationPaths(sourcePaths, targetFolder);
             var copiedPaths = new List<string>();
             try
             {
@@ -79,6 +80,7 @@ namespace TagFusion.Services
         /// </summary>
         public async Task<bool> MoveFilesAsync(string[] sourcePaths, string targetFolder, CancellationToken cancellationToken = default)
         {
+            ValidateFileOperationPaths(sourcePaths, targetFolder);
             try
             {
                 foreach (var sourcePath in sourcePaths)
@@ -114,6 +116,10 @@ namespace TagFusion.Services
         /// </summary>
         public async Task<bool> DeleteFilesAsync(string[] paths, CancellationToken cancellationToken = default)
         {
+            foreach (var path in paths)
+            {
+                ValidatePath(path);
+            }
             try
             {
                 foreach (var path in paths)
@@ -267,6 +273,54 @@ namespace TagFusion.Services
                 throw;
             }
         }
+
+        #region Path Validation
+
+        /// <summary>
+        /// Validates that a path is safe for file operations.
+        /// Rejects null bytes, control characters, and system directory targets.
+        /// </summary>
+        private static void ValidatePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new ArgumentException("Path cannot be empty");
+
+            // Reject null bytes and control characters
+            if (path.Any(c => c < 0x20 && c != '\t'))
+                throw new ArgumentException($"Path contains invalid control characters: {path}");
+
+            var fullPath = Path.GetFullPath(path);
+
+            // Block access to Windows system directories
+            var systemRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+
+            string[] blockedRoots = [systemRoot, programFiles, programFilesX86];
+
+            foreach (var blocked in blockedRoots)
+            {
+                if (!string.IsNullOrEmpty(blocked) &&
+                    fullPath.StartsWith(blocked, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UnauthorizedAccessException($"Access to system directory is not allowed: {fullPath}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Validates all source paths and the target folder.
+        /// </summary>
+        private static void ValidateFileOperationPaths(string[] sourcePaths, string targetFolder)
+        {
+            ValidatePath(targetFolder);
+            foreach (var source in sourcePaths)
+            {
+                ValidatePath(source);
+            }
+        }
+
+        #endregion
 
         #region Helpers
 

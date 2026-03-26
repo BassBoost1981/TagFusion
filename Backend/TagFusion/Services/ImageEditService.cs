@@ -11,7 +11,7 @@ namespace TagFusion.Services;
 /// Service for basic image editing operations (rotate, flip)
 /// Changes are saved directly to the original file
 /// </summary>
-public class ImageEditService
+public class ImageEditService : IImageEditService
 {
     private readonly ThumbnailService _thumbnailService;
     private readonly ILogger<ImageEditService> _logger;
@@ -128,9 +128,12 @@ public class ImageEditService
                     }
                 }
 
-                // Replace original with transformed image
-                File.Delete(imagePath);
+                // Safe replace: backup original, move temp, delete backup
+                // Crash between any two steps preserves at least one complete file
+                var backupPath = imagePath + ".bak";
+                File.Move(imagePath, backupPath);
                 File.Move(tempPath, imagePath);
+                File.Delete(backupPath);
 
                 // Invalidate thumbnail cache
                 InvalidateThumbnailCache(imagePath);
@@ -142,11 +145,22 @@ public class ImageEditService
             {
                 _logger.LogError(ex, "Failed to transform {ImagePath}", imagePath);
 
-                // Clean up temp file if it exists
+                // Clean up temp/backup files if they exist
                 var tempPath = imagePath + ".tmp";
                 if (File.Exists(tempPath))
                 {
                     try { File.Delete(tempPath); } catch (Exception cleanupEx) { _logger.LogWarning(cleanupEx, "Failed to delete temp file: {TempPath}", tempPath); }
+                }
+                var backupPath = imagePath + ".bak";
+                if (File.Exists(backupPath) && !File.Exists(imagePath))
+                {
+                    // Restore from backup if original is missing (crash recovery)
+                    try { File.Move(backupPath, imagePath); _logger.LogInformation("Restored original from backup: {ImagePath}", imagePath); }
+                    catch (Exception restoreEx) { _logger.LogError(restoreEx, "Failed to restore backup: {BackupPath}", backupPath); }
+                }
+                else if (File.Exists(backupPath))
+                {
+                    try { File.Delete(backupPath); } catch (Exception cleanupEx) { _logger.LogWarning(cleanupEx, "Failed to delete backup file: {BackupPath}", backupPath); }
                 }
 
                 return false;

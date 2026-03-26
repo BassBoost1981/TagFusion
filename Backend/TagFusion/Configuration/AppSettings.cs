@@ -9,6 +9,8 @@ public record ExifToolSettings
     public int BatchSize { get; init; } = 50;
     public int MaxImageSize { get; init; } = 1920;
     public int ProcessStopTimeoutMs { get; init; } = 1000;
+    /// <summary>Timeout in ms for reading ExifTool output. 0 = no timeout. Default: 30s.</summary>
+    public int ReadTimeoutMs { get; init; } = 30000;
 }
 
 /// <summary>
@@ -70,6 +72,6 @@ public record TagSettings
 /// </summary>
 public record UiSettings
 {
-    public int SplashDelayMs { get; init; } = 300;
+    public int SplashDelayMs { get; init; } = 100;
     public string BrowserArgs { get; init; } = "--enable-gpu-rasterization --enable-zero-copy --enable-features=VaapiVideoDecoder --disable-software-rasterizer --enable-accelerated-2d-canvas --enable-accelerated-video-decode --gpu-rasterization-msaa-sample-count=0 --disable-http-cache";
 }
