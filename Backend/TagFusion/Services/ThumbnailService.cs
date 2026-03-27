@@ -1,12 +1,13 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 using TagFusion.Configuration;
 
 namespace TagFusion.Services;
@@ -105,7 +106,7 @@ public class ThumbnailService
             return true;
         }
 
-        // Generate thumbnail using System.Drawing
+        // Generate thumbnail using ImageSharp
         var generatedThumbnail = await GenerateThumbnailBytesAsync(imagePath, cancellationToken);
         if (generatedThumbnail != null)
         {
@@ -135,7 +136,7 @@ public class ThumbnailService
             return $"https://{ThumbnailHostName}/{cacheKey}.jpg";
         }
 
-        // Generate thumbnail using System.Drawing
+        // Generate thumbnail using ImageSharp
         var generatedThumbnail = await GenerateThumbnailBytesAsync(imagePath, cancellationToken);
         if (generatedThumbnail != null)
         {
@@ -150,7 +151,7 @@ public class ThumbnailService
     /// Get multiple thumbnails with optimized 3-phase batch loading:
     /// Phase 1: Return cached thumbnails immediately
     /// Phase 2: Extract embedded thumbnails with ONE ExifTool process (not one per file!)
-    /// Phase 3: Generate remaining thumbnails with System.Drawing in parallel
+    /// Phase 3: Generate remaining thumbnails with ImageSharp in parallel
     /// </summary>
     public async Task<Dictionary<string, string?>> GetThumbnailsBatchAsync(string[] imagePaths, string exifToolPath, int maxParallel = 0, CancellationToken cancellationToken = default)
     {
@@ -192,7 +193,7 @@ public class ThumbnailService
             }
         }
 
-        // === Phase 3: Generate remaining thumbnails with System.Drawing ===
+        // === Phase 3: Generate remaining thumbnails with ImageSharp ===
         if (needsGeneration.Count > 0)
         {
             using var semaphore = new SemaphoreSlim(maxParallel);
@@ -282,7 +283,7 @@ public class ThumbnailService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Batch embedded thumbnail extraction failed");
-            // Fall through — images without results will go to System.Drawing fallback
+            // Fall through — images without results will go to ImageSharp fallback
         }
 
         return results;
@@ -325,41 +326,32 @@ public class ThumbnailService
 
     private async Task<byte[]?> GenerateThumbnailBytesAsync(string imagePath, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() =>
+        try
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Stream image file — avoids loading entire file into memory (critical for large RAW files)
+            using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var image = await Image.LoadAsync(fileStream, cancellationToken);
+
+            // Resize maintaining aspect ratio using ImageSharp's ResizeMode.Max
+            image.Mutate(x => x.Resize(new ResizeOptions
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                Size = new Size(_thumbnailSize, _thumbnailSize),
+                Mode = ResizeMode.Max
+            }));
 
-                // Stream image file — avoids loading entire file into memory (critical for large RAW files)
-                using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var originalImage = Image.FromStream(fileStream, useEmbeddedColorManagement: false, validateImageData: false);
+            using var memoryStream = new MemoryStream();
+            var encoder = new JpegEncoder { Quality = _jpegQuality };
+            await image.SaveAsync(memoryStream, encoder, cancellationToken);
 
-                // Calculate new dimensions maintaining aspect ratio
-                var ratioX = (double)_thumbnailSize / originalImage.Width;
-                var ratioY = (double)_thumbnailSize / originalImage.Height;
-                var ratio = Math.Min(ratioX, ratioY);
-
-                var newWidth = (int)(originalImage.Width * ratio);
-                var newHeight = (int)(originalImage.Height * ratio);
-
-                using var thumbnail = new Bitmap(newWidth, newHeight);
-                using var graphics = Graphics.FromImage(thumbnail);
-
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.DrawImage(originalImage, 0, 0, newWidth, newHeight);
-
-                using var memoryStream = new MemoryStream();
-                thumbnail.Save(memoryStream, ImageFormat.Jpeg);
-
-                return memoryStream.ToArray();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to generate thumbnail for {ImagePath}", imagePath);
-                return null;
-            }
-        }, cancellationToken);
+            return memoryStream.ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to generate thumbnail for {ImagePath}", imagePath);
+            return null;
+        }
     }
 
     /// <summary>
@@ -370,66 +362,35 @@ public class ThumbnailService
         if (!File.Exists(imagePath))
             return null;
 
-        return await Task.Run(() =>
+        try
         {
-            try
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Stream image file — avoids loading entire file into memory
+            using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var image = await Image.LoadAsync(fileStream, cancellationToken);
+
+            // Resize only if image exceeds maxSize (ResizeMode.Max preserves aspect ratio)
+            if (image.Width > maxSize || image.Height > maxSize)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // Stream image file — avoids loading entire file into memory
-                using var fileStream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var originalImage = Image.FromStream(fileStream, useEmbeddedColorManagement: false, validateImageData: false);
-
-                // If image is smaller than maxSize, return original
-                if (originalImage.Width <= maxSize && originalImage.Height <= maxSize)
+                image.Mutate(x => x.Resize(new ResizeOptions
                 {
-                    using var memoryStream = new MemoryStream();
-                    // Use high quality JPEG
-                    var encoder = GetEncoder(ImageFormat.Jpeg);
-                    var encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
-                    encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-                        System.Drawing.Imaging.Encoder.Quality, (long)_jpegQuality);
-                    originalImage.Save(memoryStream, encoder, encoderParams);
-                    return Convert.ToBase64String(memoryStream.ToArray());
-                }
-
-                // Calculate new dimensions maintaining aspect ratio
-                var ratioX = (double)maxSize / originalImage.Width;
-                var ratioY = (double)maxSize / originalImage.Height;
-                var ratio = Math.Min(ratioX, ratioY);
-
-                var newWidth = (int)(originalImage.Width * ratio);
-                var newHeight = (int)(originalImage.Height * ratio);
-
-                using var resizedImage = new Bitmap(newWidth, newHeight);
-                using var graphics = Graphics.FromImage(resizedImage);
-
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.DrawImage(originalImage, 0, 0, newWidth, newHeight);
-
-                using var memStream = new MemoryStream();
-                var enc = GetEncoder(ImageFormat.Jpeg);
-                var encParams = new System.Drawing.Imaging.EncoderParameters(1);
-                encParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-                    System.Drawing.Imaging.Encoder.Quality, 92L);
-                resizedImage.Save(memStream, enc, encParams);
-
-                return Convert.ToBase64String(memStream.ToArray());
+                    Size = new Size(maxSize, maxSize),
+                    Mode = ResizeMode.Max
+                }));
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to get full image: {ImagePath}", imagePath);
-                return null;
-            }
-        }, cancellationToken);
-    }
 
-    private static System.Drawing.Imaging.ImageCodecInfo GetEncoder(ImageFormat format)
-    {
-        var codecs = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders();
-        return codecs.First(codec => codec.FormatID == format.Guid);
+            using var memoryStream = new MemoryStream();
+            var encoder = new JpegEncoder { Quality = _jpegQuality };
+            await image.SaveAsync(memoryStream, encoder, cancellationToken);
+
+            return Convert.ToBase64String(memoryStream.ToArray());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get full image: {ImagePath}", imagePath);
+            return null;
+        }
     }
 
     private string GetCacheKey(string imagePath)

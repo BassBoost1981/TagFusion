@@ -92,6 +92,7 @@ public class TagHandler : IBridgeHandler
         List<string>? tags = null;
         int? minRating = null;
         int limit = 200;
+        int offset = 0;
 
         if (payload != null)
         {
@@ -106,8 +107,11 @@ public class TagHandler : IBridgeHandler
             var limitObj = payload.GetValueOrDefault("limit");
             var parsedLimit = PayloadHelper.GetInt(limitObj, 200);
             if (parsedLimit > 0) limit = parsedLimit;
+
+            var offsetObj = payload.GetValueOrDefault("offset");
+            offset = PayloadHelper.GetInt(offsetObj, 0);
         }
 
-        return await _databaseService.SearchImagesAsync(tags, minRating, limit);
+        return await _databaseService.SearchImagesAsync(tags, minRating, limit, offset);
     }
 }

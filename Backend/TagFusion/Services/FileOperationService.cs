@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
+using SixLabors.ImageSharp;
 
 namespace TagFusion.Services
 {
@@ -245,14 +245,15 @@ namespace TagFusion.Services
                         ["isFolder"] = false
                     };
 
-                    // Try to get image dimensions
+                    // Try to get image dimensions (Identify reads only metadata, no pixel decode)
                     try
                     {
                         var ext = info.Extension.ToLowerInvariant();
-                        if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".bmp" || ext == ".webp")
+                        if (ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp" or ".tiff" or ".tif")
                         {
-                            using var img = Image.FromFile(path);
-                            result["dimensions"] = new { width = img.Width, height = img.Height };
+                            var imageInfo = Image.Identify(path);
+                            if (imageInfo != null)
+                                result["dimensions"] = new { width = imageInfo.Width, height = imageInfo.Height };
                         }
                     }
                     catch (Exception ex)

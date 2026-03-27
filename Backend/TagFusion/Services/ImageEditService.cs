@@ -1,8 +1,14 @@
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Tiff;
+using SixLabors.ImageSharp.Processing;
 using TagFusion.Configuration;
 
 namespace TagFusion.Services;
@@ -34,19 +40,19 @@ public class ImageEditService : IImageEditService
     {
         var results = new Dictionary<string, bool>();
 
-        var rotateType = angle switch
+        var rotateAngle = angle switch
         {
-            90 => RotateFlipType.Rotate90FlipNone,
-            -90 => RotateFlipType.Rotate270FlipNone,
-            180 => RotateFlipType.Rotate180FlipNone,
-            270 => RotateFlipType.Rotate270FlipNone,
+            90 => 90f,
+            -90 => -90f,
+            180 => 180f,
+            270 => -90f,
             _ => throw new ArgumentException($"Invalid angle: {angle}. Use 90, -90, or 180.")
         };
 
         foreach (var path in imagePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            results[path] = await TransformImageAsync(path, rotateType, cancellationToken);
+            results[path] = await TransformImageAsync(path, img => img.Mutate(x => x.Rotate(rotateAngle)), cancellationToken);
         }
 
         return results;
@@ -62,22 +68,20 @@ public class ImageEditService : IImageEditService
     {
         var results = new Dictionary<string, bool>();
 
-        var flipType = horizontal
-            ? RotateFlipType.RotateNoneFlipX
-            : RotateFlipType.RotateNoneFlipY;
+        var flipMode = horizontal ? FlipMode.Horizontal : FlipMode.Vertical;
 
         foreach (var path in imagePaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            results[path] = await TransformImageAsync(path, flipType, cancellationToken);
+            results[path] = await TransformImageAsync(path, img => img.Mutate(x => x.Flip(flipMode)), cancellationToken);
         }
 
         return results;
     }
 
-    private async Task<bool> TransformImageAsync(string imagePath, RotateFlipType transformation, CancellationToken cancellationToken = default)
+    private async Task<bool> TransformImageAsync(string imagePath, Action<Image> transform, CancellationToken cancellationToken = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             try
             {
@@ -87,9 +91,7 @@ public class ImageEditService : IImageEditService
                     return false;
                 }
 
-                // Get original format
                 var extension = Path.GetExtension(imagePath).ToLowerInvariant();
-                var format = GetImageFormat(extension);
                 var tempPath = imagePath + ".tmp";
 
                 // Read image bytes first to avoid file lock issues
@@ -97,35 +99,14 @@ public class ImageEditService : IImageEditService
 
                 using (var memoryStream = new MemoryStream(imageBytes))
                 {
-                    // Important: Create a copy of the image to detach from stream
-                    using var originalImage = Image.FromStream(memoryStream);
+                    using var image = Image.Load(memoryStream);
 
-                    // Create a new bitmap to avoid GDI+ issues with indexed formats
-                    using var workingImage = new Bitmap(originalImage.Width, originalImage.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                    using (var g = Graphics.FromImage(workingImage))
-                    {
-                        g.DrawImage(originalImage, 0, 0, originalImage.Width, originalImage.Height);
-                    }
+                    // Apply transformation
+                    transform(image);
 
-                    // Apply transformation to the working copy
-                    workingImage.RotateFlip(transformation);
-
-                    // Save to temporary file
-                    if (format.Guid == ImageFormat.Jpeg.Guid)
-                    {
-                        var encoder = GetEncoder(ImageFormat.Jpeg);
-                        var encoderParams = new EncoderParameters(1);
-                        encoderParams.Param[0] = new EncoderParameter(Encoder.Quality, (long)_jpegQuality);
-                        workingImage.Save(tempPath, encoder, encoderParams);
-                    }
-                    else if (format.Guid == ImageFormat.Png.Guid)
-                    {
-                        workingImage.Save(tempPath, ImageFormat.Png);
-                    }
-                    else
-                    {
-                        workingImage.Save(tempPath, format);
-                    }
+                    // Save to temporary file in the appropriate format with configured quality
+                    var encoder = GetEncoderForExtension(extension, _jpegQuality);
+                    await image.SaveAsync(tempPath, encoder, cancellationToken);
                 }
 
                 // Safe replace: backup original, move temp, delete backup
@@ -168,23 +149,22 @@ public class ImageEditService : IImageEditService
         });
     }
 
-    internal static ImageFormat GetImageFormat(string extension)
+    internal static IImageEncoder GetEncoder(string extension, int jpegQuality = 95)
+    {
+        return GetEncoderForExtension(extension, jpegQuality);
+    }
+
+    private static IImageEncoder GetEncoderForExtension(string extension, int jpegQuality)
     {
         return extension switch
         {
-            ".jpg" or ".jpeg" => ImageFormat.Jpeg,
-            ".png" => ImageFormat.Png,
-            ".gif" => ImageFormat.Gif,
-            ".bmp" => ImageFormat.Bmp,
-            ".tiff" or ".tif" => ImageFormat.Tiff,
-            _ => ImageFormat.Jpeg
+            ".jpg" or ".jpeg" => new JpegEncoder { Quality = jpegQuality },
+            ".png" => new PngEncoder(),
+            ".gif" => new GifEncoder(),
+            ".bmp" => new BmpEncoder(),
+            ".tiff" or ".tif" => new TiffEncoder(),
+            _ => new JpegEncoder { Quality = jpegQuality }
         };
-    }
-
-    private ImageCodecInfo GetEncoder(ImageFormat format)
-    {
-        var codecs = ImageCodecInfo.GetImageEncoders();
-        return codecs.First(codec => codec.FormatID == format.Guid);
     }
 
     private void InvalidateThumbnailCache(string imagePath)
@@ -204,4 +184,3 @@ public class ImageEditService : IImageEditService
         }
     }
 }
-

@@ -36,7 +36,7 @@ public interface IDatabaseService
     /// Search images by tags and/or minimum rating.
     /// Suche nach Bildern anhand von Tags und/oder Mindestbewertung.
     /// </summary>
-    Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, CancellationToken cancellationToken = default);
+    Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

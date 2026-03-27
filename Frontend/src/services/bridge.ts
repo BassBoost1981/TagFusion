@@ -75,17 +75,55 @@ class BridgeService {
     }
   }
 
+  /** Maximum number of retry attempts for failed requests */
+  private static readonly MAX_RETRIES = 2;
+
+  /** Base timeout in ms (doubled on each retry) */
+  private static readonly BASE_TIMEOUT_MS = 120_000;
+
+  /** Actions that are safe to retry (idempotent reads) */
+  private static readonly RETRYABLE_ACTIONS = new Set([
+    'getDrives', 'getFolders', 'getImages', 'getFolderContents',
+    'readTags', 'getThumbnail', 'getFullImage', 'getThumbnailsBatch',
+    'getRating', 'getAllTags', 'getTagLibrary', 'healthCheck',
+    'searchImages', 'findDuplicates', 'getProperties',
+    'exportTagsJson', 'exportTagsCsv',
+  ]);
+
   private async send<T>(action: string, payload?: Record<string, unknown>): Promise<T> {
+    return this.sendWithRetry<T>(action, payload, 0);
+  }
+
+  private async sendWithRetry<T>(action: string, payload: Record<string, unknown> | undefined, attempt: number): Promise<T> {
     const id = this.generateId();
     const message: BridgeMessage = { id, action, payload };
-    log('Sending:', action, 'id:', id);
+    log('Sending:', action, 'id:', id, attempt > 0 ? `(retry ${attempt})` : '');
+
+    try {
+      return await this.sendOnce<T>(id, message, action, payload, attempt);
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.message === 'Request timeout';
+      const canRetry = isTimeout && attempt < BridgeService.MAX_RETRIES && BridgeService.RETRYABLE_ACTIONS.has(action);
+
+      if (canRetry) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 4000); // 1s, 2s, 4s
+        log(`Retrying ${action} in ${delay}ms (attempt ${attempt + 1}/${BridgeService.MAX_RETRIES})`);
+        await new Promise((r) => setTimeout(r, delay));
+        return this.sendWithRetry<T>(action, payload, attempt + 1);
+      }
+
+      throw error;
+    }
+  }
+
+  private sendOnce<T>(id: string, message: BridgeMessage, action: string, _payload: Record<string, unknown> | undefined, attempt: number): Promise<T> {
+    const timeoutMs = BridgeService.BASE_TIMEOUT_MS * Math.pow(1.5, attempt); // 120s, 180s, 270s
 
     return new Promise((resolve, reject) => {
       if (!this.isWebView) {
         log('Using mock response for:', action);
-        // Mock responses for development
         setTimeout(() => {
-          resolve(this.getMockResponse(action, payload) as T);
+          resolve(this.getMockResponse(action, _payload) as T);
         }, 100);
         return;
       }
@@ -95,14 +133,13 @@ class BridgeService {
       log('Posting to WebView:', msgStr);
       window.chrome!.webview!.postMessage(msgStr);
 
-      // Timeout after 120 seconds (increased from 30s for slow network drives)
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          console.error('[Bridge] Timeout for:', action, 'id:', id);
+          console.error('[Bridge] Timeout for:', action, 'id:', id, `(${Math.round(timeoutMs / 1000)}s)`);
           reject(new Error('Request timeout'));
         }
-      }, 120000);
+      }, timeoutMs);
     });
   }
 
@@ -229,8 +266,9 @@ class BridgeService {
     tags?: string[],
     minRating?: number,
     limit?: number,
+    offset?: number,
   ): Promise<ImageFile[]> {
-    return this.send<ImageFile[]>('searchImages', { tags, minRating, limit });
+    return this.send<ImageFile[]>('searchImages', { tags, minRating, limit, offset });
   }
 
   // Batch tag operations — write same tags to multiple images

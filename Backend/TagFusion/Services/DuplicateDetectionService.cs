@@ -46,13 +46,38 @@ public class DuplicateDetectionService
             .Where(g => g.Count() > 1)
             .ToList();
 
-        var hashMap = new Dictionary<string, List<string>>();
-
+        // Second pass: compare first 4KB headers (eliminates most non-duplicates cheaply)
+        var headerGroups = new Dictionary<string, List<string>>();
         foreach (var group in sizeGroups)
         {
-            foreach (var (path, _) in group)
+            foreach (var (path, size) in group)
             {
                 ct.ThrowIfCancellationRequested();
+                try
+                {
+                    var header = await ReadHeaderAsync(path, 4096, ct);
+                    var headerKey = $"{size}:{Convert.ToHexString(SHA256.HashData(header))}";
+                    if (!headerGroups.ContainsKey(headerKey))
+                        headerGroups[headerKey] = new List<string>();
+                    headerGroups[headerKey].Add(path);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "DuplicateDetection: Failed to read header {Path}", path);
+                }
+            }
+        }
+
+        // Third pass: full SHA256 hash only for files with matching size AND header
+        var hashMap = new Dictionary<string, List<string>>();
+        var candidateCount = 0;
+
+        foreach (var group in headerGroups.Values.Where(g => g.Count > 1))
+        {
+            foreach (var path in group)
+            {
+                ct.ThrowIfCancellationRequested();
+                candidateCount++;
                 try
                 {
                     var hash = await ComputeHashAsync(path, ct);
@@ -67,6 +92,9 @@ public class DuplicateDetectionService
             }
         }
 
+        _logger.LogInformation("DuplicateDetection: Header filter reduced {SizeGroupFiles} candidates to {HashFiles} for full hashing",
+            sizeGroups.Sum(g => g.Count()), candidateCount);
+
         var duplicates = hashMap
             .Where(kvp => kvp.Value.Count > 1)
             .Select(kvp => new DuplicateGroup
@@ -80,6 +108,17 @@ public class DuplicateDetectionService
 
         _logger.LogInformation("DuplicateDetection: Found {Count} duplicate groups", duplicates.Count);
         return duplicates;
+    }
+
+    /// <summary>
+    /// Read the first N bytes of a file for quick comparison.
+    /// </summary>
+    private static async Task<byte[]> ReadHeaderAsync(string filePath, int headerSize, CancellationToken ct)
+    {
+        var buffer = new byte[headerSize];
+        await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, headerSize, true);
+        var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, headerSize), ct);
+        return bytesRead < headerSize ? buffer[..bytesRead] : buffer;
     }
 
     /// <summary>

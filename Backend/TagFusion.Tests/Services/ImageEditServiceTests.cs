@@ -1,5 +1,9 @@
-using System.Drawing.Imaging;
 using NUnit.Framework;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Tiff;
 using TagFusion.Services;
 
 namespace TagFusion.Tests.Services;
@@ -8,48 +12,48 @@ namespace TagFusion.Tests.Services;
 public class ImageEditServiceTests
 {
     // ========================================================================
-    // GetImageFormat Tests (internal static)
+    // GetEncoder Tests (internal static)
     // ========================================================================
 
     [Test]
-    public void GetImageFormat_Jpg_ReturnsJpeg()
+    public void GetEncoder_Jpg_ReturnsJpegEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".jpg");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Jpeg.Guid));
+        var encoder = ImageEditService.GetEncoder(".jpg");
+        Assert.That(encoder, Is.InstanceOf<JpegEncoder>());
     }
 
     [Test]
-    public void GetImageFormat_Jpeg_ReturnsJpeg()
+    public void GetEncoder_Jpeg_ReturnsJpegEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".jpeg");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Jpeg.Guid));
+        var encoder = ImageEditService.GetEncoder(".jpeg");
+        Assert.That(encoder, Is.InstanceOf<JpegEncoder>());
     }
 
     [Test]
-    public void GetImageFormat_Png_ReturnsPng()
+    public void GetEncoder_Png_ReturnsPngEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".png");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Png.Guid));
+        var encoder = ImageEditService.GetEncoder(".png");
+        Assert.That(encoder, Is.InstanceOf<PngEncoder>());
     }
 
     [Test]
-    public void GetImageFormat_Gif_ReturnsGif()
+    public void GetEncoder_Gif_ReturnsGifEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".gif");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Gif.Guid));
+        var encoder = ImageEditService.GetEncoder(".gif");
+        Assert.That(encoder, Is.InstanceOf<GifEncoder>());
     }
 
     [Test]
-    public void GetImageFormat_Tiff_ReturnsTiff()
+    public void GetEncoder_Tiff_ReturnsTiffEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".tiff");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Tiff.Guid));
+        var encoder = ImageEditService.GetEncoder(".tiff");
+        Assert.That(encoder, Is.InstanceOf<TiffEncoder>());
     }
 
     [Test]
-    public void GetImageFormat_Unknown_DefaultsToJpeg()
+    public void GetEncoder_Unknown_DefaultsToJpegEncoder()
     {
-        var format = ImageEditService.GetImageFormat(".webp");
-        Assert.That(format.Guid, Is.EqualTo(ImageFormat.Jpeg.Guid));
+        var encoder = ImageEditService.GetEncoder(".webp");
+        Assert.That(encoder, Is.InstanceOf<JpegEncoder>());
     }
 }

@@ -348,7 +348,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
-    public async Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, CancellationToken cancellationToken = default)
+    public async Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default)
     {
         await _readSemaphore.WaitAsync(cancellationToken);
         try
@@ -383,8 +383,9 @@ public class DatabaseService : IDatabaseService, IDisposable
                 FROM Images i
                 {whereClause}
                 ORDER BY i.LastModified DESC
-                LIMIT @Limit";
+                LIMIT @Limit OFFSET @Offset";
             command.Parameters.AddWithValue("@Limit", limit);
+            command.Parameters.AddWithValue("@Offset", offset);
 
             var results = new List<ImageFile>();
             using var reader = await command.ExecuteReaderAsync(cancellationToken);
