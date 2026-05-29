@@ -16,8 +16,9 @@ namespace TagFusion.Services;
 public class ExifToolService : IExifToolService, IDisposable
 {
     private readonly string _exifToolPath;
-    private readonly ThumbnailService _thumbnailService;
+    private readonly IThumbnailService _thumbnailService;
     private readonly ILogger<ExifToolService> _logger;
+    private readonly IFileBackupService _backupService;
     private readonly int _batchSize;
     private readonly int _maxImageSize;
     private readonly int _processStopTimeoutMs;
@@ -28,12 +29,26 @@ public class ExifToolService : IExifToolService, IDisposable
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private bool _disposed;
 
+    /// <summary>
+    /// Separator passed to ExifTool's -sep option to split a tag list into individual
+    /// Keywords/Subject entries. Uses the ASCII Unit Separator (U+001F) because it cannot
+    /// be typed into a tag, so a user tag can never accidentally be split (the old ";;"
+    /// collided with tags that legitimately contained semicolons).
+    /// ASCII Unit Separator (U+001F) — kollisionssicher, da nicht eingebbar.
+    /// </summary>
+    internal const string TagSeparator = "\u001F";
+
     public string ExifToolPath => _exifToolPath;
 
-    public ExifToolService(ThumbnailService thumbnailService, ILogger<ExifToolService> logger, IOptions<ExifToolSettings> options)
+    public ExifToolService(
+        IThumbnailService thumbnailService,
+        ILogger<ExifToolService> logger,
+        IOptions<ExifToolSettings> options,
+        IFileBackupService? backupService = null)
     {
         _thumbnailService = thumbnailService;
         _logger = logger;
+        _backupService = backupService ?? NoopFileBackupService.Instance;
         var settings = options.Value;
         _batchSize = settings.BatchSize;
         _maxImageSize = settings.MaxImageSize;
@@ -163,32 +178,10 @@ public class ExifToolService : IExifToolService, IDisposable
         _logger.LogDebug("WriteTagsAsync called for: {ImagePath}", imagePath);
         _logger.LogDebug("Tags to write: [{Tags}]", string.Join(", ", tags));
 
-        var uniqueTags = TagHelper.DeduplicateTags(tags);
+        var (uniqueTags, args) = BuildWriteTagArgs(tags, imagePath);
 
         if (uniqueTags.Count != tags.Count)
             _logger.LogDebug("Deduplicated tags: {Original} → {Unique}", tags.Count, uniqueTags.Count);
-
-        // Build argument list directly (no string→parse round-trip)
-        var args = new List<string>();
-
-        if (uniqueTags.Count == 0)
-        {
-            // Clear all tags
-            args.Add("-Keywords=");
-            args.Add("-XMP:Subject=");
-        }
-        else
-        {
-            // Use -sep with a separator that won't appear in tag names,
-            // then set all keywords at once with direct assignment (replaces existing)
-            args.Add("-sep");
-            args.Add(";;");
-            args.Add($"-Keywords={string.Join(";;", uniqueTags)}");
-            args.Add($"-XMP:Subject={string.Join(";;", uniqueTags)}");
-        }
-
-        args.Add("-overwrite_original");
-        args.Add(imagePath);
 
         _logger.LogDebug("Sending {ArgCount} args directly to ExifTool", args.Count);
 
@@ -196,7 +189,7 @@ public class ExifToolService : IExifToolService, IDisposable
         _logger.LogDebug("WriteTagsAsync output: '{Output}'", output.Trim());
 
         // Check for errors in output (warnings are often harmless, only throw on actual errors)
-        if (output.Contains("Error", StringComparison.OrdinalIgnoreCase))
+        if (OutputIndicatesError(output))
         {
             _logger.LogError("WriteTagsAsync ERROR detected in output");
             throw new InvalidOperationException($"ExifTool error: {output}");
@@ -216,6 +209,136 @@ public class ExifToolService : IExifToolService, IDisposable
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Write the same tag set to many files in one ExifTool invocation.
+    /// 3-5x faster than calling WriteTagsAsync per file because the persistent
+    /// process only needs one round-trip for the whole batch.
+    /// </summary>
+    public async Task<Dictionary<string, bool>> WriteTagsBatchAsync(IEnumerable<string> imagePaths, List<string> tags, CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var pathList = imagePaths.Where(File.Exists).ToList();
+        if (pathList.Count == 0) return result;
+
+        var uniqueTags = TagHelper.DeduplicateTags(tags);
+
+        // Process in chunks to stay under any latent command-line / pipe limits even
+        // though -stay_open uses pipes (no Win32 8K argv limit).
+        var chunkSize = Math.Max(1, _batchSize);
+        for (int i = 0; i < pathList.Count; i += chunkSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var chunk = pathList.GetRange(i, Math.Min(chunkSize, pathList.Count - i));
+
+            var args = new List<string>();
+            if (uniqueTags.Count == 0)
+            {
+                args.Add("-Keywords=");
+                args.Add("-XMP:Subject=");
+            }
+            else
+            {
+                args.Add("-sep");
+                args.Add(TagSeparator);
+                args.Add($"-Keywords={string.Join(TagSeparator, uniqueTags)}");
+                args.Add($"-XMP:Subject={string.Join(TagSeparator, uniqueTags)}");
+            }
+            args.Add("-overwrite_original");
+            args.AddRange(chunk);
+
+            try
+            {
+                // FIX #7: Back up each file individually (best-effort).
+                // A backup failure for one file must not abort the ExifTool write for
+                // the rest of the chunk — log a warning and continue.
+                // Backup pro Datei einzeln und tolerant: ein Backup-Fehler darf den
+                // ExifTool-Schreibvorgang der restlichen Dateien nicht blockieren.
+                foreach (var path in chunk)
+                {
+                    try
+                    {
+                        await _backupService.CreateBackupAsync(path, "metadata-tags-batch-write", cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw; // always propagate cancellation
+                    }
+                    catch (Exception backupEx)
+                    {
+                        _logger.LogWarning(backupEx,
+                            "WriteTagsBatchAsync: backup skipped for '{Path}' — write will proceed without backup / " +
+                            "Backup uebersprungen fuer '{Path2}', Schreibvorgang wird ohne Backup fortgesetzt",
+                            path, path);
+                    }
+                }
+
+                var output = await RunExifToolAsync(args, cancellationToken);
+
+                // ExifTool processes each file independently and continues past per-file
+                // errors. Attribute errors per-path by EXACT normalized-path matching
+                // against the filepath token in each "Error:" line.
+                // Per-Datei-Fehler werden per exaktem Pfadvergleich zugeordnet — Teilstring-
+                // Treffer koennen bei aehnlichen Pfaden zu Fehlzuordnungen fuehren.
+                //
+                // FIX #8: Use exact path equality (Path.GetFullPath + OrdinalIgnoreCase)
+                // instead of substring containment. ExifTool error lines have the format
+                //   Error: <message> - <filepath>
+                // so we split on " - " and compare the trailing token with the normalized
+                // chunk paths. This prevents a path that is a prefix of another from being
+                // mis-attributed (e.g. C:\a\1.jpg matching C:\a\10.jpg).
+                // Exakter Pfadvergleich statt Substring-Suche, um Fehlzuordnungen bei
+                // aehnlichen Pfadnamen zu vermeiden.
+                var normalizedChunkPaths = chunk
+                    .ToDictionary(
+                        p => Path.GetFullPath(p),
+                        p => p,
+                        StringComparer.OrdinalIgnoreCase);
+
+                var failedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var line in output.Split('\n'))
+                {
+                    if (!LineIndicatesError(line)) continue;
+
+                    // Extract the filepath token from "Error: <message> - <filepath>"
+                    // If the line has no " - " separator (global/unattributable error),
+                    // we cannot attribute it to a specific file — skip attribution here
+                    // (the chunk-level catch handles fully fatal errors).
+                    var separatorIndex = line.IndexOf(" - ", StringComparison.Ordinal);
+                    if (separatorIndex < 0) continue;
+
+                    var errorPath = line[(separatorIndex + 3)..].Trim();
+                    if (string.IsNullOrEmpty(errorPath)) continue;
+
+                    string normalizedError;
+                    try { normalizedError = Path.GetFullPath(errorPath); }
+                    catch { continue; } // malformed path in ExifTool output — skip
+
+                    if (normalizedChunkPaths.TryGetValue(normalizedError, out var matchedPath))
+                        failedPaths.Add(matchedPath);
+                }
+
+                foreach (var path in chunk)
+                    result[path] = !failedPaths.Contains(path);
+
+                if (failedPaths.Count > 0)
+                    _logger.LogWarning("WriteTagsBatchAsync: {FailCount}/{ChunkSize} files failed in chunk: {Output}",
+                        failedPaths.Count, chunk.Count, output.Trim());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "WriteTagsBatchAsync chunk failed for {Count} files", chunk.Count);
+                foreach (var path in chunk)
+                    result[path] = false;
+            }
+        }
+
+        // Files that didn't exist on disk → false
+        foreach (var path in imagePaths)
+            result.TryAdd(path, false);
+
+        return result;
     }
 
     /// <summary>
@@ -272,9 +395,11 @@ public class ExifToolService : IExifToolService, IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                // Build arguments with batch files
-                var filesArgs = string.Join(" ", batch.Select(p => $"\"{p}\""));
-                var args = $"-Keywords -XMP:Subject -XMP:Rating -j {filesArgs}";
+                // Build argument list directly — avoids the string→parse round-trip
+                // which broke on paths containing quotes or special chars.
+                // Argumentliste direkt erstellen — vermeidet String-Parse-Umweg.
+                var args = new List<string> { "-Keywords", "-XMP:Subject", "-XMP:Rating", "-j" };
+                args.AddRange(batch);
 
                 var output = await RunExifToolAsync(args, cancellationToken);
 
@@ -333,7 +458,7 @@ public class ExifToolService : IExifToolService, IDisposable
         _logger.LogDebug("WriteRatingAsync output: '{Output}'", output.Trim());
         
         // Check for errors in output
-        if (output.Contains("Error", StringComparison.OrdinalIgnoreCase))
+        if (OutputIndicatesError(output))
         {
             _logger.LogError("WriteRatingAsync ERROR detected in output");
             throw new InvalidOperationException($"ExifTool error: {output}");
@@ -462,7 +587,19 @@ public class ExifToolService : IExifToolService, IDisposable
         return (tags, rating, width, height, dateTaken);
     }
 
-    private async Task<string> RunExifToolAsync(string arguments, CancellationToken cancellationToken = default)
+    private Task<string> RunExifToolAsync(string arguments, CancellationToken cancellationToken = default)
+    {
+        // In -stay_open mode with -@ -, each argument must be on a SEPARATE LINE.
+        // Parse the arguments string and delegate to the list-based overload.
+        var args = ParseArguments(arguments);
+        return RunExifToolAsync(args, cancellationToken);
+    }
+
+    /// <summary>
+    /// Run ExifTool with pre-parsed arguments (no string→parse round-trip).
+    /// Sends each argument on its own line, writes -execute, then reads until {ready}.
+    /// </summary>
+    private async Task<string> RunExifToolAsync(List<string> args, CancellationToken cancellationToken = default)
     {
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -472,9 +609,6 @@ public class ExifToolService : IExifToolService, IDisposable
             if (_commandWriter == null || _outputReader == null)
                 throw new InvalidOperationException("ExifTool process not initialized");
 
-            // In -stay_open mode with -@ -, each argument must be on a SEPARATE LINE
-            // Parse the arguments string and send each argument individually
-            var args = ParseArguments(arguments);
             _logger.LogDebug("RunExifToolAsync: Sending {ArgCount} arguments", args.Count);
             foreach (var arg in args)
             {
@@ -485,9 +619,7 @@ public class ExifToolService : IExifToolService, IDisposable
             await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             // Read output until {ready} — with timeout to prevent hanging on stuck process
-            using var readCts = _readTimeoutMs > 0
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
-                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (_readTimeoutMs > 0)
                 readCts.CancelAfter(_readTimeoutMs);
 
@@ -505,9 +637,7 @@ public class ExifToolService : IExifToolService, IDisposable
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", _readTimeoutMs);
-                try { _exifToolProcess?.Kill(); } catch { /* best effort */ }
-                _exifToolProcess?.Dispose();
-                _exifToolProcess = null;
+                ResetProcessState();
                 throw new TimeoutException($"ExifTool did not respond within {_readTimeoutMs}ms");
             }
             var output = sb.ToString();
@@ -521,65 +651,20 @@ public class ExifToolService : IExifToolService, IDisposable
         }
     }
 
-
     /// <summary>
-    /// Run ExifTool with pre-parsed arguments (no string→parse round-trip).
-    /// Used by WriteTagsAsync to avoid quoting issues with tag values.
+    /// Tear down the ExifTool process and all stream references after a timeout or fatal error.
+    /// Must be called while _semaphore is held. The next call to EnsureProcessRunning will
+    /// re-spawn a fresh process.
     /// </summary>
-    private async Task<string> RunExifToolAsync(List<string> args, CancellationToken cancellationToken = default)
+    private void ResetProcessState()
     {
-        await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            EnsureProcessRunning();
-
-            if (_commandWriter == null || _outputReader == null)
-                throw new InvalidOperationException("ExifTool process not initialized");
-
-            _logger.LogDebug("RunExifToolAsync (List): Sending {ArgCount} arguments", args.Count);
-            foreach (var arg in args)
-            {
-                _logger.LogDebug("  > {Arg}", arg);
-                await _commandWriter.WriteLineAsync(arg.AsMemory(), cancellationToken).ConfigureAwait(false);
-            }
-            await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
-            await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-
-            // Read output until {ready} — with timeout to prevent hanging on stuck process
-            using var readCts = _readTimeoutMs > 0
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
-                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            if (_readTimeoutMs > 0)
-                readCts.CancelAfter(_readTimeoutMs);
-
-            var sb = new StringBuilder();
-            string? line;
-            try
-            {
-                while ((line = await _outputReader.ReadLineAsync(readCts.Token).ConfigureAwait(false)) != null)
-                {
-                    if (line.Trim() == "{ready}")
-                        break;
-                    sb.AppendLine(line);
-                }
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", _readTimeoutMs);
-                try { _exifToolProcess?.Kill(); } catch { /* best effort */ }
-                _exifToolProcess?.Dispose();
-                _exifToolProcess = null;
-                throw new TimeoutException($"ExifTool did not respond within {_readTimeoutMs}ms");
-            }
-            var output = sb.ToString();
-            _logger.LogDebug("RunExifToolAsync (List): Output received: '{Output}'", output.Trim());
-
-            return output;
-        }
-        finally
-        {
-            _semaphore.Release();
-        }
+        try { _exifToolProcess?.Kill(); } catch { /* best effort */ }
+        _commandWriter?.Dispose();
+        _outputReader?.Dispose();
+        _exifToolProcess?.Dispose();
+        _commandWriter = null;
+        _outputReader = null;
+        _exifToolProcess = null;
     }
 
     /// <summary>
@@ -683,15 +768,38 @@ public class ExifToolService : IExifToolService, IDisposable
         else
         {
             args.Add("-sep");
-            args.Add(";;");
-            args.Add($"-Keywords={string.Join(";;", uniqueTags)}");
-            args.Add($"-XMP:Subject={string.Join(";;", uniqueTags)}");
+            args.Add(TagSeparator);
+            args.Add($"-Keywords={string.Join(TagSeparator, uniqueTags)}");
+            args.Add($"-XMP:Subject={string.Join(TagSeparator, uniqueTags)}");
         }
 
         args.Add("-overwrite_original");
         args.Add(imagePath);
 
         return (uniqueTags, args);
+    }
+
+    /// <summary>
+    /// True if a single ExifTool output line reports a fatal error (starts with "Error:").
+    /// Warnings and informational lines — even ones whose text merely contains the word
+    /// "error" — are ignored.
+    /// Wahr, wenn eine Ausgabezeile einen echten Fehler meldet (beginnt mit "Error:").
+    /// </summary>
+    internal static bool LineIndicatesError(string line)
+        => line.TrimStart().StartsWith("Error:", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True if any line in ExifTool output reports a fatal error. Replaces the fragile
+    /// output.Contains("Error") check, which false-positived on warnings and on file
+    /// paths containing the word "error".
+    /// Wahr, wenn irgendeine Ausgabezeile einen echten Fehler meldet.
+    /// </summary>
+    internal static bool OutputIndicatesError(string output)
+    {
+        if (string.IsNullOrEmpty(output)) return false;
+        foreach (var line in output.Split('\n'))
+            if (LineIndicatesError(line)) return true;
+        return false;
     }
 
     public void Dispose()

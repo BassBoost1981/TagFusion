@@ -124,7 +124,7 @@ public class TagServiceTests
     }
 
     [Test]
-    public async Task GetAllTags_Cached_ReturnsSameInstanceOnSecondCall()
+    public async Task GetAllTags_Cached_ReturnsEqualButIndependentSnapshot()
     {
         var path = WriteTagFile(new
         {
@@ -145,8 +145,12 @@ public class TagServiceTests
         var first = await service.GetAllTagsAsync();
         var second = await service.GetAllTagsAsync();
 
-        // Should return cached list (same reference)
-        Assert.That(ReferenceEquals(first, second), Is.True);
+        // Cached calls return independent snapshots (defensive copies), NOT the live
+        // cache reference — so a concurrent SaveTagLibraryAsync cannot mutate a list a
+        // caller is still reading. Contents are identical; the list instances are not.
+        // Zwischengespeicherte Aufrufe liefern unabhängige Kopien, nicht die Live-Referenz.
+        Assert.That(second, Is.Not.SameAs(first));
+        Assert.That(second, Is.EqualTo(first));
     }
 
     [Test]

@@ -9,14 +9,23 @@ namespace TagFusion.Services;
 /// </summary>
 public class FolderWatcherService : IDisposable
 {
+    private const int DebounceMs = 500;
+    // Raise the native buffer from 8KB default to 64KB so heavy write bursts
+    // (e.g. batch tagging hundreds of files) don't overflow and suspend events.
+    // Native-Puffer von 8KB auf 64KB anheben, damit Batch-Schreibvorgänge nicht
+    // zu einem Buffer-Overflow führen.
+    private const int WatcherBufferSize = 64 * 1024;
+
     private readonly ILogger<FolderWatcherService> _logger;
     private FileSystemWatcher? _watcher;
     private string? _currentPath;
     private bool _disposed;
 
-    // Debounce: collect changes and fire once after a short delay
+    // Debounce: collect changes and fire once after a short delay.
+    // Single long-lived timer reset via Stop/Start — avoids per-event allocations
+    // and the race of disposing a timer mid-Elapsed.
     private readonly object _lock = new();
-    private System.Timers.Timer? _debounceTimer;
+    private readonly System.Timers.Timer _debounceTimer;
     private readonly HashSet<string> _pendingChanges = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -28,6 +37,9 @@ public class FolderWatcherService : IDisposable
     public FolderWatcherService(ILogger<FolderWatcherService> logger)
     {
         _logger = logger;
+
+        _debounceTimer = new System.Timers.Timer(DebounceMs) { AutoReset = false };
+        _debounceTimer.Elapsed += (_, _) => FlushChanges();
     }
 
     /// <summary>
@@ -54,6 +66,7 @@ public class FolderWatcherService : IDisposable
                              | NotifyFilters.Size
                              | NotifyFilters.DirectoryName,
                 IncludeSubdirectories = false,
+                InternalBufferSize = WatcherBufferSize,
                 EnableRaisingEvents = true
             };
 
@@ -106,24 +119,40 @@ public class FolderWatcherService : IDisposable
 
     private void OnError(object sender, ErrorEventArgs e)
     {
-        _logger.LogWarning(e.GetException(), "FolderWatcher: Error");
+        var ex = e.GetException();
+        _logger.LogWarning(ex, "FolderWatcher: Error — attempting to recover");
+
+        // Buffer overflow or permission change can leave the watcher in a broken state.
+        // Tear it down and restart on the same path so the user keeps getting events.
+        // Buffer-Overflow: Watcher neu aufsetzen, damit Events weiter zugestellt werden.
+        var path = _currentPath;
+        if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+        {
+            try
+            {
+                Watch(path);
+                _logger.LogInformation("FolderWatcher: Recovered on {Path}", path);
+            }
+            catch (Exception restartEx)
+            {
+                _logger.LogError(restartEx, "FolderWatcher: Recovery failed");
+            }
+        }
     }
 
     /// <summary>
-    /// Queue a change and debounce — fire event after 500ms of quiet.
+    /// Queue a change and debounce — fire event after DebounceMs of quiet.
+    /// Reuses a single long-lived timer; Stop+Start resets the interval.
+    /// Bail early if already disposed to avoid touching a disposed timer.
+    /// Vorzeitig abbrechen wenn bereits disposed, um ObjectDisposedException zu vermeiden.
     /// </summary>
     private void QueueChange(string path)
     {
         lock (_lock)
         {
+            if (_disposed) return;  // Timer already disposed — discard event / Timer bereits entsorgt — Event verwerfen
             _pendingChanges.Add(path);
-
-            _debounceTimer?.Stop();
-            _debounceTimer?.Dispose();
-
-            _debounceTimer = new System.Timers.Timer(500);
-            _debounceTimer.AutoReset = false;
-            _debounceTimer.Elapsed += (_, _) => FlushChanges();
+            _debounceTimer.Stop();
             _debounceTimer.Start();
         }
     }
@@ -133,7 +162,7 @@ public class FolderWatcherService : IDisposable
         List<string> changes;
         lock (_lock)
         {
-            if (_pendingChanges.Count == 0) return;
+            if (_disposed || _pendingChanges.Count == 0) return;  // Skip if disposed / Überspringen wenn disposed
             changes = new List<string>(_pendingChanges);
             _pendingChanges.Clear();
         }
@@ -144,9 +173,12 @@ public class FolderWatcherService : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        lock (_lock)
+        {
+            if (_disposed) return;  // Idempotent — safe to call multiple times / Mehrfachaufruf sicher
+            _disposed = true;       // Set under lock so QueueChange sees it atomically / Unter Lock setzen für atomare Sichtbarkeit
+        }
         StopWatching();
-        _debounceTimer?.Dispose();
+        _debounceTimer.Dispose();
     }
 }

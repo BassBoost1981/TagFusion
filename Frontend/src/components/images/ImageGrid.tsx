@@ -2,22 +2,25 @@ import { useMemo, useCallback, useState, useEffect, useRef, forwardRef } from 'r
 import { motion } from 'framer-motion';
 import { CornerLeftUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { VirtuosoGrid } from 'react-virtuoso';
+import { VirtuosoGrid, type VirtuosoGridHandle } from 'react-virtuoso';
 import {
+  useAppStore,
   useGridItems,
   useCurrentFolder,
   useNavigateUp,
-  useImages,
   useZoomLevel,
   useIsLoadingImages,
   useFilterSort,
-  useSelectedImages,
   useGlobalSearch,
 } from '../../stores/appStore';
 import { ImageCard } from './ImageCard';
 import { FolderCard } from './FolderCard';
 import { EmptyState } from '../ui/EmptyState';
 import { ImageGridSkeleton } from '../ui/Skeleton';
+import { useLightboxStore } from '../../stores/lightboxStore';
+import { filterAndSortGridItems } from '../../utils/gridItems';
+import { getNextGridIndex } from '../../utils/gridNavigation';
+import { isTextInputTarget } from '../../utils/keyboardTarget';
 import type { GridItem } from '../../types';
 
 // ============================================================
@@ -115,16 +118,18 @@ export function ImageGrid() {
   const gridItems = useGridItems();
   const currentFolder = useCurrentFolder();
   const navigateUp = useNavigateUp();
-  const storeImages = useImages();
   const zoomLevel = useZoomLevel();
   const isLoadingImages = useIsLoadingImages();
-  const selectedImages = useSelectedImages();
   const { searchQuery, sortBy, sortOrder, filterRating, filterTags, setSearchQuery, setFilterRating, setFilterTags } =
     useFilterSort();
   const { isGlobalSearch, isSearching, searchResults } = useGlobalSearch();
 
+  // Keep lightbox store in sync with the displayed image list
+  const setLightboxImages = useLightboxStore((s) => s.setImages);
+
   // Container ref for measuring width
   const containerRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   // Measure container width with ResizeObserver
@@ -149,12 +154,12 @@ export function ImageGrid() {
 
   // Calculate column count and percentage-based column width
   // Using percentage ensures the full container width is always used (no rounding loss)
-  const { colWidthPercent } = useMemo(() => {
-    if (containerWidth === 0) return { colWidthPercent: '100%' };
+  const { colWidthPercent, columnCount } = useMemo(() => {
+    if (containerWidth === 0) return { colWidthPercent: '100%', columnCount: 1 };
     // How many columns fit? Each column takes itemSize + GAP (content + padding)
     const cols = Math.max(1, Math.floor(containerWidth / (itemSize + GAP)));
     // Percentage-based: exact distribution, no pixel rounding loss
-    return { colWidthPercent: `${100 / cols}%` };
+    return { colWidthPercent: `${100 / cols}%`, columnCount: cols };
   }, [containerWidth, itemSize]);
 
   // Check if we can navigate up (not at root)
@@ -168,79 +173,49 @@ export function ImageGrid() {
   // Pre-compute filterTags as Set for O(1) lookups instead of O(n) .includes()
   const filterTagsSet = useMemo(() => new Set(filterTags), [filterTags]);
 
-  // Filter and sort items
+  // Filter and sort items. Global search and normal browsing share one pipeline
+  // so both honor the sort/filter controls (global search results were previously
+  // returned raw, ignoring sort and the rating/tag filters).
   const filteredAndSortedItems = useMemo(() => {
-    // Global search mode: show search results as GridItems
-    if (isGlobalSearch && searchResults.length > 0) {
-      const searchItems: GridItem[] = searchResults.map((img) => ({
-        path: img.path,
-        name: img.fileName,
-        isFolder: false,
-        imageData: img,
-      }));
-      return searchItems;
-    }
+    const inGlobalSearch = isGlobalSearch && searchResults.length > 0;
+    const baseItems: GridItem[] = inGlobalSearch
+      ? searchResults.map((img) => ({
+          path: img.path,
+          name: img.fileName,
+          isFolder: false,
+          imageData: img,
+        }))
+      : gridItems;
 
-    let items = [...gridItems];
-
-    // Filter
-    if (searchQuery || filterRating !== null || filterTagsSet.size > 0) {
-      const query = searchQuery ? searchQuery.toLowerCase() : '';
-
-      items = items.filter((item) => {
-        if (item.isFolder) {
-          if (filterRating !== null || filterTagsSet.size > 0) return false;
-          if (query) return item.name.toLowerCase().includes(query);
-          return true;
-        } else {
-          const img = item.imageData;
-          if (!img) return false;
-
-          if (query) {
-            const matchesName = (img.fileName || '').toLowerCase().includes(query);
-            const matchesTags = (img.tags || []).some((tag) => tag.toLowerCase().includes(query));
-            if (!matchesName && !matchesTags) return false;
-          }
-          if (filterRating !== null && (img.rating || 0) !== filterRating) return false;
-          if (filterTagsSet.size > 0) {
-            const imgTags = img.tags || [];
-            if (!imgTags.some((t) => filterTagsSet.has(t))) return false;
-          }
-          return true;
-        }
-      });
-    }
-
-    // Sort and Group
-    const folders = items.filter((i) => i.isFolder);
-    const images = items.filter((i) => !i.isFolder);
-
-    const sortedFolders = [...folders].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const sortedImages = [...images].sort((aItem, bItem) => {
-      const a = aItem.imageData;
-      const b = bItem.imageData;
-      if (!a || !b) return 0;
-
-      let comparison = 0;
-      switch (sortBy) {
-        case 'name':
-          comparison = (a.fileName || '').localeCompare(b.fileName || '');
-          break;
-        case 'date':
-          comparison = new Date(a.dateModified || 0).getTime() - new Date(b.dateModified || 0).getTime();
-          break;
-        case 'size':
-          comparison = (a.fileSize || 0) - (b.fileSize || 0);
-          break;
-        case 'rating':
-          comparison = (a.rating || 0) - (b.rating || 0);
-          break;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
+    return filterAndSortGridItems(baseItems, {
+      searchQuery,
+      sortBy,
+      sortOrder,
+      filterRating,
+      filterTags: filterTagsSet,
+      isGlobalSearch: inGlobalSearch,
     });
-
-    return [...sortedFolders, ...sortedImages];
   }, [gridItems, searchQuery, sortBy, sortOrder, filterRating, filterTagsSet, isGlobalSearch, searchResults]);
+
+  // Images only, in display order — the set arrow-key navigation moves through.
+  // Nur Bilder in Anzeigereihenfolge — Ziel der Pfeiltasten-Navigation.
+  const displayImages = useMemo(
+    () => filteredAndSortedItems.filter((i) => !i.isFolder && i.imageData).map((i) => i.imageData!),
+    [filteredAndSortedItems]
+  );
+
+  // Sync lightbox with the same sorted+filtered list the grid renders.
+  // Lightbox mit derselben sortierten/gefilterten Liste synchronisieren wie das Raster.
+  useEffect(() => {
+    setLightboxImages(displayImages);
+  }, [displayImages, setLightboxImages]);
+
+  // Where the image block starts in the combined grid (navigate-up + folders precede it),
+  // so a navigation index maps to the right VirtuosoGrid scroll position.
+  const imageStartOffset = useMemo(() => {
+    const folderCount = filteredAndSortedItems.reduce((n, i) => (i.isFolder ? n + 1 : n), 0);
+    return (canNavigateUp ? 1 : 0) + folderCount;
+  }, [filteredAndSortedItems, canNavigateUp]);
 
   // Build unified virtual items array (navigate-up + folders + images)
   const virtualItems = useMemo<VirtualItem[]>(() => {
@@ -332,14 +307,40 @@ export function ImageGrid() {
               style={{ ...uniformStyle, opacity: vItem.isDimmed ? 0.3 : 1 }}
               className={vItem.isHighlighted ? 'ring-2 ring-cyan-400 rounded-xl' : ''}
             >
-              <ImageCard image={image} allImages={storeImages} isSelected={selectedImages.has(image.path)} />
+              <ImageCard image={image} />
             </div>
           );
         }
       }
     },
-    [virtualItems, navigateUp, storeImages, selectedImages, t]
+    [virtualItems, navigateUp, t]
   );
+
+  // Arrow-key navigation across the image grid. Left/Right step one, Up/Down step a
+  // full row; the moved-to image becomes the sole selection and is scrolled into view.
+  // Stands down while typing or when the lightbox owns the keyboard.
+  // Pfeiltasten-Navigation im Bildraster — verschiebt die Auswahl und scrollt mit.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (isTextInputTarget(e.target) || useLightboxStore.getState().isOpen) return;
+      if (displayImages.length === 0) return;
+      e.preventDefault();
+
+      const { lastSelectedImage, selectImage } = useAppStore.getState();
+      const currentIndex = lastSelectedImage
+        ? displayImages.findIndex((img) => img.path === lastSelectedImage)
+        : -1;
+      const nextIndex = getNextGridIndex(currentIndex, e.key, displayImages.length, columnCount);
+      if (nextIndex < 0 || nextIndex === currentIndex) return;
+
+      selectImage(displayImages[nextIndex].path);
+      virtuosoRef.current?.scrollToIndex({ index: imageStartOffset + nextIndex, behavior: 'smooth' });
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [displayImages, columnCount, imageStartOffset]);
 
   // Global search loading state
   if (isGlobalSearch && isSearching) {
@@ -394,6 +395,7 @@ export function ImageGrid() {
         {containerWidth > 0 && (
           <VirtuosoGrid
             key={currentFolder}
+            ref={virtuosoRef}
             style={{ flex: 1, minHeight: 0, overflowX: 'hidden' }}
             totalCount={virtualItems.length}
             overscan={600}

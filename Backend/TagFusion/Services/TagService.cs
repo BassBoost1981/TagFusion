@@ -7,7 +7,7 @@ using TagFusion.Models;
 
 namespace TagFusion.Services;
 
-public class TagService
+public class TagService : ITagService
 {
     private readonly string _tagFilePath;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -28,11 +28,13 @@ public class TagService
         // Look for the tag file in the workspace root (development) or app directory (production)
         var appDir = AppContext.BaseDirectory ?? string.Empty;
 
-        // Try to find the file in parent directories (up to workspace root)
-        var currentDir = new DirectoryInfo(appDir);
+        // In Release we only look in appDir — upward-walk is a dev convenience and can
+        // otherwise pick up stale JSON files from the user's Documents/profile path.
+        // In Release-Builds nur appDir prüfen — Aufwärts-Suche ist nur im Dev-Modus sinnvoll.
         string? foundPath = null;
 
-        // Search up to configured levels
+#if DEBUG
+        var currentDir = new DirectoryInfo(appDir);
         for (int i = 0; i < settings.MaxDirSearchDepth; i++)
         {
             if (currentDir == null) break;
@@ -40,15 +42,23 @@ public class TagService
             var files = currentDir.GetFiles("TagFusion_Tags_*.json");
             if (files.Length > 0)
             {
-                // Use the most recent one if multiple exist
                 foundPath = files.OrderByDescending(f => f.LastWriteTime).First().FullName;
                 break;
             }
             currentDir = currentDir.Parent;
         }
+#else
+        var appDirInfo = new DirectoryInfo(appDir);
+        if (appDirInfo.Exists)
+        {
+            var files = appDirInfo.GetFiles("TagFusion_Tags_*.json");
+            if (files.Length > 0)
+                foundPath = files.OrderByDescending(f => f.LastWriteTime).First().FullName;
+        }
+#endif
 
         _tagFilePath = foundPath ?? Path.Combine(appDir, settings.DefaultTagFile);
-        _logger.LogInformation("Tag file path: {TagFilePath}", _tagFilePath);
+        _logger.LogInformation("Tag file resolved at startup: {TagFilePath}", _tagFilePath);
     }
 
     /// <summary>
@@ -63,12 +73,23 @@ public class TagService
 
     public async Task<List<Tag>> GetAllTagsAsync(CancellationToken cancellationToken = default)
     {
+        // Fast path: return a snapshot copy so callers never hold the live reference.
+        // Schnellpfad: Snapshot-Kopie zurückgeben, damit Aufrufer nie die Live-Referenz halten.
+        if (_cachedTags.Count > 0 && File.Exists(_tagFilePath)
+            && File.GetLastWriteTime(_tagFilePath) <= _lastLoadTime)
+        {
+            return _cachedTags.ToList();
+        }
+
         await _semaphore.WaitAsync(cancellationToken);
         try
         {
-            if (_cachedTags.Count > 0 && File.Exists(_tagFilePath) && File.GetLastWriteTime(_tagFilePath) <= _lastLoadTime)
+            // Re-check inside the lock in case another caller already populated the cache.
+            // Erneute Prüfung im Lock: Snapshot-Kopie zurückgeben, nicht die Live-Referenz.
+            if (_cachedTags.Count > 0 && File.Exists(_tagFilePath)
+                && File.GetLastWriteTime(_tagFilePath) <= _lastLoadTime)
             {
-                return _cachedTags;
+                return _cachedTags.ToList();
             }
 
             if (!File.Exists(_tagFilePath))
@@ -107,7 +128,7 @@ public class TagService
             }).OrderBy(t => t.Name).ToList();
 
             _lastLoadTime = DateTime.Now;
-            return _cachedTags;
+            return _cachedTags.ToList();
         }
         catch (Exception ex)
         {
@@ -145,9 +166,10 @@ public class TagService
             var json = JsonSerializer.Serialize(library, _jsonOptions);
             await File.WriteAllTextAsync(_tagFilePath, json, cancellationToken);
 
-            // Invalidate cache
+            // Invalidate cache: swap reference so any concurrent reader keeps a stable snapshot.
+            // Cache invalidieren: Referenz tauschen, damit laufende Leser ihr Snapshot behalten.
             _lastLoadTime = DateTime.MinValue;
-            _cachedTags.Clear();
+            _cachedTags = new List<Tag>();
 
             return true;
         }

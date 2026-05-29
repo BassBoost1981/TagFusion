@@ -19,14 +19,20 @@ namespace TagFusion.Services;
 /// </summary>
 public class ImageEditService : IImageEditService
 {
-    private readonly ThumbnailService _thumbnailService;
+    private readonly IThumbnailService _thumbnailService;
     private readonly ILogger<ImageEditService> _logger;
+    private readonly IFileBackupService _backupService;
     private readonly int _jpegQuality;
 
-    public ImageEditService(ThumbnailService thumbnailService, ILogger<ImageEditService> logger, IOptions<ImageEditSettings> options)
+    public ImageEditService(
+        IThumbnailService thumbnailService,
+        ILogger<ImageEditService> logger,
+        IOptions<ImageEditSettings> options,
+        IFileBackupService? backupService = null)
     {
         _thumbnailService = thumbnailService;
         _logger = logger;
+        _backupService = backupService ?? NoopFileBackupService.Instance;
         _jpegQuality = options.Value.JpegQuality;
     }
 
@@ -95,6 +101,7 @@ public class ImageEditService : IImageEditService
                 var tempPath = imagePath + ".tmp";
 
                 // Read image bytes first to avoid file lock issues
+                await _backupService.CreateBackupAsync(imagePath, "image-transform", cancellationToken);
                 var imageBytes = File.ReadAllBytes(imagePath);
 
                 using (var memoryStream = new MemoryStream(imageBytes))
@@ -109,12 +116,38 @@ public class ImageEditService : IImageEditService
                     await image.SaveAsync(tempPath, encoder, cancellationToken);
                 }
 
-                // Safe replace: backup original, move temp, delete backup
-                // Crash between any two steps preserves at least one complete file
+                // Atomic replace on NTFS: File.Replace renames tempPath over imagePath
+                // and writes the old content to backupPath in a single transacted operation.
+                // Avoids the brief window where imagePath doesn't exist with the previous
+                // 2-step File.Move approach.
+                // Atomarer Austausch auf NTFS — kein Zeitfenster ohne Datei.
+                // Falls back to move-based replace on FAT32/exFAT (USB, SD cards) and many
+                // network shares where File.Replace (Win32 ReplaceFile) is unsupported.
+                // Fallback via File.Move auf nicht-NTFS-Volumes (FAT32, exFAT, SMB).
                 var backupPath = imagePath + ".bak";
-                File.Move(imagePath, backupPath);
-                File.Move(tempPath, imagePath);
-                File.Delete(backupPath);
+                try
+                {
+                    File.Replace(tempPath, imagePath, backupPath, ignoreMetadataErrors: true);
+                    File.Delete(backupPath);
+                }
+                catch (IOException)
+                {
+                    // File.Replace is NTFS-only; fall back to move-based replace
+                    if (File.Exists(backupPath)) File.Delete(backupPath);
+                    File.Move(imagePath, backupPath);   // original aside
+                    try
+                    {
+                        File.Move(tempPath, imagePath); // temp becomes new original
+                    }
+                    catch
+                    {
+                        // Restore original if the second move fails
+                        if (!File.Exists(imagePath) && File.Exists(backupPath))
+                            File.Move(backupPath, imagePath);
+                        throw;
+                    }
+                    File.Delete(backupPath);
+                }
 
                 // Invalidate thumbnail cache
                 InvalidateThumbnailCache(imagePath);
