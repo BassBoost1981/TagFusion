@@ -39,13 +39,13 @@ public class MigrationRunnerTests
     }
 
     [Test]
-    public void ApplyMigrations_BaselineSetsVersionTo1()
+    public void ApplyMigrations_AdvancesVersionToLatest()
     {
         var runner = new MigrationRunner(_connection, NullLogger.Instance);
         runner.ApplyMigrations();
 
         var version = runner.GetCurrentVersion();
-        Assert.That(version, Is.EqualTo(1));
+        Assert.That(version, Is.EqualTo(MigrationRunner.Migrations.Length));
     }
 
     [Test]
@@ -57,13 +57,14 @@ public class MigrationRunnerTests
         runner.ApplyMigrations();
         runner.ApplyMigrations();
 
+        var expectedVersion = MigrationRunner.Migrations.Length;
         var version = runner.GetCurrentVersion();
-        Assert.That(version, Is.EqualTo(1));
+        Assert.That(version, Is.EqualTo(expectedVersion));
 
-        // Verify only one row in SchemaVersion
+        // Verify exactly one row per migration in SchemaVersion (no duplicates from re-run)
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM SchemaVersion";
         var count = Convert.ToInt32(cmd.ExecuteScalar());
-        Assert.That(count, Is.EqualTo(1));
+        Assert.That(count, Is.EqualTo(expectedVersion));
     }
 }

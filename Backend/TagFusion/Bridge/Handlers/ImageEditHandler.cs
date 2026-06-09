@@ -36,8 +36,16 @@ public class ImageEditHandler : IBridgeHandler
         if (payload == null) return new Dictionary<string, bool>();
 
         var paths = PayloadHelper.GetStringArray(payload, "paths");
+        if (paths.Length == 0)
+            throw new BridgeException("Keine Bilder ausgewählt.");
+
         var angleObj = payload.GetValueOrDefault("angle");
         int angle = PayloadHelper.GetInt(angleObj, 90);
+        if (angle is not (90 or -90 or 180 or 270))
+            throw new BridgeException(
+                $"Ungültiger Drehwinkel ({angle}°). Erlaubt sind 90°, -90° oder 180°.",
+                internalMessage: $"Invalid rotate angle: {angle}");
+
         return await _imageEditService.RotateImagesAsync(paths, angle);
     }
 
@@ -46,6 +54,9 @@ public class ImageEditHandler : IBridgeHandler
         if (payload == null) return new Dictionary<string, bool>();
 
         var paths = PayloadHelper.GetStringArray(payload, "paths");
+        if (paths.Length == 0)
+            throw new BridgeException("Keine Bilder ausgewählt.");
+
         var horizontalObj = payload.GetValueOrDefault("horizontal");
         bool horizontal = PayloadHelper.GetBool(horizontalObj, true);
         return await _imageEditService.FlipImagesAsync(paths, horizontal);

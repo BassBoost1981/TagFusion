@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -122,15 +123,39 @@ public class WebViewBridge
         {
             if (!_actionMap.TryGetValue(message.Action, out var handler))
             {
-                throw new NotSupportedException($"Unknown action: {message.Action}");
+                throw new BridgeException(
+                    $"Unbekannte Aktion: {message.Action}",
+                    internalMessage: $"Unknown action: {message.Action}");
             }
 
             var result = await handler.HandleAsync(message.Action, message.Payload);
             SendResponse(message.Id, true, result);
         }
+        catch (BridgeException bex)
+        {
+            // User-facing German toast; full detail in the log only.
+            _logger.LogWarning(bex, "Bridge action {Action} failed: {Internal}", message.Action, bex.Message);
+            SendError(message.Id, bex.UserMessage);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "Access denied for {Action}", message.Action);
+            SendError(message.Id, "Zugriff verweigert.");
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "File not found for {Action}", message.Action);
+            SendError(message.Id, "Datei nicht gefunden.");
+        }
+        catch (TimeoutException ex)
+        {
+            _logger.LogError(ex, "Timeout for {Action}", message.Action);
+            SendError(message.Id, "Zeitüberschreitung beim Verarbeiten der Anfrage.");
+        }
         catch (Exception ex)
         {
-            SendError(message.Id, ex.Message);
+            _logger.LogError(ex, "Unhandled error in {Action}", message.Action);
+            SendError(message.Id, "Ein unerwarteter Fehler ist aufgetreten.");
         }
     }
 

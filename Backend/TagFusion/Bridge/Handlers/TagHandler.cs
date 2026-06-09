@@ -18,7 +18,7 @@ public class TagHandler : IBridgeHandler
 
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
-        "getAllTags", "getTagLibrary", "saveTagLibrary", "writeBatchTags", "searchImages"
+        "getAllTags", "getTagLibrary", "saveTagLibrary", "writeBatchTags", "updateBatchTag", "searchImages"
     };
 
     public IReadOnlySet<string> SupportedActions => _supported;
@@ -45,6 +45,7 @@ public class TagHandler : IBridgeHandler
             "getTagLibrary" => await _tagService.GetTagLibraryAsync(),
             "saveTagLibrary" => await _tagService.SaveTagLibraryAsync(payload?["library"] ?? new object()),
             "writeBatchTags" => await WriteBatchTagsAsync(payload),
+            "updateBatchTag" => await UpdateBatchTagAsync(payload),
             "searchImages" => await SearchImagesAsync(payload),
             _ => throw new NotSupportedException($"Unknown action: {action}")
         };
@@ -58,6 +59,47 @@ public class TagHandler : IBridgeHandler
         var tagsObj = payload.GetValueOrDefault("tags");
         var tags = TagHelper.DeduplicateTags(PayloadHelper.ExtractStringList(tagsObj));
 
+        if (paths.Length == 0)
+            return new Dictionary<string, bool>();
+
+        // One ExifTool batch invocation for the whole list (3-5x faster than per-file).
+        // Eine ExifTool-Batch-Invocation für alle Dateien — deutlich schneller als pro Datei.
+        var results = await _exifToolService.WriteTagsBatchAsync(paths, tags);
+
+        // Persist successes to the database in a single batch transaction.
+        var imagesToPersist = new List<Models.ImageFile>();
+        foreach (var path in paths)
+        {
+            if (results.TryGetValue(path, out var ok) && ok)
+            {
+                int rating;
+                try { rating = await _exifToolService.ReadRatingAsync(path); }
+                catch { rating = 0; }
+                imagesToPersist.Add(Models.ImageFile.FromPath(path, tags, rating));
+            }
+        }
+        if (imagesToPersist.Count > 0)
+            await _databaseService.SaveImagesBatchAsync(imagesToPersist);
+
+        // Single completion event (no per-file progress on the fast path).
+        _sendEvent("batchProgress", new { current = paths.Length, total = paths.Length, operation = "writeBatchTags" });
+
+        return results;
+    }
+
+    private async Task<Dictionary<string, bool>> UpdateBatchTagAsync(Dictionary<string, object>? payload)
+    {
+        if (payload == null) return new Dictionary<string, bool>();
+
+        var paths = PayloadHelper.GetStringArray(payload, "paths");
+        var tag = PayloadHelper.GetString(payload, "tag").Trim();
+        var operation = PayloadHelper.GetString(payload, "operation");
+
+        if (string.IsNullOrWhiteSpace(tag) || (operation != "add" && operation != "remove"))
+        {
+            return new Dictionary<string, bool>();
+        }
+
         var results = new Dictionary<string, bool>();
         var total = paths.Length;
 
@@ -66,22 +108,27 @@ public class TagHandler : IBridgeHandler
             var path = paths[i];
             try
             {
-                var success = await _exifToolService.WriteTagsAsync(path, tags);
+                var existingTags = await _exifToolService.ReadTagsAsync(path);
+                var updatedTags = operation == "add"
+                    ? TagHelper.DeduplicateTags(existingTags.Append(tag))
+                    : existingTags.Where(existingTag => !string.Equals(existingTag, tag, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                var success = await _exifToolService.WriteTagsAsync(path, updatedTags);
                 results[path] = success;
 
                 if (success)
                 {
-                    var image = Models.ImageFile.FromPath(path, tags, await _exifToolService.ReadRatingAsync(path));
+                    var image = Models.ImageFile.FromPath(path, updatedTags, await _exifToolService.ReadRatingAsync(path));
                     await _databaseService.SaveImageAsync(image);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "WriteBatchTags failed for {Path}", path);
+                _logger.LogError(ex, "UpdateBatchTag failed for {Path}", path);
                 results[path] = false;
             }
 
-            _sendEvent("batchProgress", new { current = i + 1, total, operation = "writeBatchTags" });
+            _sendEvent("batchProgress", new { current = i + 1, total, operation = "updateBatchTag" });
         }
 
         return results;

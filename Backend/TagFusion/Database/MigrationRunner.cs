@@ -23,7 +23,14 @@ public class MigrationRunner
     /// </summary>
     internal static readonly Migration[] Migrations =
     [
-        new(1, "Baseline — marks current schema as v1 (no-op)", "")
+        new(1, "Baseline — marks current schema as v1 (no-op)", ""),
+        new(2, "ThumbnailAccess table — LRU tracking that doesn't rely on NTFS LastAccessTime",
+            @"CREATE TABLE IF NOT EXISTS ThumbnailAccess (
+                CacheKey TEXT PRIMARY KEY,
+                LastAccessTicks INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_ThumbnailAccess_LastAccessTicks
+                ON ThumbnailAccess(LastAccessTicks);")
     ];
 
     public MigrationRunner(SQLiteConnection connection, ILogger logger)

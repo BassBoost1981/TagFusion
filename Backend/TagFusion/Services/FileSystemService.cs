@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -8,19 +9,38 @@ namespace TagFusion.Services;
 /// <summary>
 /// Service for file system operations (drives, folders, images)
 /// </summary>
-public class FileSystemService
+public class FileSystemService : IFileSystemService
 {
-    private readonly string[] _supportedExtensions = { ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp" };
-    private readonly string[] _videoExtensions = { ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm" };
-    private readonly ExifToolService _exifToolService;
-    private readonly ThumbnailService _thumbnailService;
+    private const int FolderStatsMaxParallelismCap = 8;
+    // HashSet for O(1) extension lookups instead of O(n) array search
+    // HashSet für O(1)-Erweiterungssuche statt O(n)-Array-Durchlauf
+    private readonly HashSet<string> _supportedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp" };
+    private readonly HashSet<string> _videoExtensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".webm" };
+    private readonly IExifToolService _exifToolService;
+    private readonly IThumbnailService _thumbnailService;
     private readonly ILogger<FileSystemService> _logger;
 
-    public FileSystemService(ExifToolService exifToolService, ThumbnailService thumbnailService, ILogger<FileSystemService> logger)
+    public FileSystemService(IExifToolService exifToolService, IThumbnailService thumbnailService, ILogger<FileSystemService> logger)
     {
         _exifToolService = exifToolService;
         _thumbnailService = thumbnailService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Creates bounded parallel options for folder stats collection.
+    /// Begrenzte Parallelisierung fuer die Ordner-Statistik.
+    /// </summary>
+    internal static ParallelOptions CreateFolderStatsParallelOptions(CancellationToken cancellationToken)
+    {
+        var maxDegree = Math.Clamp(Environment.ProcessorCount / 2, 1, FolderStatsMaxParallelismCap);
+        return new ParallelOptions
+        {
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = maxDegree,
+        };
     }
 
     /// <summary>
@@ -121,8 +141,10 @@ public class FileSystemService
             var images = new List<ImageFile>();
             try
             {
+                // HashSet uses OrdinalIgnoreCase, no ToLowerInvariant needed
+                // HashSet nutzt OrdinalIgnoreCase, kein ToLowerInvariant nötig
                 var files = Directory.GetFiles(folderPath)
-                    .Where(f => _supportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .Where(f => _supportedExtensions.Contains(Path.GetExtension(f)))
                     .ToList();
 
                 foreach (var file in files)
@@ -168,45 +190,73 @@ public class FileSystemService
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             return items;
 
-        // 1. Get Folders
+        // 1. Get Folders — parallel I/O for subfolder stats
+        // 1. Ordner holen — parallele I/O für Unterordner-Statistiken
         try
         {
             var directories = Directory.GetDirectories(folderPath);
 
+            // Filter visible directories first (fast, no heavy I/O)
+            // Sichtbare Verzeichnisse zuerst filtern (schnell, keine aufwändige I/O)
+            var visibleDirs = new List<(string Path, DirectoryInfo Info)>();
             foreach (var dir in directories)
             {
                 try
                 {
                     var dirInfo = new DirectoryInfo(dir);
-                    
                     if ((dirInfo.Attributes & FileAttributes.Hidden) != 0 ||
                         (dirInfo.Attributes & FileAttributes.System) != 0)
                         continue;
-
-                    var stats = GetFolderStats(dir);
-
-                    items.Add(new GridItem
-                    {
-                        Path = dir,
-                        Name = dirInfo.Name,
-                        IsFolder = true,
-                        SubfolderCount = stats.Subfolders,
-                        ImageCount = stats.Images,
-                        VideoCount = stats.Videos
-                    });
+                    visibleDirs.Add((dir, dirInfo));
                 }
                 catch (Exception ex)
                 {
                     _logger.LogDebug(ex, "Skipping inaccessible folder in content");
                 }
             }
+
+            // Parallel stat collection for all visible subdirectories
+            // Parallele Statistik-Erfassung für alle sichtbaren Unterverzeichnisse
+            var folderItems = new ConcurrentBag<GridItem>();
+            var parallelOptions = CreateFolderStatsParallelOptions(cancellationToken);
+            Parallel.ForEach(visibleDirs, parallelOptions, dirEntry =>
+            {
+                parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var stats = GetFolderStats(dirEntry.Path);
+                    folderItems.Add(new GridItem
+                    {
+                        Path = dirEntry.Path,
+                        Name = dirEntry.Info.Name,
+                        IsFolder = true,
+                        SubfolderCount = stats.Subfolders,
+                        ImageCount = stats.Images,
+                        VideoCount = stats.Videos
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Skipping inaccessible folder in content");
+                }
+            });
+
+            items.AddRange(folderItems);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Access denied reading folder content");
         }
 
-        // Sort folders by name
+        // Sort folders by name / Ordner nach Name sortieren
         items.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
         // 2. Get Images using existing logic
@@ -233,13 +283,16 @@ public class FileSystemService
         {
             var subfolders = Directory.GetDirectories(path).Length;
             
-            var files = Directory.EnumerateFiles(path); // Enumerate is more efficient than GetFiles for counting
+            // Enumerate is more efficient than GetFiles for counting
+            // EnumerateFiles ist effizienter als GetFiles zum Zählen
+            var files = Directory.EnumerateFiles(path);
             int images = 0;
             int videos = 0;
 
             foreach (var file in files)
             {
-                var ext = Path.GetExtension(file).ToLowerInvariant();
+                // HashSet uses OrdinalIgnoreCase, no ToLowerInvariant needed
+                var ext = Path.GetExtension(file);
                 if (_supportedExtensions.Contains(ext)) images++;
                 else if (_videoExtensions.Contains(ext)) videos++;
             }
@@ -258,8 +311,11 @@ public class FileSystemService
     /// </summary>
     public Task<string?> SelectFolderAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         return Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string? selectedPath = null;
             
             var thread = new System.Threading.Thread(() =>
@@ -280,8 +336,9 @@ public class FileSystemService
             thread.Start();
             thread.Join();
 
+            cancellationToken.ThrowIfCancellationRequested();
             return selectedPath;
-        });
+        }, cancellationToken);
     }
 
     private bool HasSubfolders(string path)

@@ -1,4 +1,5 @@
 using System.Data.SQLite;
+using System.Globalization;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -126,6 +127,16 @@ public class DatabaseService : IDatabaseService, IDisposable
         command.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Parse a timestamp stored via DateTime.ToString("o"), preserving both the value and
+    /// the DateTimeKind. Bare DateTime.Parse uses the current culture and converts "...Z"
+    /// values to local time, silently shifting stored timestamps.
+    /// Liest einen mit ToString("o") gespeicherten Zeitstempel zurück — kultur-invariant
+    /// und unter Beibehaltung von Wert und DateTimeKind.
+    /// </summary>
+    internal static DateTime ParseStoredDateTime(string value)
+        => DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
     public async Task<ImageFile?> GetImageAsync(string path, CancellationToken cancellationToken = default)
     {
         await _readSemaphore.WaitAsync(cancellationToken);
@@ -144,12 +155,12 @@ public class DatabaseService : IDatabaseService, IDisposable
                     Rating = reader.GetInt32(reader.GetOrdinal("Rating")),
                     Width = reader.GetInt32(reader.GetOrdinal("Width")),
                     Height = reader.GetInt32(reader.GetOrdinal("Height")),
-                    DateModified = DateTime.Parse(reader.GetString(reader.GetOrdinal("LastModified")))
+                    DateModified = ParseStoredDateTime(reader.GetString(reader.GetOrdinal("LastModified")))
                 };
 
                 if (!reader.IsDBNull(reader.GetOrdinal("DateTaken")))
                 {
-                    image.DateTaken = DateTime.Parse(reader.GetString(reader.GetOrdinal("DateTaken")));
+                    image.DateTaken = ParseStoredDateTime(reader.GetString(reader.GetOrdinal("DateTaken")));
                 }
 
                 var imageId = reader.GetInt64(reader.GetOrdinal("Id"));
@@ -202,74 +213,81 @@ public class DatabaseService : IDatabaseService, IDisposable
     private async Task SaveImageInternalAsync(ImageFile image, CancellationToken cancellationToken = default)
     {
         using var transaction = _connection.BeginTransaction();
-
         try
         {
-            using (var cmd = _connection.CreateCommand())
-            {
-                cmd.CommandText = @"
-                    INSERT INTO Images (Path, LastModified, Rating, Width, Height, DateTaken)
-                    VALUES (@Path, @LastModified, @Rating, @Width, @Height, @DateTaken)
-                    ON CONFLICT(Path) DO UPDATE SET
-                        LastModified = @LastModified,
-                        Rating = @Rating,
-                        Width = @Width,
-                        Height = @Height,
-                        DateTaken = @DateTaken
-                    RETURNING Id;
-                ";
-                cmd.Parameters.AddWithValue("@Path", image.Path);
-                cmd.Parameters.AddWithValue("@LastModified", image.DateModified.ToString("o"));
-                cmd.Parameters.AddWithValue("@Rating", image.Rating);
-                cmd.Parameters.AddWithValue("@Width", image.Width);
-                cmd.Parameters.AddWithValue("@Height", image.Height);
-                cmd.Parameters.AddWithValue("@DateTaken", image.DateTaken?.ToString("o") ?? (object)DBNull.Value);
-
-                var result = await cmd.ExecuteScalarAsync(cancellationToken);
-                var imageId = result != null ? (long)result : 0;
-
-                if (imageId == 0) throw new Exception("Failed to insert/update image");
-
-                using (var deleteCmd = _connection.CreateCommand())
-                {
-                    deleteCmd.CommandText = "DELETE FROM ImageTags WHERE ImageId = @ImageId";
-                    deleteCmd.Parameters.AddWithValue("@ImageId", imageId);
-                    await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
-                }
-
-                var uniqueTags = TagHelper.DeduplicateTags(image.Tags);
-
-                foreach (var tag in uniqueTags)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    long tagId;
-                    using (var tagCmd = _connection.CreateCommand())
-                    {
-                        tagCmd.CommandText = "INSERT OR IGNORE INTO Tags (Name) VALUES (@Name); SELECT Id FROM Tags WHERE Name = @Name;";
-                        tagCmd.Parameters.AddWithValue("@Name", tag);
-                        var tagResult = await tagCmd.ExecuteScalarAsync(cancellationToken);
-                        tagId = tagResult != null ? (long)tagResult : 0;
-                    }
-
-                    if (tagId == 0) continue;
-
-                    using (var linkCmd = _connection.CreateCommand())
-                    {
-                        linkCmd.CommandText = "INSERT OR IGNORE INTO ImageTags (ImageId, TagId) VALUES (@ImageId, @TagId)";
-                        linkCmd.Parameters.AddWithValue("@ImageId", imageId);
-                        linkCmd.Parameters.AddWithValue("@TagId", tagId);
-                        await linkCmd.ExecuteNonQueryAsync(cancellationToken);
-                    }
-                }
-            }
-
+            await SaveImageInternalNoTxAsync(image, cancellationToken);
             transaction.Commit();
         }
         catch
         {
             transaction.Rollback();
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Persist a single image without opening its own transaction.
+    /// Caller is responsible for the enclosing transaction (used by batch save).
+    /// </summary>
+    private async Task SaveImageInternalNoTxAsync(ImageFile image, CancellationToken cancellationToken = default)
+    {
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                INSERT INTO Images (Path, LastModified, Rating, Width, Height, DateTaken)
+                VALUES (@Path, @LastModified, @Rating, @Width, @Height, @DateTaken)
+                ON CONFLICT(Path) DO UPDATE SET
+                    LastModified = @LastModified,
+                    Rating = @Rating,
+                    Width = @Width,
+                    Height = @Height,
+                    DateTaken = @DateTaken
+                RETURNING Id;
+            ";
+            cmd.Parameters.AddWithValue("@Path", image.Path);
+            cmd.Parameters.AddWithValue("@LastModified", image.DateModified.ToString("o"));
+            cmd.Parameters.AddWithValue("@Rating", image.Rating);
+            cmd.Parameters.AddWithValue("@Width", image.Width);
+            cmd.Parameters.AddWithValue("@Height", image.Height);
+            cmd.Parameters.AddWithValue("@DateTaken", image.DateTaken?.ToString("o") ?? (object)DBNull.Value);
+
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            var imageId = result != null ? (long)result : 0;
+
+            if (imageId == 0) throw new Exception("Failed to insert/update image");
+
+            using (var deleteCmd = _connection.CreateCommand())
+            {
+                deleteCmd.CommandText = "DELETE FROM ImageTags WHERE ImageId = @ImageId";
+                deleteCmd.Parameters.AddWithValue("@ImageId", imageId);
+                await deleteCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            var uniqueTags = TagHelper.DeduplicateTags(image.Tags);
+
+            foreach (var tag in uniqueTags)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                long tagId;
+                using (var tagCmd = _connection.CreateCommand())
+                {
+                    tagCmd.CommandText = "INSERT OR IGNORE INTO Tags (Name) VALUES (@Name); SELECT Id FROM Tags WHERE Name = @Name;";
+                    tagCmd.Parameters.AddWithValue("@Name", tag);
+                    var tagResult = await tagCmd.ExecuteScalarAsync(cancellationToken);
+                    tagId = tagResult != null ? (long)tagResult : 0;
+                }
+
+                if (tagId == 0) continue;
+
+                using (var linkCmd = _connection.CreateCommand())
+                {
+                    linkCmd.CommandText = "INSERT OR IGNORE INTO ImageTags (ImageId, TagId) VALUES (@ImageId, @TagId)";
+                    linkCmd.Parameters.AddWithValue("@ImageId", imageId);
+                    linkCmd.Parameters.AddWithValue("@TagId", tagId);
+                    await linkCmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+            }
         }
     }
 
@@ -311,10 +329,10 @@ public class DatabaseService : IDatabaseService, IDisposable
                     var path = reader.GetString(0);
                     var rating = reader.GetInt32(1);
                     var tagList = reader.IsDBNull(2) ? null : reader.GetString(2);
-                    var lastModified = DateTime.Parse(reader.GetString(3));
+                    var lastModified = ParseStoredDateTime(reader.GetString(3));
                     var width = reader.GetInt32(4);
                     var height = reader.GetInt32(5);
-                    var dateTaken = reader.IsDBNull(6) ? (DateTime?)null : DateTime.Parse(reader.GetString(6));
+                    var dateTaken = reader.IsDBNull(6) ? (DateTime?)null : ParseStoredDateTime(reader.GetString(6));
 
                     var tags = tagList?.Split("||", StringSplitOptions.RemoveEmptyEntries)?.ToList()
                         ?? new List<string>();
@@ -331,15 +349,95 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
-    public async Task SaveImagesBatchAsync(List<ImageFile> images, CancellationToken cancellationToken = default)
+    public async Task TouchThumbnailAccessAsync(string cacheKey, CancellationToken cancellationToken = default)
     {
         await _writeSemaphore.WaitAsync(cancellationToken);
         try
         {
-            foreach (var image in images)
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO ThumbnailAccess (CacheKey, LastAccessTicks) VALUES (@k, @t)
+                ON CONFLICT(CacheKey) DO UPDATE SET LastAccessTicks = excluded.LastAccessTicks;";
+            cmd.Parameters.AddWithValue("@k", cacheKey);
+            cmd.Parameters.AddWithValue("@t", DateTime.UtcNow.Ticks);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally { _writeSemaphore.Release(); }
+    }
+
+    public async Task<List<string>> GetOldestThumbnailKeysAsync(int limit, CancellationToken cancellationToken = default)
+    {
+        var keys = new List<string>();
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _readConnection.CreateCommand();
+            cmd.CommandText = "SELECT CacheKey FROM ThumbnailAccess ORDER BY LastAccessTicks ASC LIMIT @lim;";
+            cmd.Parameters.AddWithValue("@lim", limit);
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                keys.Add(reader.GetString(0));
+        }
+        finally { _readSemaphore.Release(); }
+        return keys;
+    }
+
+    public async Task ForgetThumbnailAccessAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default)
+    {
+        var list = cacheKeys.ToList();
+        if (list.Count == 0) return;
+
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                await SaveImageInternalAsync(image, cancellationToken);
+                using var cmd = _connection.CreateCommand();
+                cmd.Transaction = transaction;
+                cmd.CommandText = "DELETE FROM ThumbnailAccess WHERE CacheKey = @k;";
+                var p = cmd.Parameters.Add("@k", System.Data.DbType.String);
+                foreach (var key in list)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    p.Value = key;
+                    await cmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+        finally { _writeSemaphore.Release(); }
+    }
+
+    public async Task SaveImagesBatchAsync(List<ImageFile> images, CancellationToken cancellationToken = default)
+    {
+        if (images.Count == 0) return;
+
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            // Wrap the entire batch in a single transaction to avoid one fsync per image
+            // (e.g. importing 1000 files was 1000 commits previously).
+            // Gesamten Batch in einer einzigen Transaktion — drastisch weniger fsync-Aufrufe.
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                foreach (var image in images)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await SaveImageInternalNoTxAsync(image, cancellationToken);
+                }
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
             }
         }
         finally
@@ -399,13 +497,13 @@ public class DatabaseService : IDatabaseService, IDisposable
                     Path = reader.GetString(1),
                     FileName = System.IO.Path.GetFileName(reader.GetString(1)),
                     Extension = System.IO.Path.GetExtension(reader.GetString(1)),
-                    DateModified = DateTime.Parse(reader.GetString(2)),
+                    DateModified = ParseStoredDateTime(reader.GetString(2)),
                     Rating = reader.GetInt32(3),
                     Width = reader.GetInt32(4),
                     Height = reader.GetInt32(5),
                 };
                 if (!reader.IsDBNull(6))
-                    image.DateTaken = DateTime.Parse(reader.GetString(6));
+                    image.DateTaken = ParseStoredDateTime(reader.GetString(6));
 
                 imageIds.Add((imageId, image));
                 results.Add(image);
@@ -452,6 +550,20 @@ public class DatabaseService : IDatabaseService, IDisposable
         if (_disposed) return;
         try
         {
+            // Force a WAL checkpoint so the .db-wal file shrinks before shutdown
+            // (otherwise it can grow unbounded over many sessions).
+            // WAL-Checkpoint vor Shutdown — sonst wächst die .db-wal-Datei unbegrenzt.
+            try
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "WAL checkpoint on shutdown failed");
+            }
+
             _writeSemaphore?.Dispose();
             // Only dispose read semaphore if it's a separate instance
             if (_readSemaphore != _writeSemaphore)

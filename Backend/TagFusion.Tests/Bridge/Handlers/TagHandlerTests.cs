@@ -59,27 +59,28 @@ public class TagHandlerTests
     // ========================================================================
 
     [Test]
-    public async Task WriteBatchTags_WritesToMultiplePaths_SendsProgressEvents()
+    public async Task WriteBatchTags_WritesToMultiplePaths_SendsCompletionEvent()
     {
         var path1 = CreateTempFile();
         var path2 = CreateTempFile();
         var path3 = CreateTempFile();
         var paths = new[] { path1, path2, path3 };
 
-        // Build payload with real temp paths serialized as JSON array
         var pathsJson = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(paths));
         var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"Nature\", \"Landscape\"]");
 
+        // Handler now uses WriteTagsBatchAsync (one call) + SaveImagesBatchAsync (one call).
         _exifToolService
-            .Setup(s => s.WriteTagsAsync(It.IsAny<string>(), It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .Setup(s => s.WriteTagsBatchAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<string> p, List<string> _, CancellationToken _) =>
+                p.ToDictionary(x => x, _ => true, StringComparer.OrdinalIgnoreCase));
 
         _exifToolService
             .Setup(s => s.ReadRatingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
         _databaseService
-            .Setup(s => s.SaveImageAsync(It.IsAny<ImageFile>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SaveImagesBatchAsync(It.IsAny<List<ImageFile>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var payload = new Dictionary<string, object>
@@ -95,26 +96,23 @@ public class TagHandlerTests
         Assert.That(dict, Has.Count.EqualTo(3));
         Assert.That(dict.Values, Is.All.True);
 
-        // Verify WriteTagsAsync was called for each path
-        foreach (var path in paths)
-        {
-            _exifToolService.Verify(
-                s => s.WriteTagsAsync(path, It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
-                Times.Once);
-        }
+        // One batch invocation instead of one-per-file
+        _exifToolService.Verify(
+            s => s.WriteTagsBatchAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
 
-        // Verify progress events were sent for each path
-        Assert.That(_sentEvents, Has.Count.EqualTo(3));
-        Assert.That(_sentEvents.All(e => e.EventName == "batchProgress"), Is.True);
-
-        // Verify DB save was called for each successful write
+        // One DB batch save instead of N individual saves
         _databaseService.Verify(
-            s => s.SaveImageAsync(It.IsAny<ImageFile>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(3));
+            s => s.SaveImagesBatchAsync(It.Is<List<ImageFile>>(l => l.Count == 3), It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        // Single completion progress event
+        Assert.That(_sentEvents, Has.Count.EqualTo(1));
+        Assert.That(_sentEvents[0].EventName, Is.EqualTo("batchProgress"));
     }
 
     [Test]
-    public async Task WriteBatchTags_WhenOnePathFails_ContinuesAndReportsFailure()
+    public async Task WriteBatchTags_WhenSomePathsFail_ReportsFailures()
     {
         var goodPath = CreateTempFile();
         var badPath = CreateTempFile();
@@ -123,21 +121,21 @@ public class TagHandlerTests
         var pathsJson = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(paths));
         var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"Tag1\"]");
 
-        // First path succeeds, second throws
+        // Batch write reports per-path success in the returned dictionary.
         _exifToolService
-            .Setup(s => s.WriteTagsAsync(goodPath, It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .Setup(s => s.WriteTagsBatchAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
+            {
+                [goodPath] = true,
+                [badPath] = false,
+            });
 
         _exifToolService
             .Setup(s => s.ReadRatingAsync(goodPath, It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
-        _exifToolService
-            .Setup(s => s.WriteTagsAsync(badPath, It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new IOException("File locked"));
-
         _databaseService
-            .Setup(s => s.SaveImageAsync(It.IsAny<ImageFile>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SaveImagesBatchAsync(It.IsAny<List<ImageFile>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var payload = new Dictionary<string, object>
@@ -152,8 +150,12 @@ public class TagHandlerTests
         Assert.That(dict[goodPath], Is.True);
         Assert.That(dict[badPath], Is.False);
 
-        // Progress events sent for both paths despite failure
-        Assert.That(_sentEvents, Has.Count.EqualTo(2));
+        // Only the successful image is persisted to DB
+        _databaseService.Verify(
+            s => s.SaveImagesBatchAsync(It.Is<List<ImageFile>>(l => l.Count == 1 && l[0].Path == goodPath), It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        Assert.That(_sentEvents, Has.Count.EqualTo(1));
     }
 
     [Test]

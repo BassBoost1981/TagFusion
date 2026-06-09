@@ -1,6 +1,8 @@
 using System.IO;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using TagFusion.Configuration;
 using TagFusion.Services;
 
 namespace TagFusion.Tests.Services;
@@ -103,6 +105,32 @@ public class FileOperationServiceTests
         Assert.That(result, Is.True);
         Assert.That(File.Exists(Path.Combine(_tempDir, "new.jpg")), Is.True);
         Assert.That(File.Exists(filePath), Is.False);
+    }
+
+    [Test]
+    public async Task RenameFile_WithBackupService_CreatesRecoverableBackup()
+    {
+        var filePath = Path.Combine(_tempDir, "old.jpg");
+        var backupRoot = Path.Combine(_tempDir, "backups");
+        File.WriteAllText(filePath, "content-before-rename");
+        var backupService = new FileBackupService(
+            NullLogger<FileBackupService>.Instance,
+            Options.Create(new BackupSettings
+            {
+                Enabled = true,
+                Directory = backupRoot,
+                RetentionDays = 30,
+                MaxFileSizeMb = 512
+            }));
+        var service = new FileOperationService(NullLogger<FileOperationService>.Instance, backupService);
+
+        var result = service.RenameFile(filePath, "new.jpg");
+
+        Assert.That(result, Is.True);
+        var backupFile = Directory.GetFiles(backupRoot, "*.jpg", SearchOption.AllDirectories).Single();
+        Assert.That(await File.ReadAllTextAsync(backupFile), Is.EqualTo("content-before-rename"));
+        var manifest = await File.ReadAllTextAsync(Path.Combine(backupRoot, "manifest.jsonl"));
+        Assert.That(manifest, Does.Contain("rename-file"));
     }
 
     [Test]

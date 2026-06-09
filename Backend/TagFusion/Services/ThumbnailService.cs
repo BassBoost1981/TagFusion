@@ -302,17 +302,21 @@ public class ThumbnailService : IThumbnailService
     {
         try
         {
-            using var process = new Process
+            // Pass the path via ArgumentList so the OS handles quoting and a path can never
+            // be misparsed into multiple arguments (consistent with the batch extractor above).
+            // Pfad über ArgumentList — kein fragiles String-Quoting.
+            var psi = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = exifToolPath,
-                    Arguments = $"-b -ThumbnailImage \"{imagePath}\"",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = exifToolPath,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
+            psi.ArgumentList.Add("-b");
+            psi.ArgumentList.Add("-ThumbnailImage");
+            psi.ArgumentList.Add(imagePath);
+
+            using var process = new Process { StartInfo = psi };
 
             process.Start();
 

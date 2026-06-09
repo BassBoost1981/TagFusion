@@ -68,28 +68,41 @@ public class DuplicateDetectionService
             }
         }
 
-        // Third pass: full SHA256 hash only for files with matching size AND header
+        // Third pass: full SHA256 hash only for files with matching size AND header.
+        // Parallelized across candidates — guarded by a small semaphore to avoid
+        // thrashing spinning disks and to share CPU fairly.
+        // Parallelisiert mit kleinem Semaphor — verhindert Festplatten-Thrashing.
         var hashMap = new Dictionary<string, List<string>>();
-        var candidateCount = 0;
-
-        foreach (var group in headerGroups.Values.Where(g => g.Count > 1))
+        var candidates = headerGroups.Values.Where(g => g.Count > 1).SelectMany(g => g).ToList();
+        var parallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
+        using var semaphore = new SemaphoreSlim(parallelism);
+        var hashTasks = candidates.Select(async path =>
         {
-            foreach (var path in group)
+            await semaphore.WaitAsync(ct);
+            try
             {
                 ct.ThrowIfCancellationRequested();
-                candidateCount++;
-                try
-                {
-                    var hash = await ComputeHashAsync(path, ct);
-                    if (!hashMap.ContainsKey(hash))
-                        hashMap[hash] = new List<string>();
-                    hashMap[hash].Add(path);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "DuplicateDetection: Failed to hash {Path}", path);
-                }
+                var hash = await ComputeHashAsync(path, ct);
+                return (path, hash, success: true);
             }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "DuplicateDetection: Failed to hash {Path}", path);
+                return (path, hash: string.Empty, success: false);
+            }
+            finally { semaphore.Release(); }
+        }).ToList();
+
+        var hashResults = await Task.WhenAll(hashTasks);
+        var candidateCount = hashResults.Length;
+
+        foreach (var (path, hash, success) in hashResults)
+        {
+            if (!success) continue;
+            if (!hashMap.ContainsKey(hash))
+                hashMap[hash] = new List<string>();
+            hashMap[hash].Add(path);
         }
 
         _logger.LogInformation("DuplicateDetection: Header filter reduced {SizeGroupFiles} candidates to {HashFiles} for full hashing",

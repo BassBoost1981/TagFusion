@@ -16,6 +16,12 @@ public class FileSystemHandler : IBridgeHandler
     private readonly ILogger<FileSystemHandler> _logger;
     private readonly Action<string, object?> _sendEvent;
 
+    // Cancels the previous background metadata load when a new folder is opened.
+    // Vorheriges Hintergrund-Laden wird abgebrochen, sobald ein neuer Ordner geöffnet wird.
+    private CancellationTokenSource? _metadataLoadCts;
+    private long _metadataLoadId;
+    private readonly object _metadataLock = new();
+
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
         "getDrives", "getFolders", "getImages", "getFolderContents", "selectFolder"
@@ -78,54 +84,75 @@ public class FileSystemHandler : IBridgeHandler
 
     private void StartBackgroundMetadataLoad(List<Models.ImageFile> images)
     {
+        CancellationToken ct;
+        long requestId;
+
+        lock (_metadataLock)
+        {
+            // Cancel any in-flight load — rapid folder navigation should not produce
+            // overlapping metadataUpdated events that overwrite newer results.
+            // Vorheriges Laden abbrechen, damit schnelle Navigation keine veralteten Events auslöst.
+            _metadataLoadCts?.Cancel();
+            _metadataLoadCts?.Dispose();
+            _metadataLoadCts = new CancellationTokenSource();
+            ct = _metadataLoadCts.Token;
+            requestId = ++_metadataLoadId;
+        }
+
         _ = Task.Run(async () =>
         {
             try
             {
                 var paths = images.Select(i => i.Path).ToList();
 
-                // 1. Load from Database first
-                var dbMetadata = await _databaseService.GetMetadataForPathsAsync(paths);
+                var dbMetadata = await _databaseService.GetMetadataForPathsAsync(paths, ct);
 
-                if (dbMetadata.Count > 0)
+                if (dbMetadata.Count > 0 && !ct.IsCancellationRequested)
                 {
                     var serializableDbMetadata = dbMetadata.ToDictionary(
                         kvp => kvp.Key,
                         kvp => new { tags = kvp.Value.Tags, rating = kvp.Value.Rating }
                     );
-                    _sendEvent("metadataUpdated", serializableDbMetadata);
+                    _sendEvent("metadataUpdated", new { requestId, metadata = serializableDbMetadata });
                 }
 
-                // 2. Identify missing paths
                 var missingPaths = paths.Where(p => !dbMetadata.ContainsKey(p)).ToList();
 
-                if (missingPaths.Count > 0)
+                if (missingPaths.Count > 0 && !ct.IsCancellationRequested)
                 {
-                    var exifMetadata = await _exifToolService.ReadBatchMetadataAsync(missingPaths);
+                    var exifMetadata = await _exifToolService.ReadBatchMetadataAsync(missingPaths, ct);
 
                     foreach (var kvp in exifMetadata)
                     {
+                        ct.ThrowIfCancellationRequested();
                         var imageFile = images.FirstOrDefault(i => i.Path == kvp.Key);
                         if (imageFile != null)
                         {
                             imageFile.Tags = kvp.Value.Tags;
                             imageFile.Rating = kvp.Value.Rating;
-                            await _databaseService.SaveImageAsync(imageFile);
+                            await _databaseService.SaveImageAsync(imageFile, ct);
                         }
                     }
 
-                    var serializableExifMetadata = exifMetadata.ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => new { tags = kvp.Value.Tags, rating = kvp.Value.Rating }
-                    );
-                    _sendEvent("metadataUpdated", serializableExifMetadata);
+                    if (!ct.IsCancellationRequested)
+                    {
+                        var serializableExifMetadata = exifMetadata.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => new { tags = kvp.Value.Tags, rating = kvp.Value.Rating }
+                        );
+                        _sendEvent("metadataUpdated", new { requestId, metadata = serializableExifMetadata });
+                    }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("Background metadata load cancelled (requestId {RequestId})", requestId);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Background metadata load failed");
                 _sendEvent("metadataError", new { error = ex.Message });
             }
-        });
+        }, ct);
     }
 }

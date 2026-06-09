@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -31,7 +32,10 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
+    // Attribute 20 is Windows 10 20H1+ / Windows 11.
+    // Attribute 19 is the legacy pre-20H1 value; we fall back if 20 is rejected.
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY = 19;
 
     public MainWindow(IServiceProvider serviceProvider)
     {
@@ -80,7 +84,11 @@ public partial class MainWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         var useDarkMode = 1;
-        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDarkMode, sizeof(int));
+        // Windows 10 pre-20H1 used attribute 19; try the modern value first
+        // and fall back on any non-zero HRESULT so older installs still get dark chrome.
+        var hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDarkMode, sizeof(int));
+        if (hr != 0)
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY, ref useDarkMode, sizeof(int));
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -151,11 +159,72 @@ public partial class MainWindow : Window
             // Configure WebView2 settings
             var s = webView.CoreWebView2.Settings;
             s.IsScriptEnabled = true;
-            s.AreDefaultScriptDialogsEnabled = true;
+            // React UI never uses alert()/confirm()/prompt(); disabling prevents any
+            // future embedded HTML from modal-hijacking the window.
+            s.AreDefaultScriptDialogsEnabled = false;
             s.IsWebMessageEnabled = true;
-            s.AreDevToolsEnabled = System.Diagnostics.Debugger.IsAttached;
+            // Keep production locked down by default; development can opt in via appsettings.Development.json.
+            s.AreDevToolsEnabled = _uiSettings.EnableDevTools;
             s.IsStatusBarEnabled = false;
             s.AreDefaultContextMenusEnabled = false;
+
+            // Surface navigation + JS errors into the file log so a blank window is diagnosable.
+            webView.CoreWebView2.NavigationCompleted += (_, args) =>
+            {
+                if (!args.IsSuccess)
+                    _logger.LogError("WebView2 navigation failed: {Status} (web error code {WebErrorStatus})",
+                        args.HttpStatusCode, args.WebErrorStatus);
+            };
+            webView.CoreWebView2.ProcessFailed += (_, args) =>
+                _logger.LogError("WebView2 ProcessFailed: kind={Kind}, reason={Reason}", args.ProcessFailedKind, args.Reason);
+            // Mirror page console messages into our log (visible without DevTools open).
+            webView.CoreWebView2.WebResourceResponseReceived += (_, args) =>
+            {
+                var status = args.Response?.StatusCode ?? 0;
+                if (status >= 400)
+                    _logger.LogWarning("WebView2 resource {Status}: {Uri}", status, args.Request?.Uri);
+            };
+
+            // SECURITY: Lock the renderer to our trusted origins. The bridge exposes
+            // powerful capabilities (file delete/move, ExifTool) to whatever document is
+            // loaded, so a top-level navigation to an external origin must never succeed —
+            // otherwise that page would inherit full bridge access.
+            // SICHERHEIT: Renderer auf vertrauenswürdige Origins beschränken — sonst erbt
+            // eine fremde Seite vollen Bridge-Zugriff (Dateien löschen/verschieben, ExifTool).
+            webView.CoreWebView2.NavigationStarting += (_, args) =>
+            {
+                if (!IsAllowedNavigation(args.Uri))
+                {
+                    args.Cancel = true;
+                    _logger.LogWarning("Blocked navigation to non-allowlisted URI: {Uri}", args.Uri);
+                }
+            };
+            // Never open an in-app WebView window; route external links to the system browser.
+            // Kein In-App-Fenster öffnen; externe Links im System-Browser öffnen.
+            webView.CoreWebView2.NewWindowRequested += (_, args) =>
+            {
+                args.Handled = true;
+                OpenExternalInBrowser(args.Uri);
+            };
+
+            // Clear the HTTP disk cache on every startup. Hashed chunk URLs are immutable
+            // (so caching them isn't useful), and the unhashed index.html MUST be fresh
+            // on every launch — otherwise a previous-version cached HTML can reference
+            // chunk hashes that no longer exist on disk and the app loads to a blank window.
+            // Cache vor dem Navigieren leeren — sonst kann eine veraltete index.html auf
+            // nicht mehr existierende Chunk-Dateien zeigen und die App bleibt leer.
+            if (_uiSettings.ClearDiskCacheOnStartup)
+            {
+                try
+                {
+                    await webView.CoreWebView2.Profile.ClearBrowsingDataAsync(
+                        Microsoft.Web.WebView2.Core.CoreWebView2BrowsingDataKinds.DiskCache);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "WebView2 cache clear failed (continuing)");
+                }
+            }
 
             // Wait for services (should already be done by now)
             var (exifToolService, fileSystemService, tagService, databaseService,
@@ -218,6 +287,46 @@ public partial class MainWindow : Window
                 "TagFusion - Fehler",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+    }
+
+    // Origins the renderer is allowed to navigate to: the production virtual hosts and the
+    // Vite dev server. Everything else (external sites, file://, etc.) is blocked.
+    private static readonly string[] _allowedHosts =
+        { "tagfusion.local", "thumbs.tagfusion.local", "localhost" };
+
+    private static bool IsAllowedNavigation(string uri)
+    {
+        if (string.IsNullOrEmpty(uri))
+            return false;
+        // about:blank and the initial about: document are benign.
+        if (uri.StartsWith("about:", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed))
+            return false;
+        if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps)
+            return false;
+        return Array.Exists(_allowedHosts,
+            h => string.Equals(h, parsed.Host, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OpenExternalInBrowser(string uri)
+    {
+        // Only hand http/https URLs to the OS — never file:, javascript:, data:, etc.
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var parsed) ||
+            (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+        {
+            _logger.LogWarning("Refused to open non-http(s) new-window URI: {Uri}", uri);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(parsed.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open external URL in system browser");
         }
     }
 

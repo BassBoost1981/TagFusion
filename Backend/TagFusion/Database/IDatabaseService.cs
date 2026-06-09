@@ -37,6 +37,23 @@ public interface IDatabaseService
     /// Suche nach Bildern anhand von Tags und/oder Mindestbewertung.
     /// </summary>
     Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Record that a thumbnail was just accessed. Used to drive LRU eviction
+    /// without depending on the NTFS LastAccessTime (disabled by default since Vista).
+    /// Speichert Zugriffszeit eines Thumbnails — ersetzt das auf NTFS oft deaktivierte LastAccessTime.
+    /// </summary>
+    Task TouchThumbnailAccessAsync(string cacheKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Return the N oldest-accessed thumbnail cache keys (for eviction).
+    /// </summary>
+    Task<List<string>> GetOldestThumbnailKeysAsync(int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Forget access records for cache keys that no longer exist on disk.
+    /// </summary>
+    Task ForgetThumbnailAccessAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

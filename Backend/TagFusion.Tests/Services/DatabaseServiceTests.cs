@@ -1,3 +1,4 @@
+using System.Globalization;
 using NUnit.Framework;
 using TagFusion.Models;
 using TagFusion.Services;
@@ -86,6 +87,23 @@ public class DatabaseServiceTests
         Assert.That(loaded, Is.Null);
     }
 
+    [Test]
+    public async Task SaveAndRetrieveImage_PreservesUtcDateModified()
+    {
+        // Bare DateTime.Parse loses Kind (a stored "...Z" comes back as Local, shifting
+        // the value by the machine's UTC offset). Round-trip parsing must preserve it.
+        var when = new DateTime(2026, 5, 28, 10, 0, 0, DateTimeKind.Utc);
+        var image = CreateTestImage("C:\\test\\dt.jpg", new[] { "X" });
+        image.DateModified = when;
+
+        await _db.SaveImageAsync(image);
+        var loaded = await _db.GetImageAsync("C:\\test\\dt.jpg");
+
+        Assert.That(loaded, Is.Not.Null);
+        Assert.That(loaded!.DateModified.Kind, Is.EqualTo(DateTimeKind.Utc));
+        Assert.That(loaded.DateModified, Is.EqualTo(when));
+    }
+
     // ========================================================================
     // GetMetadataForPathsAsync
     // ========================================================================
@@ -149,6 +167,24 @@ public class DatabaseServiceTests
     {
         var result = await _db.HealthCheckAsync();
         Assert.That(result, Is.True);
+    }
+
+    // ========================================================================
+    // ParseStoredDateTime
+    // ========================================================================
+
+    [TestCase(DateTimeKind.Utc)]
+    [TestCase(DateTimeKind.Local)]
+    [TestCase(DateTimeKind.Unspecified)]
+    public void ParseStoredDateTime_RoundTripsValueAndKind(DateTimeKind kind)
+    {
+        var dt = DateTime.SpecifyKind(new DateTime(2026, 5, 28, 13, 45, 30, 123), kind);
+        var stored = dt.ToString("o", CultureInfo.InvariantCulture);
+
+        var parsed = DatabaseService.ParseStoredDateTime(stored);
+
+        Assert.That(parsed, Is.EqualTo(dt));
+        Assert.That(parsed.Kind, Is.EqualTo(kind));
     }
 
     // ========================================================================

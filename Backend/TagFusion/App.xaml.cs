@@ -23,11 +23,22 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Load configuration from appsettings.json
-        var configuration = new ConfigurationBuilder()
+        // Load configuration from appsettings.json, then overlay Development overrides
+        // (e.g. --disable-http-cache) when a debugger is attached or the build is Debug.
+        // appsettings.Development.json wird nur im Debug-Modus geladen — so bleiben Dev-Flags
+        // nicht in Release-Builds.
+        var configBuilder = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-            .Build();
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
+
+#if DEBUG
+        configBuilder.AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false);
+#else
+        if (System.Diagnostics.Debugger.IsAttached)
+            configBuilder.AddJsonFile("appsettings.Development.json", optional: true, reloadOnChange: false);
+#endif
+
+        var configuration = configBuilder.Build();
 
         var services = new ServiceCollection();
 
@@ -36,6 +47,7 @@ public partial class App : Application
         services.Configure<ThumbnailSettings>(configuration.GetSection("Thumbnail"));
         services.Configure<DatabaseSettings>(configuration.GetSection("Database"));
         services.Configure<ImageEditSettings>(configuration.GetSection("ImageEdit"));
+        services.Configure<BackupSettings>(configuration.GetSection("Backup"));
         services.Configure<FileLoggingSettings>(configuration.GetSection("FileLogging"));
         services.Configure<TagSettings>(configuration.GetSection("Tags"));
         services.Configure<UiSettings>(configuration.GetSection("Ui"));
@@ -56,16 +68,23 @@ public partial class App : Application
 
         // Services ohne Abhängigkeiten
         services.AddSingleton<ThumbnailService>();
+        services.AddSingleton<IThumbnailService>(sp => sp.GetRequiredService<ThumbnailService>());
+        services.AddSingleton<IFileBackupService, FileBackupService>();
         services.AddSingleton<IDatabaseService, DatabaseService>();
         services.AddSingleton<TagService>();
+        services.AddSingleton<ITagService>(sp => sp.GetRequiredService<TagService>());
         services.AddSingleton<FileOperationService>();
+        services.AddSingleton<IFileOperationService>(sp => sp.GetRequiredService<FileOperationService>());
         services.AddSingleton<FolderWatcherService>();
         services.AddSingleton<DuplicateDetectionService>();
 
         // Services mit Abhängigkeiten
         services.AddSingleton<ExifToolService>();
+        services.AddSingleton<IExifToolService>(sp => sp.GetRequiredService<ExifToolService>());
         services.AddSingleton<FileSystemService>();
+        services.AddSingleton<IFileSystemService>(sp => sp.GetRequiredService<FileSystemService>());
         services.AddSingleton<ImageEditService>();
+        services.AddSingleton<IImageEditService>(sp => sp.GetRequiredService<ImageEditService>());
         services.AddSingleton<DiagnosticsService>();
         services.AddSingleton<TagExportService>();
 

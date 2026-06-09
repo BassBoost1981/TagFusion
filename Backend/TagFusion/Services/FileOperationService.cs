@@ -12,10 +12,12 @@ namespace TagFusion.Services
     public class FileOperationService : IFileOperationService
     {
         private readonly ILogger<FileOperationService> _logger;
+        private readonly IFileBackupService _backupService;
 
-        public FileOperationService(ILogger<FileOperationService> logger)
+        public FileOperationService(ILogger<FileOperationService> logger, IFileBackupService? backupService = null)
         {
             _logger = logger;
+            _backupService = backupService ?? NoopFileBackupService.Instance;
         }
 
         /// <summary>
@@ -95,10 +97,12 @@ namespace TagFusion.Services
 
                     if (Directory.Exists(sourcePath))
                     {
+                        await _backupService.CreateBackupAsync(sourcePath, "move-directory", cancellationToken);
                         await Task.Run(() => Directory.Move(sourcePath, destPath), cancellationToken);
                     }
                     else if (File.Exists(sourcePath))
                     {
+                        await _backupService.CreateBackupAsync(sourcePath, "move-file", cancellationToken);
                         await Task.Run(() => File.Move(sourcePath, destPath), cancellationToken);
                     }
                 }
@@ -106,7 +110,11 @@ namespace TagFusion.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MoveFiles failed");
+                // Move has no rollback — on partial failure the user ends up with a split state.
+                // Per product decision, undo is not provided; log the partial state for recovery.
+                // Verschieben hat kein Rollback — bei Teilfehler entsteht ein geteilter Zustand.
+                _logger.LogError(ex, "MoveFiles failed — partial move may have left files split between {Source} and {Target}",
+                    string.Join(", ", sourcePaths), targetFolder);
                 throw;
             }
         }
@@ -128,10 +136,12 @@ namespace TagFusion.Services
 
                     if (Directory.Exists(path))
                     {
+                        await _backupService.CreateBackupAsync(path, "delete-directory", cancellationToken);
                         await Task.Run(() => FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin), cancellationToken);
                     }
                     else if (File.Exists(path))
                     {
+                        await _backupService.CreateBackupAsync(path, "delete-file", cancellationToken);
                         await Task.Run(() => FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin), cancellationToken);
                     }
                 }
@@ -168,10 +178,12 @@ namespace TagFusion.Services
 
                 if (Directory.Exists(path))
                 {
+                    _backupService.CreateBackupAsync(path, "rename-directory").GetAwaiter().GetResult();
                     Directory.Move(path, newPath);
                 }
                 else if (File.Exists(path))
                 {
+                    _backupService.CreateBackupAsync(path, "rename-file").GetAwaiter().GetResult();
                     File.Move(path, newPath);
                 }
                 else
@@ -193,16 +205,27 @@ namespace TagFusion.Services
         /// </summary>
         public void OpenInExplorer(string path)
         {
+            ValidatePath(path);
+
+            // Reject paths containing characters that break explorer.exe /select quoting
+            if (path.IndexOfAny(new[] { '"', '\r', '\n' }) >= 0)
+                throw new ArgumentException("Path contains invalid characters");
+
             try
             {
                 if (Directory.Exists(path))
                 {
-                    Process.Start("explorer.exe", path);
+                    // Pass path via ProcessStartInfo.ArgumentList to avoid shell-quote issues
+                    var psi = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+                    psi.ArgumentList.Add(path);
+                    Process.Start(psi)?.Dispose();
                 }
                 else if (File.Exists(path))
                 {
-                    // Select the file in explorer
-                    Process.Start("explorer.exe", $"/select,\"{path}\"");
+                    var psi = new ProcessStartInfo("explorer.exe") { UseShellExecute = false };
+                    psi.ArgumentList.Add("/select,");
+                    psi.ArgumentList.Add(path);
+                    Process.Start(psi)?.Dispose();
                 }
             }
             catch (Exception ex)
@@ -217,6 +240,8 @@ namespace TagFusion.Services
         /// </summary>
         public object GetProperties(string path)
         {
+            ValidatePath(path);
+
             try
             {
                 if (Directory.Exists(path))

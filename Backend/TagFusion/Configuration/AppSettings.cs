@@ -46,6 +46,18 @@ public record ImageEditSettings
 }
 
 /// <summary>
+/// Safety backups for destructive file and metadata operations.
+/// Sicherheitskopien für schreibende Datei- und Metadatenaktionen.
+/// </summary>
+public record BackupSettings
+{
+    public bool Enabled { get; init; } = true;
+    public string Directory { get; init; } = "backups";
+    public int RetentionDays { get; init; } = 30;
+    public int MaxFileSizeMb { get; init; } = 512;
+}
+
+/// <summary>
 /// File-based logging settings.
 /// Konfiguration für dateibasiertes Logging.
 /// </summary>
@@ -73,5 +85,7 @@ public record TagSettings
 public record UiSettings
 {
     public int SplashDelayMs { get; init; } = 100;
-    public string BrowserArgs { get; init; } = "--enable-gpu-rasterization --enable-zero-copy --enable-features=VaapiVideoDecoder --disable-software-rasterizer --enable-accelerated-2d-canvas --enable-accelerated-video-decode --gpu-rasterization-msaa-sample-count=0 --disable-http-cache";
+    public string BrowserArgs { get; init; } = "--enable-gpu-rasterization --enable-zero-copy --enable-features=VaapiVideoDecoder --disable-software-rasterizer --enable-accelerated-2d-canvas --enable-accelerated-video-decode --gpu-rasterization-msaa-sample-count=0";
+    public bool EnableDevTools { get; init; }
+    public bool ClearDiskCacheOnStartup { get; init; } = true;
 }

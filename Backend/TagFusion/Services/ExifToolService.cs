@@ -30,6 +30,13 @@ public class ExifToolService : IExifToolService, IDisposable
     private bool _disposed;
 
     /// <summary>
+    /// Extra read-timeout budget per argument (mostly file paths in batch calls), so a
+    /// 500-file batch on a slow drive does not hit the fixed base timeout.
+    /// Zusatz-Timeout pro Argument, damit grosse Batches nicht ins Basis-Timeout laufen.
+    /// </summary>
+    internal const int PerArgTimeoutMs = 100;
+
+    /// <summary>
     /// Separator passed to ExifTool's -sep option to split a tag list into individual
     /// Keywords/Subject entries. Uses the ASCII Unit Separator (U+001F) because it cannot
     /// be typed into a tag, so a user tag can never accidentally be split (the old ";;"
@@ -148,7 +155,7 @@ public class ExifToolService : IExifToolService, IDisposable
         if (!File.Exists(imagePath))
             throw new FileNotFoundException($"Image not found: {imagePath}");
 
-        var args = $"-Keywords -XMP:Subject -j \"{imagePath}\"";
+        var args = new List<string> { "-Keywords", "-XMP:Subject", "-j", imagePath };
         var output = await RunExifToolAsync(args, cancellationToken);
 
         try
@@ -349,7 +356,7 @@ public class ExifToolService : IExifToolService, IDisposable
         if (!File.Exists(imagePath))
             throw new FileNotFoundException($"Image not found: {imagePath}");
 
-        var args = $"-XMP:Rating -j \"{imagePath}\"";
+        var args = new List<string> { "-XMP:Rating", "-j", imagePath };
         var output = await RunExifToolAsync(args, cancellationToken);
 
         try
@@ -451,8 +458,8 @@ public class ExifToolService : IExifToolService, IDisposable
 
         _logger.LogDebug("WriteRatingAsync called for: {ImagePath}, rating: {Rating}", imagePath, rating);
 
-        var args = $"-XMP:Rating={rating} -overwrite_original \"{imagePath}\"";
-        _logger.LogDebug("Command args: {Args}", args);
+        var args = new List<string> { $"-XMP:Rating={rating}", "-overwrite_original", imagePath };
+        _logger.LogDebug("Command args: {Args}", string.Join(" ", args));
 
         var output = await RunExifToolAsync(args, cancellationToken);
         _logger.LogDebug("WriteRatingAsync output: '{Output}'", output.Trim());
@@ -536,7 +543,11 @@ public class ExifToolService : IExifToolService, IDisposable
 
         // Combined args: tags + rating + dimensions + date in one call
         // Kombinierte Argumente: Tags + Bewertung + Abmessungen + Datum in einem Aufruf
-        var args = $"-Keywords -XMP:Subject -XMP:Rating -ImageWidth -ImageHeight -DateTimeOriginal -j \"{imagePath}\"";
+        var args = new List<string>
+        {
+            "-Keywords", "-XMP:Subject", "-XMP:Rating",
+            "-ImageWidth", "-ImageHeight", "-DateTimeOriginal", "-j", imagePath
+        };
         var output = await RunExifToolAsync(args, cancellationToken);
 
         var tags = new List<string>();
@@ -587,20 +598,14 @@ public class ExifToolService : IExifToolService, IDisposable
         return (tags, rating, width, height, dateTaken);
     }
 
-    private Task<string> RunExifToolAsync(string arguments, CancellationToken cancellationToken = default)
-    {
-        // In -stay_open mode with -@ -, each argument must be on a SEPARATE LINE.
-        // Parse the arguments string and delegate to the list-based overload.
-        var args = ParseArguments(arguments);
-        return RunExifToolAsync(args, cancellationToken);
-    }
-
     /// <summary>
     /// Run ExifTool with pre-parsed arguments (no string→parse round-trip).
     /// Sends each argument on its own line, writes -execute, then reads until {ready}.
     /// </summary>
     private async Task<string> RunExifToolAsync(List<string> args, CancellationToken cancellationToken = default)
     {
+        EnsureNoLineBreaks(args);
+
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -618,10 +623,14 @@ public class ExifToolService : IExifToolService, IDisposable
             await _commandWriter.WriteLineAsync("-execute".AsMemory(), cancellationToken).ConfigureAwait(false);
             await _commandWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            // Read output until {ready} — with timeout to prevent hanging on stuck process
+            // Read output until {ready} — with timeout to prevent hanging on stuck process.
+            // The timeout scales with the argument count: a 500-file batch on a slow
+            // HDD/network drive can legitimately exceed the base timeout.
+            // Timeout skaliert mit der Argumentanzahl — grosse Batches brauchen laenger.
+            var effectiveTimeoutMs = _readTimeoutMs > 0 ? _readTimeoutMs + args.Count * PerArgTimeoutMs : 0;
             using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            if (_readTimeoutMs > 0)
-                readCts.CancelAfter(_readTimeoutMs);
+            if (effectiveTimeoutMs > 0)
+                readCts.CancelAfter(effectiveTimeoutMs);
 
             var sb = new StringBuilder();
             string? line;
@@ -636,9 +645,9 @@ public class ExifToolService : IExifToolService, IDisposable
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", _readTimeoutMs);
+                _logger.LogError("ExifTool read timeout after {TimeoutMs}ms — killing process", effectiveTimeoutMs);
                 ResetProcessState();
-                throw new TimeoutException($"ExifTool did not respond within {_readTimeoutMs}ms");
+                throw new TimeoutException($"ExifTool did not respond within {effectiveTimeoutMs}ms");
             }
             var output = sb.ToString();
             _logger.LogDebug("RunExifToolAsync: Output received: '{Output}'", output.Trim());
@@ -648,6 +657,22 @@ public class ExifToolService : IExifToolService, IDisposable
         finally
         {
             _semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// SECURITY: In -stay_open -@ - mode every argument is one stdin line. An argument
+    /// containing a line break would inject an extra ExifTool argument (argument injection).
+    /// Defense-in-depth behind TagHelper.StripControlChars — this guards ALL args
+    /// (including file paths), not just tag values.
+    /// SICHERHEIT: Letzte Verteidigungslinie gegen Argument-Injection ueber Zeilenumbrueche.
+    /// </summary>
+    internal static void EnsureNoLineBreaks(IEnumerable<string> args)
+    {
+        foreach (var arg in args)
+        {
+            if (arg.IndexOf('\n') >= 0 || arg.IndexOf('\r') >= 0)
+                throw new ArgumentException("ExifTool argument must not contain line breaks");
         }
     }
 
@@ -806,8 +831,13 @@ public class ExifToolService : IExifToolService, IDisposable
     {
         if (_disposed) return;
 
-        // Use synchronous Wait for Dispose — acceptable since Dispose is called once at shutdown
-        _semaphore.Wait();
+        // Bounded wait: a stuck ExifTool call must never hang app shutdown forever.
+        // If the semaphore cannot be acquired we still tear the process down — the app
+        // is exiting and an unkilled exiftool.exe would outlive it as a zombie.
+        // Begrenztes Warten: ein haengender ExifTool-Aufruf darf das Beenden nicht blockieren.
+        var acquired = _semaphore.Wait(TimeSpan.FromSeconds(5));
+        if (!acquired)
+            _logger.LogWarning("Dispose: semaphore not acquired within 5s — forcing ExifTool shutdown");
         try
         {
             if (_commandWriter != null)
@@ -840,7 +870,7 @@ public class ExifToolService : IExifToolService, IDisposable
         }
         finally
         {
-            _semaphore.Release();
+            if (acquired) _semaphore.Release();
             _semaphore.Dispose();
         }
 
