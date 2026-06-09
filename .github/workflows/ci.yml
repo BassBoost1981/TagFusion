@@ -44,8 +44,38 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
-        run: npx vitest run
+      - name: Unit tests (with coverage)
+        run: npx vitest run --coverage
+
+      - name: npm audit (production deps, high severity)
+        run: npm audit --omit=dev --audit-level=high
+
+  # ── Frontend E2E (Windows — the only platform the app ships on) ──
+  frontend-e2e:
+    name: Frontend E2E (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: E2E tests
+        run: npm run test:e2e -- --reporter=line
 
   # ── Backend checks (Windows required for WPF/net8.0-windows) ───
   backend:
@@ -58,10 +88,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 9 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Restore dependencies
         run: dotnet restore TagFusion.sln
@@ -69,5 +99,22 @@ jobs:
       - name: Build
         run: dotnet build TagFusion.sln -c Release --no-restore
 
-      - name: Run tests
-        run: dotnet test TagFusion.sln -c Release --no-build --verbosity normal
+      - name: Run tests (with coverage)
+        run: dotnet test TagFusion.sln -c Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: Backend/TestResults/**/coverage.cobertura.xml
+          retention-days: 14
+
+      - name: Vulnerable .NET packages scan
+        shell: pwsh
+        run: |
+          $report = dotnet list TagFusion.sln package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Output $report
+          if ($report -match 'has the following vulnerable packages') {
+            Write-Error 'Vulnerable .NET packages detected'
+            exit 1
+          }

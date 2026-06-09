@@ -8,6 +8,10 @@ Backend/TagFusion/obj/
 Backend/TagFusion.Tests/bin/
 Backend/TagFusion.Tests/obj/
 
+# Hash-named frontend bundles copied into wwwroot by build_release.ps1 / sync:wwwroot.
+# Hashed Dateinamen aendern sich bei jedem Build — in Git nur die unveraendliche index.html tracken.
+Backend/TagFusion/wwwroot/assets/
+
 # Test outputs
 Frontend/playwright-report/
 Frontend/test-results/
@@ -58,14 +62,18 @@ ehthumbs.db
 .agents/
 .augment/
 .shared/
+.bg-shell/
+.planning/
 
 # Scratch/temp files
 heroui.txt
 lucide.txt
 
-# Build scripts (local only)
-build_release.ps1
+# Build notes (local only)
 build_app.md
+
+# Local release artifacts
+TagFusion-v*-win-*.zip
 
 # Python cache
 __pycache__/
