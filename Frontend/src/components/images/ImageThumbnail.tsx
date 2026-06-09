@@ -22,7 +22,9 @@ export function ImageThumbnail({
   const [hasError, setHasError] = useState(false);
   // Handle both URL (from virtual host) and base64 (legacy) thumbnail formats
   const imageSrc = thumbnail
-    ? thumbnail.startsWith('http') ? thumbnail : `data:image/jpeg;base64,${thumbnail}`
+    ? thumbnail.startsWith('http')
+      ? thumbnail
+      : `data:image/jpeg;base64,${thumbnail}`
     : thumbnailUrl || null;
 
   const handleError = useCallback(() => {

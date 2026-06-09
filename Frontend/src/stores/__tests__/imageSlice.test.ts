@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
 import { normalizeGridItems } from '../slices/imageSlice';
+import { bridge } from '../../services/bridge';
 import type { ImageFile, GridItem } from '../../types';
 
 // Mock bridge service
@@ -9,11 +10,17 @@ vi.mock('../../services/bridge', () => ({
     getFolderContents: vi.fn(),
     writeTags: vi.fn().mockResolvedValue(true),
     setRating: vi.fn().mockResolvedValue(true),
+    // Default: every requested path succeeds / Standard: jeder Pfad erfolgreich
+    updateBatchTag: vi
+      .fn()
+      .mockImplementation((paths: string[]) => Promise.resolve(Object.fromEntries(paths.map((p) => [p, true])))),
     readTags: vi.fn(),
     saveTagLibrary: vi.fn().mockResolvedValue(true),
     getTagLibrary: vi.fn().mockResolvedValue(null),
   },
 }));
+
+const mockedBridge = vi.mocked(bridge);
 
 const makeImage = (path: string, tags: string[] = [], rating = 0): ImageFile => ({
   path,
@@ -40,6 +47,15 @@ const makeFolderItem = (path: string, name: string): GridItem => ({
   subfolderCount: 2,
   imageCount: 5,
 });
+
+const expectSelectedImages = (...paths: string[]) => {
+  const selection = useAppStore.getState().selectedImages;
+
+  expect(selection.size).toBe(paths.length);
+  paths.forEach((path) => {
+    expect(selection.has(path)).toBe(true);
+  });
+};
 
 describe('normalizeGridItems (pure function)', () => {
   it('syncs image data into grid items', () => {
@@ -68,11 +84,13 @@ describe('imageSlice — selectImage', () => {
   const images = [makeImage('C:\\1.jpg'), makeImage('C:\\2.jpg'), makeImage('C:\\3.jpg'), makeImage('C:\\4.jpg')];
 
   beforeEach(() => {
+    vi.clearAllMocks();
     useAppStore.setState({
       images,
       gridItems: images.map(makeGridItem),
       selectedImages: new Set<string>(),
       lastSelectedImage: null,
+      error: null,
     });
   });
 
@@ -87,8 +105,7 @@ describe('imageSlice — selectImage', () => {
   it('single click replaces previous selection', () => {
     useAppStore.getState().selectImage('C:\\1.jpg');
     useAppStore.getState().selectImage('C:\\3.jpg');
-    expect(useAppStore.getState().selectedImages.size).toBe(1);
-    expect(useAppStore.getState().selectedImages.has('C:\\3.jpg')).toBe(true);
+    expectSelectedImages('C:\\3.jpg');
   });
 
   it('ctrl+click toggles image in selection', () => {
@@ -96,45 +113,36 @@ describe('imageSlice — selectImage', () => {
     useAppStore.getState().selectImage('C:\\3.jpg', true);
     expect(useAppStore.getState().selectedImages.size).toBe(2);
 
-    // Ctrl+click again to deselect
     useAppStore.getState().selectImage('C:\\1.jpg', true);
-    expect(useAppStore.getState().selectedImages.size).toBe(1);
-    expect(useAppStore.getState().selectedImages.has('C:\\3.jpg')).toBe(true);
+    expectSelectedImages('C:\\3.jpg');
   });
 
   it('shift+click selects range', () => {
     useAppStore.getState().selectImage('C:\\1.jpg');
     useAppStore.getState().selectImage('C:\\4.jpg', false, true);
 
-    const sel = useAppStore.getState().selectedImages;
-    expect(sel.size).toBe(4);
-    expect(sel.has('C:\\1.jpg')).toBe(true);
-    expect(sel.has('C:\\2.jpg')).toBe(true);
-    expect(sel.has('C:\\3.jpg')).toBe(true);
-    expect(sel.has('C:\\4.jpg')).toBe(true);
+    expectSelectedImages('C:\\1.jpg', 'C:\\2.jpg', 'C:\\3.jpg', 'C:\\4.jpg');
   });
 
   it('shift+ctrl extends selection with range', () => {
     useAppStore.getState().selectImage('C:\\1.jpg');
-    useAppStore.getState().selectImage('C:\\2.jpg', true); // ctrl: add #2
-    useAppStore.getState().selectImage('C:\\4.jpg', true, true); // shift+ctrl from #2 → #4
+    useAppStore.getState().selectImage('C:\\2.jpg', true);
+    useAppStore.getState().selectImage('C:\\4.jpg', true, true);
 
-    const sel = useAppStore.getState().selectedImages;
-    expect(sel.has('C:\\1.jpg')).toBe(true); // kept from ctrl
-    expect(sel.has('C:\\2.jpg')).toBe(true);
-    expect(sel.has('C:\\3.jpg')).toBe(true);
-    expect(sel.has('C:\\4.jpg')).toBe(true);
+    expectSelectedImages('C:\\1.jpg', 'C:\\2.jpg', 'C:\\3.jpg', 'C:\\4.jpg');
   });
 });
 
 describe('imageSlice — selectAllImages / clearSelection', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     const images = [makeImage('C:\\a.jpg'), makeImage('C:\\b.jpg')];
     useAppStore.setState({
       images,
       gridItems: images.map(makeGridItem),
       selectedImages: new Set<string>(),
       lastSelectedImage: null,
+      error: null,
     });
   });
 
@@ -148,5 +156,65 @@ describe('imageSlice — selectAllImages / clearSelection', () => {
     useAppStore.getState().clearSelection();
     expect(useAppStore.getState().selectedImages.size).toBe(0);
     expect(useAppStore.getState().lastSelectedImage).toBeNull();
+  });
+});
+
+describe('imageSlice — batch tag updates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const images = [
+      makeImage('C:\\1.jpg', ['Natur']),
+      makeImage('C:\\2.jpg', ['Natur', 'Sommer']),
+      makeImage('C:\\3.jpg', ['Stadt']),
+    ];
+
+    useAppStore.setState({
+      images,
+      gridItems: images.map(makeGridItem),
+      selectedImages: new Set(['C:\\1.jpg', 'C:\\2.jpg']),
+      lastSelectedImage: 'C:\\2.jpg',
+      error: null,
+    });
+  });
+
+  it('adds a tag to multiple images and calls the batch bridge once', async () => {
+    await useAppStore.getState().addTagToImages(['C:\\1.jpg', 'C:\\2.jpg'], 'Urlaub');
+
+    const { images } = useAppStore.getState();
+    expect(images.find((img) => img.path === 'C:\\1.jpg')?.tags).toEqual(['Natur', 'Urlaub']);
+    expect(images.find((img) => img.path === 'C:\\2.jpg')?.tags).toEqual(['Natur', 'Sommer', 'Urlaub']);
+    expect(images.find((img) => img.path === 'C:\\3.jpg')?.tags).toEqual(['Stadt']);
+    expect(mockedBridge.updateBatchTag).toHaveBeenCalledWith(['C:\\1.jpg', 'C:\\2.jpg'], 'Urlaub', 'add');
+  });
+
+  it('removes a tag from multiple images and calls the batch bridge once', async () => {
+    await useAppStore.getState().removeTagFromImages(['C:\\1.jpg', 'C:\\2.jpg'], 'Natur');
+
+    const { images } = useAppStore.getState();
+    expect(images.find((img) => img.path === 'C:\\1.jpg')?.tags).toEqual([]);
+    expect(images.find((img) => img.path === 'C:\\2.jpg')?.tags).toEqual(['Sommer']);
+    expect(mockedBridge.updateBatchTag).toHaveBeenCalledWith(['C:\\1.jpg', 'C:\\2.jpg'], 'Natur', 'remove');
+  });
+
+  it('rolls back optimistic batch updates when the bridge call fails', async () => {
+    mockedBridge.updateBatchTag.mockRejectedValueOnce(new Error('bridge failed'));
+
+    await useAppStore.getState().addTagToImages(['C:\\1.jpg', 'C:\\2.jpg'], 'Urlaub');
+
+    const { images, error } = useAppStore.getState();
+    expect(images.find((img) => img.path === 'C:\\1.jpg')?.tags).toEqual(['Natur']);
+    expect(images.find((img) => img.path === 'C:\\2.jpg')?.tags).toEqual(['Natur', 'Sommer']);
+    expect(error).toBe('bridge failed');
+  });
+
+  it('reverts only failed paths on partial batch failure, successes stay applied', async () => {
+    mockedBridge.updateBatchTag.mockResolvedValueOnce({ 'C:\\1.jpg': true, 'C:\\2.jpg': false });
+
+    await useAppStore.getState().addTagToImages(['C:\\1.jpg', 'C:\\2.jpg'], 'Urlaub');
+
+    const { images, error } = useAppStore.getState();
+    expect(images.find((img) => img.path === 'C:\\1.jpg')?.tags).toEqual(['Natur', 'Urlaub']);
+    expect(images.find((img) => img.path === 'C:\\2.jpg')?.tags).toEqual(['Natur', 'Sommer']);
+    expect(error).toBe('Tag konnte für 1 von 2 Bildern nicht gespeichert werden');
   });
 });

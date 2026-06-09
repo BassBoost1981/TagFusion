@@ -8,14 +8,15 @@ import type {
   GridItem,
   TagLibrary,
 } from '../types';
+import { BRIDGE_ACTIONS, type BridgeActionName } from './bridgeActions';
 
 type EventCallback = (data: unknown) => void;
 
-const isDev = import.meta.env.DEV;
+const isDebugLoggingEnabled = import.meta.env.DEV && import.meta.env.MODE !== 'test';
 
-/** Debug-only logger — calls are no-ops in production builds */
+/** Debug-only logger — disabled in tests to keep output clean */
 // eslint-disable-next-line no-console
-const log = isDev ? (...args: unknown[]) => console.log('[Bridge]', ...args) : () => {};
+const log = isDebugLoggingEnabled ? (...args: unknown[]) => console.log('[Bridge]', ...args) : () => {};
 
 class BridgeService {
   private pendingRequests: Map<string, { resolve: (value: unknown) => void; reject: (reason: unknown) => void }> =
@@ -82,19 +83,39 @@ class BridgeService {
   private static readonly BASE_TIMEOUT_MS = 120_000;
 
   /** Actions that are safe to retry (idempotent reads) */
-  private static readonly RETRYABLE_ACTIONS = new Set([
-    'getDrives', 'getFolders', 'getImages', 'getFolderContents',
-    'readTags', 'getThumbnail', 'getFullImage', 'getThumbnailsBatch',
-    'getRating', 'getAllTags', 'getTagLibrary', 'healthCheck',
-    'searchImages', 'findDuplicates', 'getProperties',
-    'exportTagsJson', 'exportTagsCsv',
+  private static readonly RETRYABLE_ACTIONS = new Set<BridgeActionName>([
+    BRIDGE_ACTIONS.GET_DRIVES,
+    BRIDGE_ACTIONS.GET_FOLDERS,
+    BRIDGE_ACTIONS.GET_IMAGES,
+    BRIDGE_ACTIONS.GET_FOLDER_CONTENTS,
+    BRIDGE_ACTIONS.READ_TAGS,
+    BRIDGE_ACTIONS.GET_THUMBNAIL,
+    BRIDGE_ACTIONS.GET_FULL_IMAGE,
+    BRIDGE_ACTIONS.GET_THUMBNAILS_BATCH,
+    BRIDGE_ACTIONS.GET_RATING,
+    BRIDGE_ACTIONS.GET_ALL_TAGS,
+    BRIDGE_ACTIONS.GET_TAG_LIBRARY,
+    BRIDGE_ACTIONS.HEALTH_CHECK,
+    BRIDGE_ACTIONS.SEARCH_IMAGES,
+    BRIDGE_ACTIONS.FIND_DUPLICATES,
+    BRIDGE_ACTIONS.GET_PROPERTIES,
+    BRIDGE_ACTIONS.EXPORT_TAGS_JSON,
+    BRIDGE_ACTIONS.EXPORT_TAGS_CSV,
+    BRIDGE_ACTIONS.EXPORT_TAGS_XMP,
+    BRIDGE_ACTIONS.WATCH_FOLDER,
+    BRIDGE_ACTIONS.STOP_WATCHING,
+    BRIDGE_ACTIONS.UPDATE_BATCH_TAG,
   ]);
 
-  private async send<T>(action: string, payload?: Record<string, unknown>): Promise<T> {
+  private async send<T>(action: BridgeActionName, payload?: Record<string, unknown>): Promise<T> {
     return this.sendWithRetry<T>(action, payload, 0);
   }
 
-  private async sendWithRetry<T>(action: string, payload: Record<string, unknown> | undefined, attempt: number): Promise<T> {
+  private async sendWithRetry<T>(
+    action: BridgeActionName,
+    payload: Record<string, unknown> | undefined,
+    attempt: number
+  ): Promise<T> {
     const id = this.generateId();
     const message: BridgeMessage = { id, action, payload };
     log('Sending:', action, 'id:', id, attempt > 0 ? `(retry ${attempt})` : '');
@@ -116,7 +137,13 @@ class BridgeService {
     }
   }
 
-  private sendOnce<T>(id: string, message: BridgeMessage, action: string, _payload: Record<string, unknown> | undefined, attempt: number): Promise<T> {
+  private sendOnce<T>(
+    id: string,
+    message: BridgeMessage,
+    action: BridgeActionName,
+    _payload: Record<string, unknown> | undefined,
+    attempt: number
+  ): Promise<T> {
     const timeoutMs = BridgeService.BASE_TIMEOUT_MS * Math.pow(1.5, attempt); // 120s, 180s, 270s
 
     return new Promise((resolve, reject) => {
@@ -157,93 +184,93 @@ class BridgeService {
 
   // API Methods
   async getDrives(): Promise<FolderItem[]> {
-    return this.send<FolderItem[]>('getDrives');
+    return this.send<FolderItem[]>(BRIDGE_ACTIONS.GET_DRIVES);
   }
 
   async getFolders(path: string): Promise<FolderItem[]> {
-    return this.send<FolderItem[]>('getFolders', { path });
+    return this.send<FolderItem[]>(BRIDGE_ACTIONS.GET_FOLDERS, { path });
   }
 
   async getImages(folderPath: string): Promise<ImageFile[]> {
-    return this.send<ImageFile[]>('getImages', { folderPath });
+    return this.send<ImageFile[]>(BRIDGE_ACTIONS.GET_IMAGES, { folderPath });
   }
 
   async getFolderContents(folderPath: string): Promise<GridItem[]> {
-    return this.send<GridItem[]>('getFolderContents', { folderPath });
+    return this.send<GridItem[]>(BRIDGE_ACTIONS.GET_FOLDER_CONTENTS, { folderPath });
   }
 
   async selectFolder(): Promise<string | null> {
-    return this.send<string | null>('selectFolder');
+    return this.send<string | null>(BRIDGE_ACTIONS.SELECT_FOLDER);
   }
 
   async readTags(imagePath: string): Promise<string[]> {
-    return this.send<string[]>('readTags', { imagePath });
+    return this.send<string[]>(BRIDGE_ACTIONS.READ_TAGS, { imagePath });
   }
 
   async writeTags(imagePath: string, tags: string[]): Promise<boolean> {
-    return this.send<boolean>('writeTags', { imagePath, tags });
+    return this.send<boolean>(BRIDGE_ACTIONS.WRITE_TAGS, { imagePath, tags });
   }
 
   async getThumbnail(imagePath: string): Promise<string> {
-    return this.send<string>('getThumbnail', { imagePath });
+    return this.send<string>(BRIDGE_ACTIONS.GET_THUMBNAIL, { imagePath });
   }
 
   async getFullImage(imagePath: string, maxSize: number = 1920): Promise<string> {
-    return this.send<string>('getFullImage', { imagePath, maxSize });
+    return this.send<string>(BRIDGE_ACTIONS.GET_FULL_IMAGE, { imagePath, maxSize });
   }
 
   async getThumbnailsBatch(imagePaths: string[]): Promise<Record<string, string | null>> {
-    return this.send<Record<string, string | null>>('getThumbnailsBatch', { imagePaths });
+    return this.send<Record<string, string | null>>(BRIDGE_ACTIONS.GET_THUMBNAILS_BATCH, { imagePaths });
   }
 
   async getRating(imagePath: string): Promise<number> {
-    return this.send<number>('getRating', { imagePath });
+    return this.send<number>(BRIDGE_ACTIONS.GET_RATING, { imagePath });
   }
 
   async setRating(imagePath: string, rating: number): Promise<boolean> {
-    return this.send<boolean>('setRating', { imagePath, rating });
+    return this.send<boolean>(BRIDGE_ACTIONS.SET_RATING, { imagePath, rating });
   }
 
   async getAllTags(): Promise<Tag[]> {
-    return this.send<Tag[]>('getAllTags');
+    return this.send<Tag[]>(BRIDGE_ACTIONS.GET_ALL_TAGS);
   }
 
   async getTagLibrary(): Promise<TagLibrary> {
-    return this.send<TagLibrary>('getTagLibrary');
+    return this.send<TagLibrary>(BRIDGE_ACTIONS.GET_TAG_LIBRARY);
   }
 
   async saveTagLibrary(library: TagLibrary): Promise<boolean> {
-    return this.send<boolean>('saveTagLibrary', { library });
+    return this.send<boolean>(BRIDGE_ACTIONS.SAVE_TAG_LIBRARY, { library });
   }
 
   // Image Edit Methods
   async rotateImages(paths: string[], angle: number): Promise<Record<string, boolean>> {
-    return this.send<Record<string, boolean>>('rotateImages', { paths, angle });
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.ROTATE_IMAGES, { paths, angle });
   }
 
   async flipImages(paths: string[], horizontal: boolean): Promise<Record<string, boolean>> {
-    return this.send<Record<string, boolean>>('flipImages', { paths, horizontal });
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.FLIP_IMAGES, { paths, horizontal });
   }
 
   // File Operations
   async copyFiles(paths: string[], targetFolder: string): Promise<boolean> {
-    return this.send<boolean>('copyFiles', { paths, targetFolder });
+    return this.send<boolean>(BRIDGE_ACTIONS.COPY_FILES, { paths, targetFolder });
   }
 
   async moveFiles(paths: string[], targetFolder: string): Promise<boolean> {
-    return this.send<boolean>('moveFiles', { paths, targetFolder });
+    return this.send<boolean>(BRIDGE_ACTIONS.MOVE_FILES, { paths, targetFolder });
   }
 
   async deleteFiles(paths: string[]): Promise<boolean> {
-    return this.send<boolean>('deleteFiles', { paths });
+    return this.send<boolean>(BRIDGE_ACTIONS.DELETE_FILES, { paths });
   }
 
   async rename(path: string, newName: string): Promise<boolean> {
-    return this.send<boolean>('renameFile', { path, newName });
+    return this.send<boolean>(BRIDGE_ACTIONS.RENAME_FILE, { path, newName });
   }
 
   async openInExplorer(path: string): Promise<void> {
-    return this.send<void>('openInExplorer', { path });
+    return this.send<void>(BRIDGE_ACTIONS.OPEN_IN_EXPLORER, { path });
   }
 
   // Health Check / Diagnostics
@@ -258,56 +285,64 @@ class BridgeService {
     diskFreeBytes: number;
     diskTotalBytes: number;
   }> {
-    return this.send('healthCheck');
+    return this.send(BRIDGE_ACTIONS.HEALTH_CHECK);
   }
 
   // Search / Filter images by tags and/or rating
-  async searchImages(
-    tags?: string[],
-    minRating?: number,
-    limit?: number,
-    offset?: number,
-  ): Promise<ImageFile[]> {
-    return this.send<ImageFile[]>('searchImages', { tags, minRating, limit, offset });
+  async searchImages(tags?: string[], minRating?: number, limit?: number, offset?: number): Promise<ImageFile[]> {
+    return this.send<ImageFile[]>(BRIDGE_ACTIONS.SEARCH_IMAGES, { tags, minRating, limit, offset });
   }
 
-  // Batch tag operations — write same tags to multiple images
+  // Batch tag operations — write identical tags to multiple images
   async writeBatchTags(paths: string[], tags: string[]): Promise<Record<string, boolean>> {
-    return this.send<Record<string, boolean>>('writeBatchTags', { paths, tags });
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.WRITE_BATCH_TAGS, { paths, tags });
+  }
+
+  // Batch tag operations — merge or remove one tag across multiple images
+  async updateBatchTag(paths: string[], tag: string, operation: 'add' | 'remove'): Promise<Record<string, boolean>> {
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.UPDATE_BATCH_TAG, { paths, tag, operation });
   }
 
   // Folder watcher — start/stop watching a folder for changes
   async watchFolder(path: string): Promise<boolean> {
-    return this.send<boolean>('watchFolder', { path });
+    return this.send<boolean>(BRIDGE_ACTIONS.WATCH_FOLDER, { path });
   }
 
   async stopWatching(): Promise<boolean> {
-    return this.send<boolean>('stopWatching');
+    return this.send<boolean>(BRIDGE_ACTIONS.STOP_WATCHING);
   }
 
   // Tag import/export
   async exportTagsJson(paths: string[]): Promise<string> {
-    return this.send<string>('exportTagsJson', { paths });
+    return this.send<string>(BRIDGE_ACTIONS.EXPORT_TAGS_JSON, { paths });
   }
 
   async exportTagsCsv(paths: string[]): Promise<string> {
-    return this.send<string>('exportTagsCsv', { paths });
+    return this.send<string>(BRIDGE_ACTIONS.EXPORT_TAGS_CSV, { paths });
+  }
+
+  /**
+   * Write a per-image XMP sidecar (.xmp file next to each source image).
+   * Useful for RAW formats that can't be written inline.
+   */
+  async exportTagsXmp(paths: string[]): Promise<Record<string, boolean>> {
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.EXPORT_TAGS_XMP, { paths });
   }
 
   async importTagsJson(data: string): Promise<Record<string, boolean>> {
-    return this.send<Record<string, boolean>>('importTagsJson', { data });
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.IMPORT_TAGS_JSON, { data });
   }
 
   async importTagsCsv(data: string): Promise<Record<string, boolean>> {
-    return this.send<Record<string, boolean>>('importTagsCsv', { data });
+    return this.send<Record<string, boolean>>(BRIDGE_ACTIONS.IMPORT_TAGS_CSV, { data });
   }
 
   // Duplicate detection
   async findDuplicates(
     path: string,
-    includeSubfolders: boolean = false,
+    includeSubfolders: boolean = false
   ): Promise<{ hash: string; paths: string[]; fileSize: number }[]> {
-    return this.send('findDuplicates', { path, includeSubfolders });
+    return this.send(BRIDGE_ACTIONS.FIND_DUPLICATES, { path, includeSubfolders });
   }
 
   async getProperties(path: string): Promise<{
@@ -319,7 +354,7 @@ class BridgeService {
     isFolder: boolean;
     dimensions?: { width: number; height: number };
   }> {
-    return this.send('getProperties', { path });
+    return this.send(BRIDGE_ACTIONS.GET_PROPERTIES, { path });
   }
 
   // Mock responses for development without WebView

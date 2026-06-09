@@ -33,7 +33,8 @@ export const StatusBar = () => {
   }, [images]);
 
   return (
-    <motion.div
+    <motion.footer
+      data-testid="status-bar"
       initial={{ y: 30, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 25 }}
@@ -155,6 +156,6 @@ export const StatusBar = () => {
           </button>
         </div>
       </div>
-    </motion.div>
+    </motion.footer>
   );
 };

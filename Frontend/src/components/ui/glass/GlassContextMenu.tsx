@@ -18,9 +18,6 @@ export function GlassContextMenu() {
   // Check if light mode is active
   const isLightMode = document.documentElement.classList.contains('light-mode');
 
-  // eslint-disable-next-line no-console
-  console.log('[GlassContextMenu] render - isOpen:', isOpen, 'x:', x, 'y:', y, 'sections:', sections.length);
-
   // Flatten items for keyboard navigation
   const allItems = sections.flatMap((s) => s.items.filter((i) => !i.disabled));
 

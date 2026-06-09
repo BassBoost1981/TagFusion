@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectAppShellVisible } from './helpers';
 
 test.describe('Navigation', () => {
     test('should load application and show main layout components', async ({ page }) => {
@@ -8,10 +9,7 @@ test.describe('Navigation', () => {
         // Wait for the app to load (basic check)
         await expect(page).toHaveTitle(/TagFusion/);
 
-        // Check if layout components are visible
-        await expect(page.getByTestId('sidebar')).toBeVisible();
-        await expect(page.getByTestId('main-content')).toBeVisible();
-        await expect(page.getByTestId('tag-panel')).toBeVisible();
+        await expectAppShellVisible(page);
     });
 
     test('should show hero section when no folder is selected', async ({ page }) => {

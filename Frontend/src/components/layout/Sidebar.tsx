@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useToastStore } from '../../stores/toastStore';
 import { Collapsible } from '@base-ui-components/react/collapsible';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion } from 'framer-motion';
@@ -6,7 +7,6 @@ import { HardDrive, FolderClosed, ChevronDown, FolderOpen, Loader2, Star, Plus, 
 import {
   useSidebarState,
   useCurrentFolder,
-  useLoadImages,
   useNavigateToFolder,
   useAddCurrentFolderToFavorites,
 } from '../../stores/appStore';
@@ -15,6 +15,7 @@ import { GlassIconButton } from '../ui/glass';
 import { Skeleton } from '../ui/Skeleton';
 import { useTranslation } from 'react-i18next';
 import { SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX } from '../../constants/ui';
+import { useResizeHandle } from '../../hooks/useResizeHandle';
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -32,53 +33,90 @@ export function Sidebar() {
     removeFavorite,
   } = useSidebarState();
   const currentFolder = useCurrentFolder();
-  const loadImages = useLoadImages();
   const navigateToFolder = useNavigateToFolder();
   const addCurrentFolderToFavorites = useAddCurrentFolderToFavorites();
-  const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Drag-and-drop folder import.
+  // WebView2 (Chromium 90+) exposes a non-standard `path` field on dropped File
+  // objects so we can resolve a folder's full path. For folder drops, the entry
+  // can be obtained via webkitGetAsEntry().
+  // Drag-and-Drop für Ordner — WebView2 stellt `path` an gedroppten File-Objekten bereit.
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'link';
+      setIsDragOver(true);
+    }
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    if (e.currentTarget === e.target) setIsDragOver(false);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const items = Array.from(e.dataTransfer.items ?? []);
+    let resolvedPath: string | null = null;
+
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry?.();
+      // Prefer DataTransferItem.path (non-standard, present in WebView2/Chromium)
+      const file = item.getAsFile?.();
+      const filePath = (file as unknown as { path?: string } | null)?.path;
+
+      if (entry?.isDirectory && filePath) {
+        resolvedPath = filePath;
+        break;
+      }
+      if (filePath) {
+        // Dropped a file — navigate to its containing folder
+        const sep = filePath.includes('\\') ? '\\' : '/';
+        const idx = filePath.lastIndexOf(sep);
+        if (idx > 0) {
+          resolvedPath = filePath.slice(0, idx);
+          break;
+        }
+      }
+    }
+
+    if (resolvedPath) {
+      navigateToFolder(resolvedPath).catch(() => {
+        useToastStore.getState().error(t('sidebar.dropFailed') ?? 'Ordner konnte nicht geöffnet werden.');
+      });
+    } else {
+      useToastStore
+        .getState()
+        .info(t('sidebar.dropUnsupported') ?? 'Pfad konnte nicht aufgelöst werden — Drag-and-Drop benötigt WebView2.');
+    }
+  };
+
+  const { isResizing, handlePointerDown } = useResizeHandle({
+    width: sidebarWidth,
+    onWidthChange: setSidebarWidth,
+    minWidth: SIDEBAR_WIDTH_MIN,
+    maxWidth: SIDEBAR_WIDTH_MAX,
+    direction: 'right',
+  });
 
   useEffect(() => {
     loadDrives();
   }, [loadDrives]);
 
-  // Handle resize (drag right edge)
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsResizing(true);
-
-      const startX = e.clientX;
-      const startWidth = sidebarWidth;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        const diff = e.clientX - startX;
-        const newWidth = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, startWidth + diff));
-        setSidebarWidth(newWidth);
-      };
-
-      const handleMouseUp = () => {
-        setIsResizing(false);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [sidebarWidth, setSidebarWidth]
-  );
-
   return (
     <aside
       ref={panelRef}
-      className="h-full flex flex-col glass-sidebar relative"
+      className={`h-full flex flex-col glass-sidebar relative ${isDragOver ? 'ring-2 ring-cyan-400/60' : ''}`}
       style={{ width: sidebarWidth }}
       data-testid="sidebar"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {/* Resize Handle (right edge) */}
       <div
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
         className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize group hover:bg-cyan-500/30 transition-colors z-10 ${isResizing ? 'bg-cyan-500/40' : ''}`}
       >
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-[var(--glass-border)] group-hover:bg-cyan-500/50 transition-colors" />
@@ -159,7 +197,7 @@ export function Sidebar() {
                     folderCache={folderCache}
                     loadingPaths={loadingPaths}
                     onToggle={toggleFolder}
-                    onSelect={loadImages}
+                    onSelect={navigateToFolder}
                   />
                 ))
               )}

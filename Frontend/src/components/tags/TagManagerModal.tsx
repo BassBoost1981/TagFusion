@@ -71,9 +71,9 @@ export function TagManagerModal() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const json = ev.target?.result as string;
-      if (importLibrary(json)) {
+      if (await importLibrary(json)) {
         useToastStore.getState().success(t('tagManager.importSuccess', 'Import successful!'));
       } else {
         useAppStore.getState().setError(t('tagManager.importFailed', 'Import failed!'));
@@ -121,6 +121,7 @@ export function TagManagerModal() {
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <Dialog.Popup
+          data-testid="tag-manager-modal"
           className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[800px] max-h-[80vh] rounded-2xl overflow-hidden flex flex-col transition-all data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 glass-card"
           style={{
             background:
@@ -239,31 +240,40 @@ export function TagManagerModal() {
   );
 }
 
-// Category Item Component
-interface CategoryItemProps {
-  category: TagCategory;
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
+interface EditControls {
   editingId: string | null;
   editValue: string;
   setEditValue: (v: string) => void;
   startEdit: (id: string, name: string) => void;
   confirmEdit: (type: 'category' | 'subcategory', catId: string, subId?: string) => void;
   setEditingId: (id: string | null) => void;
-  newSubName: { catId: string; value: string } | null;
-  setNewSubName: (v: { catId: string; value: string } | null) => void;
+}
+
+interface TagInputControls {
   newTagInput: { catId: string; subId: string; value: string } | null;
   setNewTagInput: (v: { catId: string; subId: string; value: string } | null) => void;
+}
+
+interface SubcategoryMutations {
+  deleteSubcategory: (catId: string, subId: string) => Promise<void>;
+  reorderSubcategories: (catId: string, s: number, e: number) => Promise<void>;
+  addTag: (catId: string, subId: string, tag: string) => Promise<void>;
+  removeTag: (catId: string, subId: string, tag: string) => Promise<void>;
+}
+
+// Category Item Component
+interface CategoryItemProps extends EditControls, TagInputControls, SubcategoryMutations {
+  category: TagCategory;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  newSubName: { catId: string; value: string } | null;
+  setNewSubName: (v: { catId: string; value: string } | null) => void;
   toggleCategoryExpand: (id: string) => void;
-  deleteCategory: (id: string) => void;
-  reorderCategories: (s: number, e: number) => void;
-  addSubcategory: (catId: string, name: string) => void;
-  renameSubcategory: (catId: string, subId: string, name: string) => void;
-  deleteSubcategory: (catId: string, subId: string) => void;
-  reorderSubcategories: (catId: string, s: number, e: number) => void;
-  addTag: (catId: string, subId: string, tag: string) => void;
-  removeTag: (catId: string, subId: string, tag: string) => void;
+  deleteCategory: (id: string) => Promise<void>;
+  reorderCategories: (s: number, e: number) => Promise<void>;
+  addSubcategory: (catId: string, name: string) => Promise<void>;
+  renameSubcategory: (catId: string, subId: string, name: string) => Promise<void>;
 }
 
 function CategoryItem({
@@ -440,6 +450,14 @@ function CategoryItem({
 }
 
 // Subcategory Item Component
+interface SubcategoryItemProps extends EditControls, TagInputControls, SubcategoryMutations {
+  sub: TagSubcategory;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  catId: string;
+}
+
 function SubcategoryItem({
   sub,
   index,
@@ -458,25 +476,7 @@ function SubcategoryItem({
   reorderSubcategories,
   addTag,
   removeTag,
-}: {
-  sub: TagSubcategory;
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
-  catId: string;
-  editingId: string | null;
-  editValue: string;
-  setEditValue: (v: string) => void;
-  startEdit: (id: string, name: string) => void;
-  confirmEdit: (type: 'category' | 'subcategory', catId: string, subId?: string) => void;
-  setEditingId: (id: string | null) => void;
-  newTagInput: { catId: string; subId: string; value: string } | null;
-  setNewTagInput: (v: { catId: string; subId: string; value: string } | null) => void;
-  deleteSubcategory: (catId: string, subId: string) => void;
-  reorderSubcategories: (catId: string, s: number, e: number) => void;
-  addTag: (catId: string, subId: string, tag: string) => void;
-  removeTag: (catId: string, subId: string, tag: string) => void;
-}) {
+}: SubcategoryItemProps) {
   const { t } = useTranslation();
   const theme = useSettingsStore((state) => state.theme);
 

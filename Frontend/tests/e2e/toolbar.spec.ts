@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fillAndClearToolbarSearch } from './helpers';
 
 test.describe('Toolbar', () => {
     test.beforeEach(async ({ page }) => {
@@ -17,27 +18,18 @@ test.describe('Toolbar', () => {
     });
 
     test('should display search input with placeholder', async ({ page }) => {
-        const searchInput = page.locator('input[placeholder="Bilder oder Tags suchen..."]');
+        const searchInput = page.getByTestId('toolbar-search-input');
         await expect(searchInput).toBeVisible();
     });
 
     test('should accept text in search input', async ({ page }) => {
-        const searchInput = page.locator('input[placeholder="Bilder oder Tags suchen..."]');
+        const searchInput = page.getByTestId('toolbar-search-input');
         await searchInput.fill('test');
         await expect(searchInput).toHaveValue('test');
     });
 
     test('should clear search input with X button', async ({ page }) => {
-        const searchInput = page.locator('input[placeholder="Bilder oder Tags suchen..."]');
-        await searchInput.fill('test');
-        // Base UI Combobox.Clear renders as a button inside the .w-72.relative container
-        const searchContainer = page.locator('div').filter({
-            has: page.locator('input[placeholder="Bilder oder Tags suchen..."]'),
-        }).first();
-        const clearButton = searchContainer.locator('button');
-        await expect(clearButton).toBeVisible();
-        await clearButton.click();
-        await expect(searchInput).toHaveValue('');
+        await fillAndClearToolbarSearch(page, 'test');
     });
 
     test('should display sort dropdown with default sort option', async ({ page }) => {
@@ -50,4 +42,3 @@ test.describe('Toolbar', () => {
         await expect(page.getByText('Bewertung').first()).toBeVisible();
     });
 });
-

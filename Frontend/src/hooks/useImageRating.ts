@@ -28,8 +28,7 @@ export function useImageRating(imagePath: string, initialRating: number) {
       useToastStore
         .getState()
         .success(`${t('imageCard.ratingSet')} ${'★'.repeat(newRating)}${'☆'.repeat(5 - newRating)}`);
-    } catch (error) {
-      console.error('Failed to save rating:', error);
+    } catch {
       setRating(initialRating);
       useToastStore.getState().error(t('imageCard.ratingFailed'));
     } finally {
@@ -43,8 +42,7 @@ export function useImageRating(imagePath: string, initialRating: number) {
     setIsSaving(true);
     try {
       await updateImageRating(imagePath, 0);
-    } catch (error) {
-      console.error('Failed to clear rating:', error);
+    } catch {
       setRating(initialRating);
     } finally {
       setIsSaving(false);

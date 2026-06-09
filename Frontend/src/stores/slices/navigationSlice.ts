@@ -17,7 +17,13 @@ const loadFavorites = (): Favorite[] => {
 };
 
 const saveFavorites = (favorites: Favorite[]) => {
-  localStorage.setItem('tagfusion-favorites', JSON.stringify(favorites));
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+      localStorage.setItem('tagfusion-favorites', JSON.stringify(favorites));
+    }
+  } catch {
+    // Ignore — localStorage may be unavailable or blocked.
+  }
 };
 
 export interface NavigationSlice {
@@ -141,8 +147,8 @@ export const createNavigationSlice: StateCreator<
         try {
           const subfolders = await bridge.getFolders(path);
           newCache.set(path, subfolders);
-        } catch (error) {
-          console.error('expandToPath error for', path, error);
+        } catch {
+          // Best-effort tree expansion: navigation itself can still continue.
         }
       }
     }
@@ -151,10 +157,15 @@ export const createNavigationSlice: StateCreator<
   },
 
   navigateToFolder: async (path) => {
+    try {
+      await bridge.stopWatching();
+    } catch {
+      // Ignore — there may be no active watcher yet.
+    }
+
     await get().expandToPath(path);
     await get().loadImages(path);
-    // Start watching the new folder for file changes
-    bridge.watchFolder(path).catch(() => {});
+    await bridge.watchFolder(path).catch(() => {});
   },
 
   navigateUp: async () => {
@@ -203,7 +214,7 @@ export const createNavigationSlice: StateCreator<
     try {
       const folder = await bridge.selectFolder();
       if (folder) {
-        await get().loadImages(folder);
+        await get().navigateToFolder(folder);
       }
     } catch (error) {
       get().setError((error as Error).message);

@@ -3,6 +3,7 @@ import { Sidebar, MainContent, TagPanel, Toolbar, StatusBar } from './components
 import { ToastContainer } from './components/ui/ToastContainer';
 import { GlassContextMenu } from './components/ui/glass';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { KeyboardShortcutsOverlay } from './components/common/KeyboardShortcutsOverlay';
 import { useError, useSetError } from './stores/appStore';
 import { useToastStore } from './stores/toastStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -78,6 +79,9 @@ function App() {
 
       {/* Toast Notifications */}
       <ToastContainer />
+
+      {/* Press ? anywhere to open the keyboard shortcuts overlay */}
+      <KeyboardShortcutsOverlay />
     </div>
   );
 }

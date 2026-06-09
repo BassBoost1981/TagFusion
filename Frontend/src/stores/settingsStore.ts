@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import i18n from '../i18n';
 
 type Language = 'de' | 'en';
@@ -34,6 +34,37 @@ const applyTheme = (theme: Theme) => {
     document.documentElement.classList.remove('dark');
     document.documentElement.classList.add('light-mode');
   }
+};
+
+const safeStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+        return localStorage.getItem(name);
+      }
+    } catch {
+      // Ignore — localStorage may be unavailable or blocked.
+    }
+    return null;
+  },
+  setItem: (name, value) => {
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+        localStorage.setItem(name, value);
+      }
+    } catch {
+      // Ignore — localStorage may be unavailable or blocked.
+    }
+  },
+  removeItem: (name) => {
+    try {
+      if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+        localStorage.removeItem(name);
+      }
+    } catch {
+      // Ignore — localStorage may be unavailable or blocked.
+    }
+  },
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -85,6 +116,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'tagfusion-settings',
+      storage: createJSONStorage(() => safeStorage),
       onRehydrateStorage: () => (state) => {
         if (state?.performanceMode) {
           document.documentElement.classList.add('performance-mode');

@@ -11,12 +11,11 @@ import type { ImageFile } from '../../types';
 
 interface UseImageContextMenuOptions {
   image: ImageFile;
-  allImages: ImageFile[];
 }
 
-export function useImageContextMenu({ image, allImages }: UseImageContextMenuOptions) {
+export function useImageContextMenu({ image }: UseImageContextMenuOptions) {
   const { selectedImages, selectImage, images: storeImages } = useAppStore();
-  const { open: openLightbox } = useLightboxStore();
+  const { open: openLightbox, images: lightboxImages } = useLightboxStore();
   const { show: showContextMenu } = useContextMenuStore();
   const { copy, cut } = useClipboardStore();
   const { openModal } = useModalStore();
@@ -34,7 +33,7 @@ export function useImageContextMenu({ image, allImages }: UseImageContextMenuOpt
 
       const selectedPaths = isSelected ? Array.from(selectedImages) : [image.path];
       const isMultiSelect = selectedPaths.length > 1;
-      const imageList = allImages.length > 0 ? allImages : storeImages;
+      const imageList = lightboxImages.length > 0 ? lightboxImages : storeImages;
 
       const sections: ContextMenuSection[] = [
         {
@@ -109,7 +108,7 @@ export function useImageContextMenu({ image, allImages }: UseImageContextMenuOpt
       image,
       isSelected,
       selectedImages,
-      allImages,
+      lightboxImages,
       storeImages,
       selectImage,
       copy,

@@ -15,6 +15,12 @@ import {
 
 let subscriptionsInitialized = false;
 
+// Highest metadataUpdated requestId we've accepted — guards against out-of-order
+// deliveries from cancelled background loads overwriting fresher data.
+// Höchste akzeptierte requestId — verhindert, dass abgebrochene Hintergrund-Ladeläufe
+// frischere Daten überschreiben.
+let latestMetadataRequestId = 0;
+
 export interface UISlice {
   tags: Tag[];
   error: string | null;
@@ -51,12 +57,7 @@ export interface UISlice {
   exitGlobalSearch: () => void;
 }
 
-export const createUISlice: StateCreator<
-  UISlice & ImageSlice & NavigationSlice,
-  [],
-  [],
-  UISlice
-> = (set, get) => ({
+export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice, [], [], UISlice> = (set, get) => ({
   tags: [],
   error: null,
   sidebarWidth: SIDEBAR_WIDTH_DEFAULT,
@@ -103,7 +104,16 @@ export const createUISlice: StateCreator<
   setFilterTags: (tags) => set({ filterTags: tags }),
   clearFilters: () => {
     const wasGlobal = get().isGlobalSearch;
-    set({ searchQuery: '', filterRating: null, filterTags: [], sortBy: 'name', sortOrder: 'asc', isGlobalSearch: false, isSearching: false, searchResults: [] });
+    set({
+      searchQuery: '',
+      filterRating: null,
+      filterTags: [],
+      sortBy: 'name',
+      sortOrder: 'asc',
+      isGlobalSearch: false,
+      isSearching: false,
+      searchResults: [],
+    });
     // If we were in global search mode, reload current folder to restore normal view
     if (wasGlobal) {
       const folder = get().currentFolder;
@@ -156,12 +166,23 @@ export const createUISlice: StateCreator<
     });
 
     bridge.on('metadataUpdated', (data) => {
-      // eslint-disable-next-line no-console
-      console.log('metadataUpdated received', data);
       if (!data || typeof data !== 'object') return;
 
+      // New envelope shape: { requestId, metadata }. Fall back to the legacy raw
+      // dictionary for any handler that hasn't been migrated yet.
+      const envelope = data as {
+        requestId?: number;
+        metadata?: Record<string, { tags: string[]; rating: number }>;
+      };
+      const requestId = typeof envelope.requestId === 'number' ? envelope.requestId : 0;
+      const metadataMap = envelope.metadata ?? (data as Record<string, { tags: string[]; rating: number }>);
+
+      if (requestId > 0) {
+        if (requestId < latestMetadataRequestId) return; // stale delivery
+        latestMetadataRequestId = requestId;
+      }
+
       const { images, gridItems } = get();
-      const metadataMap = data as Record<string, { tags: string[]; rating: number }>;
       let hasChanges = false;
 
       const normalizedMap = new Map<string, { tags: string[]; rating: number }>();
@@ -172,8 +193,7 @@ export const createUISlice: StateCreator<
       }
 
       const updatedImages = images.map((img) => {
-        let meta = metadataMap[img.path];
-        if (!meta) meta = normalizedMap.get(img.path.toLowerCase())!;
+        const meta = metadataMap[img.path] ?? normalizedMap.get(img.path.toLowerCase());
         if (meta) {
           hasChanges = true;
           return { ...img, tags: meta.tags || [], rating: meta.rating || 0 };

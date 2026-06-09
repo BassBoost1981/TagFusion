@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tag, FolderOpen, Settings2, FolderTree, GripVertical, ChevronDown, Search } from 'lucide-react';
@@ -8,63 +8,45 @@ import { AnimatedCounter, GlassTag, GlassIconButton, GlassInput } from '../ui';
 import { TagTreeView } from '../tags';
 import { useTranslation } from 'react-i18next';
 import { TAG_PANEL_WIDTH_MIN, TAG_PANEL_WIDTH_MAX } from '../../constants/ui';
+import { useResizeHandle } from '../../hooks/useResizeHandle';
+import { countImageTags } from '../../utils/tagCounts';
 
 export function TagPanel() {
   const { t } = useTranslation();
   const { images, tagPanelWidth, setTagPanelWidth, filterTags, setFilterTags } = useTagPanelState();
   const { openModal, categories } = useTagStore();
-  const [isResizing, setIsResizing] = useState(false);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const panelRef = useRef<HTMLElement>(null);
 
-  // Collapsible state with localStorage persistence
+  const { isResizing, handlePointerDown } = useResizeHandle({
+    width: tagPanelWidth,
+    onWidthChange: setTagPanelWidth,
+    minWidth: TAG_PANEL_WIDTH_MIN,
+    maxWidth: TAG_PANEL_WIDTH_MAX,
+    direction: 'left',
+  });
+
+  // Collapsible state with settingsStore persistence
   const [isFolderTagsCollapsed, setIsFolderTagsCollapsed] = useState(() => {
-    return localStorage.getItem('tagfusion-folder-tags-collapsed') === 'true';
+    try {
+      return localStorage.getItem('tagfusion-folder-tags-collapsed') === 'true';
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem('tagfusion-folder-tags-collapsed', String(isFolderTagsCollapsed));
+    try {
+      localStorage.setItem('tagfusion-folder-tags-collapsed', String(isFolderTagsCollapsed));
+    } catch {
+      // Ignore — localStorage may be unavailable in tests
+    }
   }, [isFolderTagsCollapsed]);
 
-  // Handle resize
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsResizing(true);
+  const folderTags = useMemo(() => countImageTags(images), [images]);
 
-      const startX = e.clientX;
-      const startWidth = tagPanelWidth;
-
-      const handleMouseMove = (e: MouseEvent) => {
-        const diff = startX - e.clientX;
-        const newWidth = Math.min(TAG_PANEL_WIDTH_MAX, Math.max(TAG_PANEL_WIDTH_MIN, startWidth + diff));
-        setTagPanelWidth(newWidth);
-      };
-
-      const handleMouseUp = () => {
-        setIsResizing(false);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [tagPanelWidth, setTagPanelWidth]
-  );
-
-  // Get all tags from folder
-  const folderTags = useMemo(() => {
-    const tagCounts = new Map<string, number>();
-    images.forEach((img) => {
-      img.tags?.forEach((tag) => {
-        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-      });
-    });
-    return Array.from(tagCounts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [images]);
+  // Pre-compute filterTags as Set for O(1) lookups
+  const filterTagsSet = useMemo(() => new Set(filterTags), [filterTags]);
 
   return (
     <aside
@@ -75,7 +57,7 @@ export function TagPanel() {
     >
       {/* Resize Handle */}
       <div
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
         className={`absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize group hover:bg-cyan-500/30 transition-colors z-10 ${isResizing ? 'bg-cyan-500/50' : ''}`}
       >
         <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -125,7 +107,7 @@ export function TagPanel() {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {folderTags.map(({ name, count }, index) => {
-                        const isActive = filterTags.includes(name);
+                        const isActive = filterTagsSet.has(name);
                         return (
                           <GlassTag
                             key={name}
@@ -160,7 +142,12 @@ export function TagPanel() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <FolderTree size={14} className="text-cyan-400" />
-                <h4 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">{t('tagPanel.title')}</h4>
+                <h4
+                  data-testid="tag-library-heading"
+                  className="text-xs font-semibold text-cyan-400 uppercase tracking-wider"
+                >
+                  {t('tagPanel.title')}
+                </h4>
               </div>
               <GlassIconButton onClick={openModal} title={t('common.edit')} size="xs" variant="ghost">
                 <Settings2 size={14} />

@@ -3,6 +3,7 @@ import { bridge } from '../services/bridge';
 
 const BATCH_DELAY_MS = 30;
 const BATCH_SIZE = 80;
+const MAX_CONCURRENT_BATCHES = 2;
 const MAX_MEMORY_CACHE_SIZE = 500; // Increased in-memory cache for faster access
 const MAX_RETRY_COUNT = 2; // Retry failed thumbnail loads
 const IDB_NAME = 'tagfusion-thumbnails';
@@ -10,6 +11,7 @@ const IDB_STORE = 'thumbnails';
 const IDB_VERSION = 1;
 const IDB_MAX_ENTRIES = 5000; // Max cached entries before eviction
 const IDB_EVICTION_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+const IDB_WARN_ENABLED = import.meta.env.MODE !== 'test';
 
 // ============================================================================
 // IndexedDB Layer — persistent second-level cache
@@ -45,7 +47,9 @@ openIDB()
     setTimeout(evictOldEntries, 10_000);
   })
   .catch((err) => {
-    console.warn('[ThumbnailManager] IndexedDB unavailable, using memory-only cache:', err);
+    if (IDB_WARN_ENABLED) {
+      console.warn('[ThumbnailManager] IndexedDB unavailable, using memory-only cache:', err);
+    }
   });
 
 /** Remove excess entries from IndexedDB to prevent unbounded growth */
@@ -103,6 +107,17 @@ function idbPut(key: string, value: string): void {
   }
 }
 
+function idbDelete(key: string): void {
+  if (!idbReady || !idb) return;
+  try {
+    const tx = idb.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    store.delete(key);
+  } catch {
+    // Silently ignore — IndexedDB is best-effort
+  }
+}
+
 // ============================================================================
 // Singleton thumbnail manager — shared across all ImageCard instances
 // ============================================================================
@@ -115,6 +130,10 @@ const pendingPaths = new Set<string>();
 
 /** Paths currently being fetched */
 const loadingPaths = new Set<string>();
+
+/** Batched fetch queue; prevents large folders from spawning many bridge calls at once */
+const batchQueue: string[][] = [];
+let activeBatchCount = 0;
 
 /** Retry counts for failed paths */
 const retryCounts = new Map<string, number>();
@@ -166,12 +185,15 @@ async function fetchBatch(paths: string[]) {
       if (retries < MAX_RETRY_COUNT) {
         retryCounts.set(p, retries + 1);
         // Re-queue for retry after delay
-        setTimeout(() => {
-          if (!cache.has(p) && !pendingPaths.has(p) && !loadingPaths.has(p)) {
-            pendingPaths.add(p);
-            scheduleBatch();
-          }
-        }, 1000 * (retries + 1)); // Exponential backoff: 1s, 2s
+        setTimeout(
+          () => {
+            if (!cache.has(p) && !pendingPaths.has(p) && !loadingPaths.has(p)) {
+              pendingPaths.add(p);
+              scheduleBatch();
+            }
+          },
+          1000 * (retries + 1)
+        ); // Exponential backoff: 1s, 2s
       }
     }
   }
@@ -191,9 +213,24 @@ function flushPending() {
     chunks.push(paths.slice(i, i + BATCH_SIZE));
   }
 
-  Promise.all(chunks.map((chunk) => fetchBatch(chunk))).catch((error) => {
-    console.error('[ThumbnailManager] Parallel batch fetch failed:', error);
-  });
+  batchQueue.push(...chunks);
+  processBatchQueue();
+}
+
+function processBatchQueue() {
+  while (activeBatchCount < MAX_CONCURRENT_BATCHES && batchQueue.length > 0) {
+    const chunk = batchQueue.shift()!;
+    activeBatchCount++;
+
+    void fetchBatch(chunk)
+      .catch((error) => {
+        console.error('[ThumbnailManager] Batch queue failed:', error);
+      })
+      .finally(() => {
+        activeBatchCount--;
+        processBatchQueue();
+      });
+  }
 }
 
 function scheduleBatch() {
@@ -232,6 +269,22 @@ function retryThumbnail(path: string) {
   scheduleBatch();
 }
 
+/**
+ * Invalidate a cached thumbnail whose underlying image bytes changed (e.g. after a
+ * lightbox rotate/flip). Drops both cache levels and forces a fresh bridge fetch so
+ * the grid and filmstrip show the edited image instead of the stale cached copy.
+ * Verwirft beide Cache-Ebenen und erzwingt einen neuen Abruf nach einer Bildbearbeitung.
+ */
+function invalidateThumbnail(path: string) {
+  cache.delete(path);
+  idbDelete(path);
+  retryCounts.delete(path);
+  loadingPaths.delete(path);
+  pendingPaths.add(path);
+  scheduleBatch();
+  notify();
+}
+
 function subscribe(cb: () => void) {
   subscribers.add(cb);
   return () => {
@@ -257,9 +310,15 @@ export function useThumbnail(imagePath: string, initialThumbnail?: string | null
   }
 
   useSyncExternalStore(subscribe, () => {
-    const cached = cache.has(imagePath) ? 'y' : 'n';
-    const loading = loadingPaths.has(imagePath) ? 'y' : 'n';
-    return `${cached}-${loading}`;
+    // Encode the cached value itself, not just presence — an in-place refresh
+    // (invalidateThumbnail → re-fetch) returns has/loading to their original
+    // booleans, so a presence-only snapshot would skip the re-render and keep
+    // showing the stale image. Den Wert mitkodieren, damit eine Aktualisierung
+    // (z. B. nach Drehen/Spiegeln) ein erneutes Rendern auslöst.
+    const has = cache.has(imagePath) ? '1' : '0';
+    const value = cache.get(imagePath) ?? '';
+    const loading = loadingPaths.has(imagePath) ? '1' : '0';
+    return `${has}|${value}|${loading}`;
   });
 
   const thumbnail = cache.get(imagePath) ?? null;
@@ -268,4 +327,4 @@ export function useThumbnail(imagePath: string, initialThumbnail?: string | null
   return [thumbnail, isLoading];
 }
 
-export { requestThumbnail, retryThumbnail };
+export { requestThumbnail, retryThumbnail, invalidateThumbnail };

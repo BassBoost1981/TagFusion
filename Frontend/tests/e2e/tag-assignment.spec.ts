@@ -17,9 +17,8 @@ test.describe('Tag Assignment', () => {
     });
 
     test('should display tag library section', async ({ page }) => {
-        // Heading text comes from t('tagPanel.title') = "Tags"
         const tagPanel = page.getByTestId('tag-panel');
-        await expect(tagPanel.getByRole('heading', { name: 'Tags' })).toBeVisible();
+        await expect(tagPanel.getByTestId('tag-library-heading')).toBeVisible();
     });
 
     test('should have search input for tags', async ({ page }) => {

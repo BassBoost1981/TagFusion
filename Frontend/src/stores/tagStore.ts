@@ -3,81 +3,116 @@ import type { TagCategory, TagSubcategory, TagLibrary, RawImportCategory, RawImp
 import { bridge } from '../services/bridge';
 import { useAppStore } from './appStore';
 
-// Generate unique ID
 const generateId = () => crypto.randomUUID();
-
-// LocalStorage key
 const STORAGE_KEY = 'tagfusion-tag-library';
 
-// Load from localStorage
+const serializeLibrary = (categories: TagCategory[]): TagLibrary => ({
+  version: '1.0',
+  exportDate: new Date().toISOString(),
+  categories,
+});
+
+const saveTagLibraryToLocalStorage = (categories: TagCategory[]) => {
+  if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeLibrary(categories)));
+  }
+};
+
 const loadTagLibrary = (): TagCategory[] => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const library: TagLibrary = JSON.parse(saved);
-      return library.categories.map((cat) => ({
-        ...cat,
-        id: cat.id || generateId(),
-        subcategories: cat.subcategories.map((sub) => ({
-          ...sub,
-          id: sub.id || generateId(),
-        })),
-      }));
-    }
-  } catch (e) {
-    console.error('Failed to load tag library:', e);
+    const saved =
+      typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function'
+        ? localStorage.getItem(STORAGE_KEY)
+        : null;
+
+    if (!saved) return [];
+
+    const library: TagLibrary = JSON.parse(saved);
+    return library.categories.map((cat) => ({
+      ...cat,
+      id: cat.id || generateId(),
+      subcategories: cat.subcategories.map((sub) => ({
+        ...sub,
+        id: sub.id || generateId(),
+      })),
+    }));
+  } catch {
+    return [];
   }
-  return [];
 };
 
-// Save to localStorage and Backend
-const saveTagLibrary = (categories: TagCategory[]) => {
-  const library: TagLibrary = {
-    version: '1.0',
-    exportDate: new Date().toISOString(),
-    categories,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-  // Save to backend (fire and forget)
-  bridge.saveTagLibrary(library).catch((err) => {
-    useAppStore.getState().setError((err as Error).message);
-  });
+const persistTagLibrary = async (categories: TagCategory[]) => {
+  const library = serializeLibrary(categories);
+  const saved = await bridge.saveTagLibrary(library);
+
+  if (!saved) {
+    throw new Error('Tag-Bibliothek konnte nicht gespeichert werden.');
+  }
+
+  try {
+    saveTagLibraryToLocalStorage(categories);
+  } catch {
+    // Ignore — localStorage may be unavailable in tests.
+  }
 };
+
+const reportTagStoreError = (error: unknown) => {
+  useAppStore.getState().setError((error as Error).message);
+};
+
+const tryPersistTagLibrary = async (categories: TagCategory[]) => {
+  try {
+    await persistTagLibrary(categories);
+    return true;
+  } catch (error) {
+    reportTagStoreError(error);
+    return false;
+  }
+};
+
+const updateCategory = (
+  categories: TagCategory[],
+  categoryId: string,
+  update: (category: TagCategory) => TagCategory
+) => categories.map((cat) => (cat.id === categoryId ? update(cat) : cat));
+
+const updateSubcategory = (
+  categories: TagCategory[],
+  categoryId: string,
+  subId: string,
+  update: (subcategory: TagSubcategory) => TagSubcategory
+) =>
+  updateCategory(categories, categoryId, (cat) => ({
+    ...cat,
+    subcategories: cat.subcategories.map((sub) => (sub.id === subId ? update(sub) : sub)),
+  }));
 
 interface TagStore {
-  // State
   categories: TagCategory[];
   isModalOpen: boolean;
 
-  // Modal
   openModal: () => void;
   closeModal: () => void;
 
-  // Category CRUD
-  addCategory: (name: string) => void;
-  renameCategory: (id: string, name: string) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (name: string) => Promise<void>;
+  renameCategory: (id: string, name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   toggleCategoryExpand: (id: string) => void;
 
-  // Subcategory CRUD
-  addSubcategory: (categoryId: string, name: string) => void;
-  renameSubcategory: (categoryId: string, subId: string, name: string) => void;
-  deleteSubcategory: (categoryId: string, subId: string) => void;
+  addSubcategory: (categoryId: string, name: string) => Promise<void>;
+  renameSubcategory: (categoryId: string, subId: string, name: string) => Promise<void>;
+  deleteSubcategory: (categoryId: string, subId: string) => Promise<void>;
 
-  // Tag CRUD
-  addTag: (categoryId: string, subId: string, tag: string) => void;
-  removeTag: (categoryId: string, subId: string, tag: string) => void;
+  addTag: (categoryId: string, subId: string, tag: string) => Promise<void>;
+  removeTag: (categoryId: string, subId: string, tag: string) => Promise<void>;
 
-  // Reorder
-  reorderCategories: (startIndex: number, endIndex: number) => void;
-  reorderSubcategories: (categoryId: string, startIndex: number, endIndex: number) => void;
-  reorderTags: (categoryId: string, subId: string, startIndex: number, endIndex: number) => void;
+  reorderCategories: (startIndex: number, endIndex: number) => Promise<void>;
+  reorderSubcategories: (categoryId: string, startIndex: number, endIndex: number) => Promise<void>;
+  reorderTags: (categoryId: string, subId: string, startIndex: number, endIndex: number) => Promise<void>;
 
-  // Import/Export
-  importLibrary: (json: string) => boolean;
+  importLibrary: (json: string) => Promise<boolean>;
   exportLibrary: () => string;
 
-  // Initialization
   initialize: () => Promise<void>;
 }
 
@@ -87,46 +122,46 @@ export const useTagStore = create<TagStore>((set, get) => ({
 
   initialize: async () => {
     const { categories } = get();
-    if (categories.length === 0) {
-      try {
-        const library = await bridge.getTagLibrary();
-        if (library) {
-          get().importLibrary(JSON.stringify(library));
-        }
-      } catch (error) {
-        useAppStore.getState().setError((error as Error).message);
+    if (categories.length > 0) return;
+
+    try {
+      const library = await bridge.getTagLibrary();
+      if (library) {
+        await get().importLibrary(JSON.stringify(library));
       }
+    } catch (error) {
+      reportTagStoreError(error);
     }
   },
 
   openModal: () => set({ isModalOpen: true }),
   closeModal: () => set({ isModalOpen: false }),
 
-  addCategory: (name) => {
+  addCategory: async (name) => {
     const { categories } = get();
-    const newCategory: TagCategory = {
-      id: generateId(),
-      name,
-      subcategories: [],
-      isExpanded: true,
-    };
-    const updated = [...categories, newCategory];
-    saveTagLibrary(updated);
-    set({ categories: updated });
+    const updated = [...categories, { id: generateId(), name, subcategories: [], isExpanded: true }];
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  renameCategory: (id, name) => {
+  renameCategory: async (id, name) => {
     const { categories } = get();
     const updated = categories.map((cat) => (cat.id === id ? { ...cat, name } : cat));
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  deleteCategory: (id) => {
+  deleteCategory: async (id) => {
     const { categories } = get();
     const updated = categories.filter((cat) => cat.id !== id);
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
   toggleCategoryExpand: (id) => {
@@ -135,81 +170,75 @@ export const useTagStore = create<TagStore>((set, get) => ({
     set({ categories: updated });
   },
 
-  addSubcategory: (categoryId, name) => {
+  addSubcategory: async (categoryId, name) => {
     const { categories } = get();
     const newSub: TagSubcategory = { id: generateId(), name, tags: [] };
-    const updated = categories.map((cat) =>
-      cat.id === categoryId ? { ...cat, subcategories: [...cat.subcategories, newSub] } : cat
-    );
-    saveTagLibrary(updated);
-    set({ categories: updated });
+    const updated = updateCategory(categories, categoryId, (cat) => ({
+      ...cat,
+      subcategories: [...cat.subcategories, newSub],
+    }));
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  renameSubcategory: (categoryId, subId, name) => {
+  renameSubcategory: async (categoryId, subId, name) => {
     const { categories } = get();
-    const updated = categories.map((cat) =>
-      cat.id === categoryId
-        ? {
-            ...cat,
-            subcategories: cat.subcategories.map((sub) => (sub.id === subId ? { ...sub, name } : sub)),
-          }
-        : cat
-    );
-    saveTagLibrary(updated);
-    set({ categories: updated });
+    const updated = updateSubcategory(categories, categoryId, subId, (sub) => ({ ...sub, name }));
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  deleteSubcategory: (categoryId, subId) => {
+  deleteSubcategory: async (categoryId, subId) => {
     const { categories } = get();
-    const updated = categories.map((cat) =>
-      cat.id === categoryId ? { ...cat, subcategories: cat.subcategories.filter((sub) => sub.id !== subId) } : cat
-    );
-    saveTagLibrary(updated);
-    set({ categories: updated });
+    const updated = updateCategory(categories, categoryId, (cat) => ({
+      ...cat,
+      subcategories: cat.subcategories.filter((sub) => sub.id !== subId),
+    }));
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  addTag: (categoryId, subId, tag) => {
+  addTag: async (categoryId, subId, tag) => {
     const { categories } = get();
-    const updated = categories.map((cat) =>
-      cat.id === categoryId
-        ? {
-            ...cat,
-            subcategories: cat.subcategories.map((sub) =>
-              sub.id === subId && !sub.tags.includes(tag) ? { ...sub, tags: [...sub.tags, tag] } : sub
-            ),
-          }
-        : cat
+    const updated = updateSubcategory(categories, categoryId, subId, (sub) =>
+      sub.tags.includes(tag) ? sub : { ...sub, tags: [...sub.tags, tag] }
     );
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  removeTag: (categoryId, subId, tag) => {
+  removeTag: async (categoryId, subId, tag) => {
     const { categories } = get();
-    const updated = categories.map((cat) =>
-      cat.id === categoryId
-        ? {
-            ...cat,
-            subcategories: cat.subcategories.map((sub) =>
-              sub.id === subId ? { ...sub, tags: sub.tags.filter((t) => t !== tag) } : sub
-            ),
-          }
-        : cat
-    );
-    saveTagLibrary(updated);
-    set({ categories: updated });
+    const updated = updateSubcategory(categories, categoryId, subId, (sub) => ({
+      ...sub,
+      tags: sub.tags.filter((t) => t !== tag),
+    }));
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  reorderCategories: (startIndex, endIndex) => {
+  reorderCategories: async (startIndex, endIndex) => {
     const { categories } = get();
     const updated = Array.from(categories);
     const [removed] = updated.splice(startIndex, 1);
     updated.splice(endIndex, 0, removed);
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  reorderSubcategories: (categoryId, startIndex, endIndex) => {
+  reorderSubcategories: async (categoryId, startIndex, endIndex) => {
     const { categories } = get();
     const updated = categories.map((cat) => {
       if (cat.id !== categoryId) return cat;
@@ -218,11 +247,13 @@ export const useTagStore = create<TagStore>((set, get) => ({
       subs.splice(endIndex, 0, removed);
       return { ...cat, subcategories: subs };
     });
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  reorderTags: (categoryId, subId, startIndex, endIndex) => {
+  reorderTags: async (categoryId, subId, startIndex, endIndex) => {
     const { categories } = get();
     const updated = categories.map((cat) => {
       if (cat.id !== categoryId) return cat;
@@ -237,14 +268,15 @@ export const useTagStore = create<TagStore>((set, get) => ({
         }),
       };
     });
-    saveTagLibrary(updated);
-    set({ categories: updated });
+
+    if (await tryPersistTagLibrary(updated)) {
+      set({ categories: updated });
+    }
   },
 
-  importLibrary: (json) => {
+  importLibrary: async (json) => {
     try {
       const data = JSON.parse(json);
-      // Support both formats: with 'categories' array or direct array
       const rawCategories = data.categories || data;
       if (!Array.isArray(rawCategories)) return false;
 
@@ -259,26 +291,29 @@ export const useTagStore = create<TagStore>((set, get) => ({
         })),
       }));
 
-      saveTagLibrary(categories);
+      await persistTagLibrary(categories);
       set({ categories });
       return true;
     } catch (e) {
-      useAppStore.getState().setError((e as Error).message);
+      reportTagStoreError(e);
       return false;
     }
   },
 
   exportLibrary: () => {
     const { categories } = get();
-    const library: TagLibrary = {
-      version: '1.0',
-      exportDate: new Date().toISOString(),
-      categories: categories.map(({ id, name, subcategories }) => ({
-        id,
-        name,
-        subcategories: subcategories.map(({ id, name, tags }) => ({ id, name, tags })),
-      })),
-    };
-    return JSON.stringify(library, null, 2);
+    return JSON.stringify(
+      {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        categories: categories.map(({ id, name, subcategories }) => ({
+          id,
+          name,
+          subcategories: subcategories.map(({ id, name, tags }) => ({ id, name, tags })),
+        })),
+      },
+      null,
+      2
+    );
   },
 }));

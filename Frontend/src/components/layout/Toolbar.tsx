@@ -234,19 +234,27 @@ export function Toolbar() {
           }}
           onInputValueChange={(inputValue) => setSearchQuery(inputValue)}
         >
-          <div className="w-72 relative">
+          <div className="w-72 relative" data-testid="toolbar-search">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
               <Search size={16} className="text-[var(--color-text-secondary)]" />
             </div>
             <Combobox.Input
               value={searchQuery}
+              aria-label={t('toolbar.search')}
+              data-testid="toolbar-search-input"
               placeholder={t('toolbar.search')}
               className="w-full h-8 pl-9 pr-8 rounded-lg backdrop-blur-glass-xs bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all"
             />
             {searchQuery && (
-              <Combobox.Clear className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--glass-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+              <button
+                type="button"
+                aria-label={t('toolbar.clearSearch')}
+                data-testid="toolbar-search-clear"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[var(--glass-bg-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              >
                 <X size={14} />
-              </Combobox.Clear>
+              </button>
             )}
           </div>
           <Combobox.Portal>
@@ -284,14 +292,20 @@ export function Toolbar() {
 
         {/* Sort Dropdown - Base UI Menu */}
         <Menu.Root>
-          <Menu.Trigger className="flex items-center gap-2 px-3 py-1.5 rounded-lg backdrop-blur-glass-xs bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] transition-colors data-[popup-open]:bg-[var(--glass-bg-hover)]">
+          <Menu.Trigger
+            data-testid="toolbar-sort-trigger"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg backdrop-blur-glass-xs bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-sm text-[var(--color-text-primary)] transition-colors data-[popup-open]:bg-[var(--glass-bg-hover)]"
+          >
             {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
             <span>{SORT_OPTIONS.find((o) => o.value === sortBy)?.label}</span>
             <ChevronDown size={14} className="transition-transform data-[popup-open]:rotate-180" />
           </Menu.Trigger>
           <Menu.Portal>
             <Menu.Positioner side="bottom" align="end" sideOffset={4}>
-              <Menu.Popup className="w-40 py-1 rounded-xl backdrop-blur-glass-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-glass-lg z-50 outline-none transition-all data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95">
+              <Menu.Popup
+                data-testid="toolbar-sort-menu"
+                className="w-40 py-1 rounded-xl backdrop-blur-glass-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-glass-lg z-50 outline-none transition-all data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95"
+              >
                 {SORT_OPTIONS.map((option) => (
                   <Menu.Item
                     key={option.value}
@@ -370,7 +384,12 @@ export function Toolbar() {
 
         {/* Exit Global Search */}
         {isGlobalSearch && (
-          <GlassIconButton onClick={exitGlobalSearch} title={t('toolbar.exitSearch', 'Suche beenden')} variant="danger" size="sm">
+          <GlassIconButton
+            onClick={exitGlobalSearch}
+            title={t('toolbar.exitSearch', 'Suche beenden')}
+            variant="danger"
+            size="sm"
+          >
             <X size={16} />
           </GlassIconButton>
         )}

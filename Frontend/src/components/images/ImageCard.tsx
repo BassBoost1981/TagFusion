@@ -7,20 +7,18 @@ import type { ImageFile } from '../../types';
 import { ImageThumbnail } from './ImageThumbnail';
 import { StarRating } from './StarRating';
 import { useImageContextMenu } from './useImageContextMenu';
-import { useThumbnail, requestThumbnail } from '../../hooks/useThumbnailManager';
+import { useThumbnail, requestThumbnail, retryThumbnail } from '../../hooks/useThumbnailManager';
 import { useImageRating } from '../../hooks/useImageRating';
 
 interface ImageCardProps {
   image: ImageFile;
   thumbnailSize?: number;
-  allImages?: ImageFile[];
   isSelected?: boolean;
 }
 
 export const ImageCard = memo(
-  function ImageCard({ image, thumbnailSize, allImages = [], isSelected: isSelectedProp }: ImageCardProps) {
+  function ImageCard({ image, thumbnailSize, isSelected: isSelectedProp }: ImageCardProps) {
     const selectImage = useAppStore((s) => s.selectImage);
-    const storeImages = useAppStore((s) => s.images);
     const openLightbox = useLightboxStore((s) => s.open);
     const [thumbnail, isLoading] = useThumbnail(image.path, image.thumbnailBase64);
     const {
@@ -34,7 +32,7 @@ export const ImageCard = memo(
     const selectedImages = useAppStore((s) => (isSelectedProp === undefined ? s.selectedImages : null));
     const isSelected = isSelectedProp ?? selectedImages?.has(image.path) ?? false;
     const tagCount = image.tags?.length || 0;
-    const handleContextMenu = useImageContextMenu({ image, allImages });
+    const handleContextMenu = useImageContextMenu({ image });
 
     // VirtuosoGrid only renders visible items — request thumbnail on mount
     useEffect(() => {
@@ -48,8 +46,7 @@ export const ImageCard = memo(
     const handleDoubleClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const imageList = allImages.length > 0 ? allImages : storeImages;
-      openLightbox(image, imageList);
+      openLightbox(image);
     };
 
     return (
@@ -64,8 +61,7 @@ export const ImageCard = memo(
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            const imageList = allImages.length > 0 ? allImages : storeImages;
-            openLightbox(image, imageList);
+            openLightbox(image);
           } else if (e.key === ' ') {
             e.preventDefault();
             selectImage(image.path, e.ctrlKey || e.metaKey, e.shiftKey);
@@ -98,7 +94,7 @@ export const ImageCard = memo(
             isLoading={isLoading}
             thumbnailSize={thumbnailSize}
             onThumbnailError={() => {
-              if (!thumbnail) requestThumbnail(image.path);
+              retryThumbnail(image.path);
             }}
           />
 
@@ -148,13 +144,26 @@ export const ImageCard = memo(
     );
   },
   (prev, next) => {
-    return (
-      prev.image.path === next.image.path &&
-      prev.image.rating === next.image.rating &&
-      prev.isSelected === next.isSelected &&
-      prev.thumbnailSize === next.thumbnailSize &&
-      prev.image.tags?.length === next.image.tags?.length &&
-      prev.image.tags?.join(',') === next.image.tags?.join(',')
-    );
+    // Fast scalar comparisons first / Schnelle skalare Vergleiche zuerst
+    if (
+      prev.image.path !== next.image.path ||
+      prev.image.rating !== next.image.rating ||
+      prev.isSelected !== next.isSelected ||
+      prev.thumbnailSize !== next.thumbnailSize
+    ) {
+      return false;
+    }
+
+    // Optimized tags comparison: length check + element-wise early exit
+    // Optimierter Tag-Vergleich: Laengencheck + elementweiser Fruehausstieg
+    const prevTags = prev.image.tags;
+    const nextTags = next.image.tags;
+    if (prevTags === nextTags) return true; // Same reference or both undefined / Gleiche Referenz oder beide undefined
+    if (!prevTags || !nextTags) return false; // One is undefined / Einer ist undefined
+    if (prevTags.length !== nextTags.length) return false;
+    for (let i = 0; i < prevTags.length; i++) {
+      if (prevTags[i] !== nextTags[i]) return false;
+    }
+    return true;
   }
 );

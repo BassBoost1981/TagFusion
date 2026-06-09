@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectAppShellVisible, fillAndClearToolbarSearch } from './helpers';
 
 test.describe('User Interactions', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,18 +29,7 @@ test.describe('User Interactions', () => {
   // ========================================================================
 
   test('should filter via search input and clear', async ({ page }) => {
-    const searchInput = page.locator('input[placeholder="Bilder oder Tags suchen..."]');
-    await searchInput.fill('Landschaft');
-    await expect(searchInput).toHaveValue('Landschaft');
-
-    // Clear button should appear
-    const searchContainer = page.locator('div').filter({
-      has: page.locator('input[placeholder="Bilder oder Tags suchen..."]'),
-    }).first();
-    const clearButton = searchContainer.locator('button');
-    await expect(clearButton).toBeVisible();
-    await clearButton.click();
-    await expect(searchInput).toHaveValue('');
+    await fillAndClearToolbarSearch(page, 'Landschaft');
   });
 
   // ========================================================================
@@ -61,8 +51,7 @@ test.describe('User Interactions', () => {
     const settingsButton = tagPanel.getByTitle('Bearbeiten');
     await settingsButton.click();
 
-    // Tag Manager modal should appear
-    await expect(page.getByText(/Tag-Manager/)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('tag-manager-modal')).toBeVisible({ timeout: 3000 });
   });
 
   // ========================================================================
@@ -70,14 +59,10 @@ test.describe('User Interactions', () => {
   // ========================================================================
 
   test('should open sort dropdown and show options', async ({ page }) => {
-    // Click the sort trigger button (shows "Name" by default)
-    const toolbarSort = page.getByRole('button', { name: /Name/ }).first();
-    if (await toolbarSort.isVisible()) {
-      await toolbarSort.click();
-      // Dropdown listbox should appear with sort options
-      const listbox = page.getByRole('listbox');
-      await expect(listbox).toBeVisible({ timeout: 2000 });
-    }
+    const toolbarSort = page.getByTestId('toolbar-sort-trigger');
+    await expect(toolbarSort).toBeVisible();
+    await toolbarSort.click();
+    await expect(page.getByTestId('toolbar-sort-menu')).toBeVisible({ timeout: 2000 });
   });
 
   // ========================================================================
@@ -102,9 +87,7 @@ test.describe('User Interactions', () => {
 
   test('should maintain layout structure at different viewport sizes', async ({ page }) => {
     // Default viewport is 1280x720
-    await expect(page.getByTestId('sidebar')).toBeVisible();
-    await expect(page.getByTestId('main-content')).toBeVisible();
-    await expect(page.getByTestId('tag-panel')).toBeVisible();
+    await expectAppShellVisible(page);
   });
 
   // ========================================================================
@@ -125,8 +108,6 @@ test.describe('User Interactions', () => {
   // ========================================================================
 
   test('should display status bar at bottom', async ({ page }) => {
-    // Status bar shows item counts or ready state
-    const statusBar = page.locator('footer, [class*="status"]').first();
-    await expect(statusBar).toBeVisible();
+    await expect(page.getByTestId('status-bar')).toBeVisible();
   });
 });

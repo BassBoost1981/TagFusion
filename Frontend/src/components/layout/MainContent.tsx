@@ -16,6 +16,8 @@ import { Breadcrumb } from './Breadcrumb';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSetError } from '../../stores/appStore';
+import { canNavigateUpFromFolder } from '../../utils/navigation';
+import { countImageTags } from '../../utils/tagCounts';
 
 export function MainContent() {
   const { t } = useTranslation();
@@ -30,29 +32,14 @@ export function MainContent() {
   const navigateUp = useNavigateUp();
   const setError = useSetError();
 
-  // Check if we can navigate up (not at root)
-  const canNavigateUp = useMemo(() => {
-    if (!currentFolder) return false;
-    const normalized = currentFolder.replace(/\\/g, '/');
-    const parts = normalized.split('/').filter(Boolean);
-    return parts.length > 1;
-  }, [currentFolder]);
+  const canNavigateUp = useMemo(() => canNavigateUpFromFolder(currentFolder), [currentFolder]);
 
   // Get tags from selected images only
   const selectedTags = useMemo(() => {
     if (selectedImages.size === 0) return [];
 
     const selectedImgs = images.filter((img) => selectedImages.has(img.path));
-    const tagCounts = new Map<string, number>();
-    selectedImgs.forEach((img) => {
-      img.tags?.forEach((tag) => {
-        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-      });
-    });
-
-    return Array.from(tagCounts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
+    return countImageTags(selectedImgs);
   }, [images, selectedImages]);
 
   // Remove tag from all selected images

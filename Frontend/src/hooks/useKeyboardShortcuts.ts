@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useClipboardStore } from '../stores/clipboardStore';
 import { useModalStore } from '../stores/modalStore';
+import { isTextInputTarget } from '../utils/keyboardTarget';
 
 /**
  * Keyboard shortcuts hook - reads state via getState() to avoid
@@ -9,8 +10,8 @@ import { useModalStore } from '../stores/modalStore';
  */
 export function useKeyboardShortcuts() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Ignore shortcuts when typing in input fields
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    // Ignore shortcuts when typing in input fields or contentEditable hosts
+    if (isTextInputTarget(e.target)) {
       return;
     }
 

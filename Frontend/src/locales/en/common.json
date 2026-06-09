@@ -1,0 +1,139 @@
+{
+    "toolbar": {
+        "search": "Search images or tags...",
+        "clearSearch": "Clear search",
+        "home": "Home",
+        "sort": {
+            "name": "Name",
+            "date": "Date",
+            "size": "Size",
+            "rating": "Rating"
+        },
+        "rating": "Rating",
+        "clearFilters": "Clear all filters",
+        "resetFilter": "Reset filter",
+        "rotate90Left": "Rotate 90° left",
+        "rotate90Right": "Rotate 90° right",
+        "rotate180": "Rotate 180°",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "selected": "selected",
+        "file": "File",
+        "tag": "Tag",
+        "noSuggestions": "No suggestions found"
+    },
+    "sidebar": {
+        "openFile": "Open file",
+        "selectFolder": "Select folder",
+        "recentFolders": "Recent folders",
+        "favorites": "Favorites",
+        "noFavorites": "No favorites",
+        "noRecentFolders": "No folders",
+        "dropFailed": "Could not open folder.",
+        "dropUnsupported": "Could not resolve path — drag-and-drop requires WebView2."
+    },
+    "tagPanel": {
+        "title": "Tags",
+        "addTag": "Add tag",
+        "noTags": "No tags",
+        "folderTags": "Folder tags",
+        "imageTags": "Image tags",
+        "selectImage": "Select image"
+    },
+    "settings": {
+        "title": "Settings",
+        "language": "Language",
+        "theme": "Theme",
+        "themeLight": "Light",
+        "themeDark": "Dark",
+        "performanceMode": "Performance mode",
+        "performanceModeDesc": "Reduces glass effects"
+    },
+    "common": {
+        "loading": "Loading...",
+        "loadingItems": "Loading items...",
+        "error": "Error",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "close": "Close",
+        "parentFolder": "Parent folder"
+    },
+    "emptyState": {
+        "noResults": "No results",
+        "noResultsHint": "Try different search terms or filters",
+        "resetFilters": "Reset filters",
+        "folderEmpty": "Folder is empty",
+        "noImages": "This folder contains no subfolders or supported image files.",
+        "noTags": "No tags available",
+        "noTagsHint": "Select images and assign tags",
+        "openTagManager": "Open Tag Manager"
+    },
+    "imageCard": {
+        "ratingSet": "Rating:",
+        "ratingFailed": "Failed to save rating"
+    },
+    "lightbox": {
+        "close": "Close (ESC)",
+        "previous": "Previous (←)",
+        "next": "Next (→)",
+        "info": "Info (I)",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "zoomOut": "Zoom out (-)",
+        "zoomIn": "Zoom in (+)",
+        "filmstrip": "Filmstrip"
+    },
+    "mainContent": {
+        "selectedTags": "Selection tags"
+    },
+    "statusBar": {
+        "images": "images",
+        "folders": "folders",
+        "selected": "selected"
+    },
+    "tagManager": {
+        "title": "Tag Manager",
+        "newCategory": "Add new category...",
+        "newSubcategory": "New subcategory...",
+        "newTag": "New tag...",
+        "import": "Import",
+        "export": "Export"
+    },
+    "hero": {
+        "title": "Welcome to TagFusion",
+        "subtitle": "Organize your image collection with modern tagging, lightning-fast search, and intuitive controls.",
+        "drives": "Devices and Drives",
+        "freeOf": "free of"
+    },
+    "shortcuts": {
+        "title": "Keyboard shortcuts",
+        "groupSelection": "Selection",
+        "groupClipboard": "Clipboard",
+        "groupFiles": "Files",
+        "groupZoom": "Zoom",
+        "groupLightbox": "Lightbox",
+        "groupHelp": "Help",
+        "selectAll": "Select all",
+        "clearSelection": "Clear selection",
+        "copy": "Copy",
+        "cut": "Cut",
+        "paste": "Paste",
+        "rename": "Rename",
+        "delete": "Delete",
+        "properties": "Properties",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "zoomReset": "Reset zoom",
+        "lightboxNav": "Previous / next image",
+        "lightboxZoom": "Zoom in / out",
+        "lightboxReset": "Reset zoom",
+        "lightboxInfo": "Toggle info panel",
+        "lightboxClose": "Close lightbox",
+        "helpOverlay": "Open / close this overlay",
+        "dismissHint": "Press ? or Esc to close."
+    }
+}

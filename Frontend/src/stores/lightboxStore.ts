@@ -10,7 +10,7 @@ interface LightboxState {
   zoomLevel: number;
 
   // Actions
-  open: (image: ImageFile, images: ImageFile[]) => void;
+  open: (image: ImageFile, images?: ImageFile[]) => void;
   close: () => void;
   next: () => void;
   previous: () => void;
@@ -19,6 +19,8 @@ interface LightboxState {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
+  /** Update the image list without opening — used by ImageGrid to keep it current */
+  setImages: (images: ImageFile[]) => void;
 }
 
 export const useLightboxStore = create<LightboxState>((set, get) => ({
@@ -29,12 +31,14 @@ export const useLightboxStore = create<LightboxState>((set, get) => ({
   zoomLevel: LIGHTBOX_ZOOM_DEFAULT,
 
   open: (image, images) => {
-    const index = images.findIndex((img) => img.path === image.path);
+    // If images provided, use them; otherwise use the currently stored list
+    const imageList = images && images.length > 0 ? images : get().images;
+    const index = imageList.findIndex((img) => img.path === image.path);
     set({
       isOpen: true,
       currentImage: image,
       currentIndex: index >= 0 ? index : 0,
-      images,
+      images: imageList,
       zoomLevel: LIGHTBOX_ZOOM_DEFAULT,
     });
   },
@@ -98,5 +102,9 @@ export const useLightboxStore = create<LightboxState>((set, get) => ({
 
   resetZoom: () => {
     set({ zoomLevel: LIGHTBOX_ZOOM_DEFAULT });
+  },
+
+  setImages: (images) => {
+    set({ images });
   },
 }));

@@ -13,6 +13,8 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+const shouldLogErrors = import.meta.env.DEV && import.meta.env.MODE !== 'test';
+
 /**
  * Error Boundary Component
  * Catches JavaScript errors in child components and displays a fallback UI
@@ -33,7 +35,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({ errorInfo });
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    if (shouldLogErrors) {
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+    }
   }
 
   handleReset = (): void => {

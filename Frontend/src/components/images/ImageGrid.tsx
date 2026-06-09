@@ -21,6 +21,7 @@ import { useLightboxStore } from '../../stores/lightboxStore';
 import { filterAndSortGridItems } from '../../utils/gridItems';
 import { getNextGridIndex } from '../../utils/gridNavigation';
 import { isTextInputTarget } from '../../utils/keyboardTarget';
+import { canNavigateUpFromFolder } from '../../utils/navigation';
 import type { GridItem } from '../../types';
 
 // ============================================================
@@ -123,6 +124,10 @@ export function ImageGrid() {
   const { searchQuery, sortBy, sortOrder, filterRating, filterTags, setSearchQuery, setFilterRating, setFilterTags } =
     useFilterSort();
   const { isGlobalSearch, isSearching, searchResults } = useGlobalSearch();
+  // Selection lives here (one subscriber) instead of in every ImageCard — passing
+  // isSelected as prop lets the memo comparator skip unchanged cards on selection.
+  // Auswahl hier abonnieren statt in jeder Karte — memo ueberspringt unveraenderte Karten.
+  const selectedImages = useAppStore((s) => s.selectedImages);
 
   // Keep lightbox store in sync with the displayed image list
   const setLightboxImages = useLightboxStore((s) => s.setImages);
@@ -162,13 +167,7 @@ export function ImageGrid() {
     return { colWidthPercent: `${100 / cols}%`, columnCount: cols };
   }, [containerWidth, itemSize]);
 
-  // Check if we can navigate up (not at root)
-  const canNavigateUp = useMemo(() => {
-    if (!currentFolder) return false;
-    const normalized = currentFolder.replace(/\\/g, '/');
-    const parts = normalized.split('/').filter(Boolean);
-    return parts.length > 1;
-  }, [currentFolder]);
+  const canNavigateUp = useMemo(() => canNavigateUpFromFolder(currentFolder), [currentFolder]);
 
   // Pre-compute filterTags as Set for O(1) lookups instead of O(n) .includes()
   const filterTagsSet = useMemo(() => new Set(filterTags), [filterTags]);
@@ -307,13 +306,13 @@ export function ImageGrid() {
               style={{ ...uniformStyle, opacity: vItem.isDimmed ? 0.3 : 1 }}
               className={vItem.isHighlighted ? 'ring-2 ring-cyan-400 rounded-xl' : ''}
             >
-              <ImageCard image={image} />
+              <ImageCard image={image} isSelected={selectedImages.has(image.path)} />
             </div>
           );
         }
       }
     },
-    [virtualItems, navigateUp, t]
+    [virtualItems, navigateUp, t, selectedImages]
   );
 
   // Arrow-key navigation across the image grid. Left/Right step one, Up/Down step a
@@ -328,9 +327,7 @@ export function ImageGrid() {
       e.preventDefault();
 
       const { lastSelectedImage, selectImage } = useAppStore.getState();
-      const currentIndex = lastSelectedImage
-        ? displayImages.findIndex((img) => img.path === lastSelectedImage)
-        : -1;
+      const currentIndex = lastSelectedImage ? displayImages.findIndex((img) => img.path === lastSelectedImage) : -1;
       const nextIndex = getNextGridIndex(currentIndex, e.key, displayImages.length, columnCount);
       if (nextIndex < 0 || nextIndex === currentIndex) return;
 

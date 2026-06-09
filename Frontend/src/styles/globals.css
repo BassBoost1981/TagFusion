@@ -56,22 +56,11 @@
 }
 
 /* ============================================
-   NOISE TEXTURE OVERLAY
-   Subtle film grain effect for premium aesthetic
-   Using static noise pattern for better performance
+   BACKGROUND
+   Keep the app background smooth. The previous
+   tiled texture overlay caused visible banding
+   in WebView2 on large dark gradients.
    ============================================ */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.04;
-  /* Static noise pattern - more performant than SVG feTurbulence */
-  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAElBMVEUAAAAAAAAAAAAAAAAAAAAAAADgKxmiAAAABnRSTlMFBgcICQoLNvWdAAAARElEQVQ4y2NgGLTAH4qYQAiKmOGIGYZYoIgFhlihiJWBgYGJCYaYYIgZhphgiAWGWGCIFYZYGRgYmJhgiBmGmGAIAACGxAOjzM3xsAAAAABJRU5ErkJggg==');
-  background-repeat: repeat;
-  mix-blend-mode: overlay;
-}
 
 /* ============================================
    FONTS
@@ -126,7 +115,7 @@ body {
     radial-gradient(ellipse at 0% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
     radial-gradient(ellipse at 100% 50%, rgba(236, 72, 153, 0.06) 0%, transparent 40%),
     linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 50%, var(--color-bg-tertiary) 100%);
-  background-attachment: fixed;
+  background-attachment: scroll;
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

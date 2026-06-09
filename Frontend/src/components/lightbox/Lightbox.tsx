@@ -21,6 +21,8 @@ import { useAppStore, useSetError } from '../../stores/appStore';
 import { bridge } from '../../services/bridge';
 import { LIGHTBOX_ZOOM_DEFAULT } from '../../constants/ui';
 import { GlassIconButton as GlassIconButtonBase } from '../ui/glass';
+import { invalidateThumbnail } from '../../hooks/useThumbnailManager';
+import { FilmstripThumbnail } from './FilmstripThumbnail';
 
 export function Lightbox() {
   const {
@@ -42,6 +44,8 @@ export function Lightbox() {
   const setError = useSetError();
   const { t } = useTranslation();
 
+  // Now holds an HTTPS URL (thumbs.tagfusion.local) rather than base64 —
+  // avoids multi-megabyte JSON payloads on the WebView2 bridge.
   const [fullImage, setFullImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -79,33 +83,42 @@ export function Lightbox() {
       setIsLoading(true);
       setFullImage(null);
 
-      // Load full image via bridge
+      // Load full image via bridge — returns a virtual-host URL.
       bridge
         .getFullImage(currentImage.path)
-        .then((base64) => {
-          setFullImage(base64);
+        .then((url) => {
+          setFullImage(url);
           setIsLoading(false);
         })
         .catch((err) => {
           setError((err as Error).message);
-          // Fallback to thumbnail
-          setFullImage(currentImage.thumbnailBase64 || null);
+          // Fallback to existing thumbnail URL.
+          setFullImage(currentImage.thumbnailUrl || null);
           setIsLoading(false);
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentImage?.path]);
 
-  // Preload adjacent images for instant navigation
+  // Preload adjacent images for instant navigation. With URL-based full images,
+  // preloading is essentially free (one HTTP fetch into the WebView2 cache),
+  // so widen the window to \u00b13 for power-user keyboard navigation.
+  // Preload-Fenster auf \u00b13 verbreitern \u2014 mit URL-basierten Bildern fast kostenlos.
   useEffect(() => {
     if (!isOpen || images.length <= 1) return;
 
-    const preloadIndices = [currentIndex - 1, currentIndex + 1].filter((i) => i >= 0 && i < images.length);
+    const preloadIndices = [
+      currentIndex - 3,
+      currentIndex - 2,
+      currentIndex - 1,
+      currentIndex + 1,
+      currentIndex + 2,
+      currentIndex + 3,
+    ].filter((i) => i >= 0 && i < images.length);
 
     preloadIndices.forEach((idx) => {
       const img = images[idx];
       if (img?.path) {
-        // Preload in background (result is cached by backend)
         bridge.getFullImage(img.path).catch(() => {});
       }
     });
@@ -211,49 +224,36 @@ export function Lightbox() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Rotate image
-  const handleRotate = async (angle: number) => {
+  const runImageMutation = async (mutate: (path: string) => Promise<unknown>) => {
     if (!currentImage || isProcessing) return;
+
     setIsProcessing(true);
     try {
-      await bridge.rotateImages([currentImage.path], angle);
-      // Reload image
-      const base64 = await bridge.getFullImage(currentImage.path);
-      setFullImage(base64);
-      // Refresh thumbnails in grid
+      await mutate(currentImage.path);
+      const url = await bridge.getFullImage(currentImage.path);
+      setFullImage(url);
+      invalidateThumbnail(currentImage.path);
       refreshImages();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Rotate image
+  const handleRotate = async (angle: number) => {
+    await runImageMutation((path) => bridge.rotateImages([path], angle));
   };
 
   // Flip image
   const handleFlip = async (horizontal: boolean) => {
-    if (!currentImage || isProcessing) return;
-    setIsProcessing(true);
-    try {
-      await bridge.flipImages([currentImage.path], horizontal);
-      // Reload image
-      const base64 = await bridge.getFullImage(currentImage.path);
-      setFullImage(base64);
-      // Refresh thumbnails in grid
-      refreshImages();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsProcessing(false);
-    }
+    await runImageMutation((path) => bridge.flipImages([path], horizontal));
   };
 
   if (!currentImage) return null;
 
-  const imageUrl = fullImage
-    ? `data:image/jpeg;base64,${fullImage}`
-    : currentImage.thumbnailBase64
-      ? `data:image/jpeg;base64,${currentImage.thumbnailBase64}`
-      : currentImage.thumbnailUrl || '';
+  const imageUrl = fullImage || currentImage.thumbnailUrl || '';
 
   return (
     <AnimatePresence>
@@ -416,36 +416,14 @@ export function Lightbox() {
               >
                 {images.map((img, idx) => {
                   const isActive = idx === currentIndex;
-                  const thumbSrc = img.thumbnailBase64
-                    ? `data:image/jpeg;base64,${img.thumbnailBase64}`
-                    : img.thumbnailUrl || '';
                   return (
-                    <button
+                    <FilmstripThumbnail
                       key={img.path}
                       ref={isActive ? activeThumbRef : null}
-                      onClick={() => goToIndex(idx)}
-                      title={img.fileName}
-                      className={`
-                        flex-shrink-0 rounded overflow-hidden transition-all duration-150
-                        outline-none focus-visible:ring-2 focus-visible:ring-cyan-400
-                        ${isActive ? 'ring-2 ring-cyan-400 opacity-100 brightness-110' : 'opacity-40 hover:opacity-75'}
-                      `}
-                      style={{ width: 56, height: 40 }}
-                    >
-                      {thumbSrc ? (
-                        <img
-                          src={thumbSrc}
-                          alt={img.fileName}
-                          className="w-full h-full object-cover"
-                          draggable={false}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-slate-700 flex items-center justify-center">
-                          <span className="text-[8px] text-slate-400 truncate px-0.5">{img.fileName}</span>
-                        </div>
-                      )}
-                    </button>
+                      image={img}
+                      isActive={isActive}
+                      onSelect={() => goToIndex(idx)}
+                    />
                   );
                 })}
               </div>

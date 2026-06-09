@@ -40,6 +40,21 @@ export const useGridItems = () => useAppStore((state) => state.gridItems);
 export const useImages = () => useAppStore((state) => state.images);
 export const useIsLoadingImages = () => useAppStore((state) => state.isLoadingImages);
 
+// Cheap reactive count — avoids re-rendering consumers on every metadata diff,
+// since only the array length matters to them (e.g., status bar, empty-state UI).
+export const useImagesCount = () => useAppStore((state) => state.images.length);
+
+// Subscribe only to ONE image's tags+rating. Use in row-level components
+// (ImageCard, FilmstripThumb, etc.) so batch metadata updates only re-render
+// the affected rows, not the entire grid.
+export const useImageMetaByPath = (path: string | undefined) =>
+  useAppStore(
+    useShallow((state) => {
+      const img = path ? state.images.find((i) => i.path === path) : undefined;
+      return img ? { tags: img.tags ?? [], rating: img.rating ?? 0 } : { tags: [] as string[], rating: 0 };
+    })
+  );
+
 // Selection selectors
 export const useSelectedImages = () => useAppStore((state) => state.selectedImages);
 export const useSelectImage = () => useAppStore((state) => state.selectImage);
@@ -95,6 +110,8 @@ export const useRefreshImages = () => useAppStore((state) => state.refreshImages
 export const useTags = () => useAppStore((state) => state.tags);
 export const useUpdateImageTags = () => useAppStore((state) => state.updateImageTags);
 export const useUpdateImageRating = () => useAppStore((state) => state.updateImageRating);
+export const useAddTagToImages = () => useAppStore((state) => state.addTagToImages);
+export const useRemoveTagFromImages = () => useAppStore((state) => state.removeTagFromImages);
 
 // Sidebar selectors
 export const useSidebarState = () =>
