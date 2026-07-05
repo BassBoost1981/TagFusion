@@ -297,6 +297,36 @@ public class DatabaseServiceTests
     }
 
     // ========================================================================
+    // DeleteImagesAsync
+    // ========================================================================
+
+    [Test]
+    public async Task DeleteImages_RemovesImageAndItIsNoLongerFound()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\weg.jpg", new[] { "Urlaub" }));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\bleibt.jpg", new[] { "Urlaub" }));
+
+        await _db.DeleteImagesAsync(new List<string> { "C:\\t\\weg.jpg" });
+
+        Assert.That(await _db.GetImageAsync("C:\\t\\weg.jpg"), Is.Null);
+        var results = await _db.SearchImagesAsync(new List<string> { "urlaub" }, null);
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\t\\bleibt.jpg"));
+    }
+
+    [Test]
+    public async Task DeleteImages_EmptyList_NoOp()
+    {
+        Assert.DoesNotThrowAsync(() => _db.DeleteImagesAsync(new List<string>()));
+    }
+
+    [Test]
+    public async Task DeleteImages_UnknownPath_DoesNotThrow()
+    {
+        Assert.DoesNotThrowAsync(() => _db.DeleteImagesAsync(new List<string> { "C:\\gibtsnicht.jpg" }));
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 

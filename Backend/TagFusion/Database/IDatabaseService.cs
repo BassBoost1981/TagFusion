@@ -56,6 +56,13 @@ public interface IDatabaseService
     /// Forget access records for cache keys that no longer exist on disk.
     /// </summary>
     Task ForgetThumbnailAccessAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delete image rows and their tag links for the given paths (stale entries).
+    /// Tag rows themselves are kept. Löscht Bild-Einträge samt Tag-Verknüpfungen;
+    /// die Tags selbst bleiben erhalten.
+    /// </summary>
+    Task DeleteImagesAsync(List<string> paths, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

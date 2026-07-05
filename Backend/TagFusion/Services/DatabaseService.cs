@@ -425,6 +425,48 @@ public class DatabaseService : IDatabaseService, IDisposable
         finally { _writeSemaphore.Release(); }
     }
 
+    public async Task DeleteImagesAsync(List<string> paths, CancellationToken cancellationToken = default)
+    {
+        if (paths.Count == 0) return;
+
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                using var linkCmd = _connection.CreateCommand();
+                linkCmd.Transaction = transaction;
+                linkCmd.CommandText = "DELETE FROM ImageTags WHERE ImageId IN (SELECT Id FROM Images WHERE Path = @Path)";
+                var linkParam = linkCmd.Parameters.Add("@Path", System.Data.DbType.String);
+
+                using var imgCmd = _connection.CreateCommand();
+                imgCmd.Transaction = transaction;
+                imgCmd.CommandText = "DELETE FROM Images WHERE Path = @Path";
+                var imgParam = imgCmd.Parameters.Add("@Path", System.Data.DbType.String);
+
+                foreach (var path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    linkParam.Value = path;
+                    await linkCmd.ExecuteNonQueryAsync(cancellationToken);
+                    imgParam.Value = path;
+                    await imgCmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+        finally
+        {
+            _writeSemaphore.Release();
+        }
+    }
+
     public async Task SaveImagesBatchAsync(List<ImageFile> images, CancellationToken cancellationToken = default)
     {
         if (images.Count == 0) return;
