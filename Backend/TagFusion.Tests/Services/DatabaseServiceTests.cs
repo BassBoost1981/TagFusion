@@ -188,6 +188,77 @@ public class DatabaseServiceTests
     }
 
     // ========================================================================
+    // SearchImagesAsync — Teilwort-Suche / partial-match search
+    // ========================================================================
+
+    [Test]
+    public async Task Search_PartialTerm_MatchesTagSubstring()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "Urlaubsreise" }));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\2.jpg", new[] { "Arbeit" }));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "urlaub" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\t\\1.jpg"));
+    }
+
+    [Test]
+    public async Task Search_UmlautTerm_IsCaseInsensitive()
+    {
+        // Built-in SQLite LIKE is ASCII-only case-insensitive — this needs lower_inv.
+        // SQLites LIKE kann Umlaute nicht case-insensitiv — dafür gibt es lower_inv.
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "Käfer" }));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "KÄFER" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Search_MultipleTerms_AreAndCombined()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "Urlaub", "Strand" }));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\2.jpg", new[] { "Urlaub" }));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "urlaub", "strand" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\t\\1.jpg"));
+    }
+
+    [Test]
+    public async Task Search_LikeWildcardsInTerm_AreEscaped()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "50%" }));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\2.jpg", new[] { "50x" }));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "50%" }, null);
+
+        // Unescaped, '%' would match both tags. / Ohne Escaping träfe '%' beide Tags.
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\t\\1.jpg"));
+    }
+
+    [Test]
+    public async Task Search_TermPlusMinRating_BothApply()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "Urlaub" }, 5));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\2.jpg", new[] { "Urlaub" }, 2));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "urlaub" }, 4);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\t\\1.jpg"));
+    }
+
+    [Test]
+    public void EscapeLikePattern_EscapesBackslashPercentUnderscore()
+    {
+        Assert.That(DatabaseService.EscapeLikePattern(@"a%b_c\d"), Is.EqualTo(@"a\%b\_c\\d"));
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 

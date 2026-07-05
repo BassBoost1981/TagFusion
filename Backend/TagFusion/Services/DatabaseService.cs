@@ -19,6 +19,13 @@ public class DatabaseService : IDatabaseService, IDisposable
     private readonly int _chunkSize;
     private bool _disposed;
 
+    static DatabaseService()
+    {
+        // Bind lower_inv to every connection opened afterwards.
+        // Registriert lower_inv für alle danach geöffneten Verbindungen.
+        SQLiteFunction.RegisterFunction(typeof(LowerInvariantSqliteFunction));
+    }
+
     public DatabaseService(ILogger<DatabaseService> logger, IOptions<DatabaseSettings> options)
     {
         _logger = logger;
@@ -447,7 +454,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
-    public async Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default)
+    public async Task<List<ImageFile>> SearchImagesAsync(List<string>? terms, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default)
     {
         await _readSemaphore.WaitAsync(cancellationToken);
         try
@@ -461,18 +468,19 @@ public class DatabaseService : IDatabaseService, IDisposable
                 command.Parameters.AddWithValue("@MinRating", minRating.Value);
             }
 
-            if (tags != null && tags.Count > 0)
+            if (terms != null && terms.Count > 0)
             {
-                var tagPlaceholders = string.Join(",", tags.Select((_, idx) => $"@tag{idx}"));
-                conditions.Add($@"i.Id IN (
-                    SELECT it.ImageId FROM ImageTags it
-                    JOIN Tags t ON it.TagId = t.Id
-                    WHERE t.Name IN ({tagPlaceholders})
-                    GROUP BY it.ImageId
-                    HAVING COUNT(DISTINCT t.Name) = @tagCount)");
-                for (int i = 0; i < tags.Count; i++)
-                    command.Parameters.AddWithValue($"@tag{i}", tags[i]);
-                command.Parameters.AddWithValue("@tagCount", tags.Count);
+                // Each term must match at least one tag name (substring, case-insensitive).
+                // Terms are AND-combined. / Jeder Begriff muss einen Tag treffen; UND-verknüpft.
+                for (int t = 0; t < terms.Count; t++)
+                {
+                    conditions.Add($@"EXISTS (
+                    SELECT 1 FROM ImageTags it
+                    JOIN Tags tg ON it.TagId = tg.Id
+                    WHERE it.ImageId = i.Id AND lower_inv(tg.Name) LIKE @term{t} ESCAPE '\')");
+                    command.Parameters.AddWithValue($"@term{t}",
+                        "%" + EscapeLikePattern(terms[t].ToLowerInvariant()) + "%");
+                }
             }
 
             var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : "";
@@ -545,6 +553,13 @@ public class DatabaseService : IDatabaseService, IDisposable
             _readSemaphore.Release();
         }
     }
+
+    /// <summary>
+    /// Escape LIKE wildcards in user input so they match literally (used with ESCAPE '\').
+    /// Escaped LIKE-Wildcards in Nutzereingaben, damit sie wörtlich matchen.
+    /// </summary>
+    internal static string EscapeLikePattern(string term)
+        => term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
     public void Dispose()
     {

@@ -33,10 +33,12 @@ public interface IDatabaseService
     Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Search images by tags and/or minimum rating.
-    /// Suche nach Bildern anhand von Tags und/oder Mindestbewertung.
+    /// Search images: each term must match a tag name as substring (case-insensitive
+    /// incl. umlauts). Terms are AND-combined; minRating filters additionally.
+    /// Suche: jeder Begriff als Teilwort auf Tag-Namen (case-insensitiv inkl. Umlauten),
+    /// Begriffe UND-verknüpft; minRating filtert zusätzlich.
     /// </summary>
-    Task<List<ImageFile>> SearchImagesAsync(List<string>? tags, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default);
+    Task<List<ImageFile>> SearchImagesAsync(List<string>? terms, int? minRating, int limit = 200, int offset = 0, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Record that a thumbnail was just accessed. Used to drive LRU eviction
