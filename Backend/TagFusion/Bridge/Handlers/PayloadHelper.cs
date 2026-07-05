@@ -46,6 +46,18 @@ public static class PayloadHelper
         return new List<string>();
     }
 
+    /// <summary>Extract a list of longs from a JsonElement/array payload value.</summary>
+    public static List<long> ExtractLongList(object? value)
+    {
+        var result = new List<long>();
+        if (value is System.Text.Json.JsonElement el && el.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in el.EnumerateArray())
+                if (item.TryGetInt64(out var l)) result.Add(l);
+        }
+        return result;
+    }
+
     public static int GetInt(object? obj, int defaultValue = 0)
     {
         if (obj == null) return defaultValue;

@@ -121,7 +121,7 @@ public partial class MainWindow : Window
     /// </summary>
     private (IExifToolService, IFileSystemService, ITagService, IDatabaseService, IImageEditService,
         IFileOperationService, DiagnosticsService, FolderWatcherService, TagExportService,
-        DuplicateDetectionService, ILoggerFactory) ResolveServices()
+        DuplicateDetectionService, FaceScanService, IFaceEngine, ILoggerFactory) ResolveServices()
     {
         return (
             _serviceProvider.GetRequiredService<IExifToolService>(),
@@ -134,6 +134,8 @@ public partial class MainWindow : Window
             _serviceProvider.GetRequiredService<FolderWatcherService>(),
             _serviceProvider.GetRequiredService<TagExportService>(),
             _serviceProvider.GetRequiredService<DuplicateDetectionService>(),
+            _serviceProvider.GetRequiredService<FaceScanService>(),
+            _serviceProvider.GetRequiredService<IFaceEngine>(),
             _serviceProvider.GetRequiredService<ILoggerFactory>()
         );
     }
@@ -230,6 +232,7 @@ public partial class MainWindow : Window
             var (exifToolService, fileSystemService, tagService, databaseService,
                 imageEditService, fileOperationService, diagnosticsService,
                 folderWatcherService, tagExportService, duplicateDetectionService,
+                faceScanService, faceEngine,
                 bridgeLogger) = await serviceTask;
 
             // Initialize bridge for C# <-> React communication
@@ -245,6 +248,8 @@ public partial class MainWindow : Window
                 folderWatcherService,
                 tagExportService,
                 duplicateDetectionService,
+                faceScanService,
+                faceEngine,
                 bridgeLogger);
 
             // Set up virtual host for wwwroot

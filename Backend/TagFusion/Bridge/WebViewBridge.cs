@@ -39,6 +39,8 @@ public class WebViewBridge
         FolderWatcherService folderWatcherService,
         TagExportService tagExportService,
         DuplicateDetectionService duplicateDetectionService,
+        FaceScanService faceScanService,
+        IFaceEngine faceEngine,
         ILoggerFactory loggerFactory)
     {
         _webView = webView;
@@ -61,6 +63,9 @@ public class WebViewBridge
             new UtilityHandler(
                 diagnosticsService, folderWatcherService,
                 tagExportService, duplicateDetectionService),
+            new FaceHandler(
+                faceScanService, faceEngine, databaseService, exifToolService,
+                loggerFactory.CreateLogger<FaceHandler>()),
         };
 
         // Build action → handler lookup
@@ -79,6 +84,12 @@ public class WebViewBridge
         {
             SendEvent("folderChanged", new { paths = changedPaths });
         };
+
+        // Face scan progress → frontend events. / Scan-Fortschritt als Events ans Frontend.
+        faceScanService.Progress += (current, total, faces) =>
+            SendEvent("faceScanProgress", new { current, total, faces });
+        faceScanService.Completed += summary =>
+            SendEvent("faceScanCompleted", new { scanned = summary.Scanned, faces = summary.Faces, skipped = summary.Skipped, cancelled = summary.Cancelled });
 
         _logger.LogInformation("WebViewBridge initialized with {HandlerCount} handlers, {ActionCount} actions",
             handlers.Length, _actionMap.Count);
