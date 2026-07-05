@@ -135,5 +135,21 @@
         "lightboxClose": "Close lightbox",
         "helpOverlay": "Open / close this overlay",
         "dismissHint": "Press ? or Esc to close."
+    },
+    "faces": {
+        "scan": "Scan faces",
+        "scanning": "Scanning faces… {{current}}/{{total}}",
+        "cancel": "Cancel",
+        "reviewTitle": "Review faces",
+        "suggestionsHeading": "Suggestions",
+        "suggestionQuestion": "Is this {{name}}?",
+        "confirm": "Confirm",
+        "reject": "Reject",
+        "unknownHeading": "Unknown faces",
+        "groupSize": "{{count}} faces",
+        "namePlaceholder": "Enter name…",
+        "ignore": "Ignore",
+        "empty": "No open faces in this folder.",
+        "renameHint": "Note: a confirmed name is written into the files as a tag. Renaming a person later does not change tags already written."
     }
 }

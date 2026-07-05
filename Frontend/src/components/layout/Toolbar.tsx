@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Combobox } from '@base-ui-components/react/combobox';
 import { Menu } from '@base-ui-components/react/menu';
 import { Popover } from '@base-ui-components/react/popover';
@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Globe,
   Tags,
+  ScanFace,
 } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 import {
@@ -32,9 +33,11 @@ import {
   useRefreshImages,
   useSetError,
   useGlobalSearch,
+  useCurrentFolder,
 } from '../../stores/appStore';
+import { useFaceStore } from '../../stores/faceStore';
 import { bridge } from '../../services/bridge';
-import { GlassIconButton } from '../ui/glass';
+import { GlassIconButton, GlassButton } from '../ui/glass';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { SettingsMenu } from './SettingsMenu';
 import { useTranslation } from 'react-i18next';
@@ -75,11 +78,17 @@ export function Toolbar() {
   const refreshImages = useRefreshImages();
   const setError = useSetError();
   const { isGlobalSearch, isSearching, executeGlobalSearch, exitGlobalSearch } = useGlobalSearch();
+  const currentFolderForFaces = useCurrentFolder();
+  const { engineAvailable, isScanning, progress, checkEngine, startScan, cancelScan } = useFaceStore();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isBatchTagging, setIsBatchTagging] = useState(false);
   const [batchTagInput, setBatchTagInput] = useState('');
   const hasSelection = selectedImages.size > 0;
+
+  useEffect(() => {
+    if (engineAvailable === null) void checkEngine();
+  }, [engineAvailable, checkEngine]);
 
   // Image edit handlers
   const handleRotate = async (angle: number) => {
@@ -383,6 +392,25 @@ export function Toolbar() {
         >
           {isSearching ? <Spinner size="sm" color="secondary" /> : <Globe size={16} />}
         </GlassIconButton>
+
+        {/* Face Scan Button */}
+        {currentFolderForFaces &&
+          (isScanning ? (
+            <GlassButton variant="ghost" onClick={() => void cancelScan()} title={t('faces.cancel')}>
+              {progress
+                ? t('faces.scanning', { current: progress.current, total: progress.total })
+                : t('faces.scan')}
+            </GlassButton>
+          ) : (
+            <GlassButton
+              variant="ghost"
+              disabled={engineAvailable === false}
+              onClick={() => void startScan(currentFolderForFaces)}
+              title={t('faces.scan')}
+            >
+              <ScanFace size={18} />
+            </GlassButton>
+          ))}
 
         {/* Exit Global Search */}
         {isGlobalSearch && (

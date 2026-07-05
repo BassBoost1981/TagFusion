@@ -135,5 +135,21 @@
         "lightboxClose": "Lightbox schließen",
         "helpOverlay": "Diese Übersicht öffnen/schließen",
         "dismissHint": "Drücke ? oder Esc zum Schließen."
+    },
+    "faces": {
+        "scan": "Gesichter scannen",
+        "scanning": "Scanne Gesichter… {{current}}/{{total}}",
+        "cancel": "Abbrechen",
+        "reviewTitle": "Gesichter überprüfen",
+        "suggestionsHeading": "Vorschläge",
+        "suggestionQuestion": "Ist das {{name}}?",
+        "confirm": "Bestätigen",
+        "reject": "Ablehnen",
+        "unknownHeading": "Unbekannte Gesichter",
+        "groupSize": "{{count}} Gesichter",
+        "namePlaceholder": "Name eingeben…",
+        "ignore": "Ignorieren",
+        "empty": "Keine offenen Gesichter in diesem Ordner.",
+        "renameHint": "Hinweis: Ein bestätigter Name wird als Tag in die Dateien geschrieben. Späteres Umbenennen einer Person ändert bereits geschriebene Tags nicht."
     }
 }
