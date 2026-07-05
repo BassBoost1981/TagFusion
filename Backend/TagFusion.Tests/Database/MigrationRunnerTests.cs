@@ -67,4 +67,63 @@ public class MigrationRunnerTests
         var count = Convert.ToInt32(cmd.ExecuteScalar());
         Assert.That(count, Is.EqualTo(expectedVersion));
     }
+
+    [Test]
+    public void MigrationV3_OldSchema_AddsAndBackfillsFileName()
+    {
+        // Simulate a pre-v3 database: Images table without FileName, with existing rows.
+        // Simuliert eine Alt-DB: Images-Tabelle ohne FileName-Spalte, mit Bestandsdaten.
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE Images (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Path TEXT NOT NULL UNIQUE,
+                    LastModified TEXT NOT NULL,
+                    Rating INTEGER DEFAULT 0,
+                    Width INTEGER DEFAULT 0,
+                    Height INTEGER DEFAULT 0,
+                    DateTaken TEXT
+                );
+                INSERT INTO Images (Path, LastModified) VALUES ('C:\Fotos\Käfer Übung.jpg', '2026-01-01T00:00:00.0000000Z');
+                INSERT INTO Images (Path, LastModified) VALUES ('D:\a\b\IMG_0001.JPG', '2026-01-01T00:00:00.0000000Z');";
+            cmd.ExecuteNonQuery();
+        }
+
+        new MigrationRunner(_connection, NullLogger.Instance).ApplyMigrations();
+
+        using var check = _connection.CreateCommand();
+        check.CommandText = "SELECT FileName FROM Images ORDER BY Id";
+        using var reader = check.ExecuteReader();
+        var fileNames = new List<string>();
+        while (reader.Read()) fileNames.Add(reader.GetString(0));
+
+        Assert.That(fileNames, Is.EqualTo(new[] { "Käfer Übung.jpg", "IMG_0001.JPG" }));
+    }
+
+    [Test]
+    public void MigrationV3_ColumnAlreadyExists_IsNoOp()
+    {
+        // Fresh databases get FileName via InitializeDatabase — migration must not fail.
+        // Frische DBs haben FileName schon — die Migration darf dann nicht fehlschlagen.
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE Images (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Path TEXT NOT NULL UNIQUE,
+                    FileName TEXT NOT NULL DEFAULT '',
+                    LastModified TEXT NOT NULL
+                );
+                INSERT INTO Images (Path, FileName, LastModified) VALUES ('C:\x.jpg', 'x.jpg', '2026-01-01T00:00:00.0000000Z');";
+            cmd.ExecuteNonQuery();
+        }
+
+        var runner = new MigrationRunner(_connection, NullLogger.Instance);
+        Assert.DoesNotThrow(() => runner.ApplyMigrations());
+
+        using var check = _connection.CreateCommand();
+        check.CommandText = "SELECT FileName FROM Images";
+        Assert.That(check.ExecuteScalar(), Is.EqualTo("x.jpg"));
+    }
 }

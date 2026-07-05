@@ -101,6 +101,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             CREATE TABLE IF NOT EXISTS Images (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Path TEXT NOT NULL UNIQUE,
+                FileName TEXT NOT NULL DEFAULT '',
                 LastModified TEXT NOT NULL,
                 Rating INTEGER DEFAULT 0,
                 Width INTEGER DEFAULT 0,
