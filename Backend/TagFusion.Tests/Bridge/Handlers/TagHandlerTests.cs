@@ -176,9 +176,10 @@ public class TagHandlerTests
     public async Task SearchImages_PassesAllParameters_Correctly()
     {
         var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"Nature\", \"Landscape\"]");
+        var existingFile = CreateTempFile();
         var expectedImages = new List<ImageFile>
         {
-            new() { Path = @"C:\Photos\a.jpg", Tags = new List<string> { "Nature" } }
+            new() { Path = existingFile, Tags = new List<string> { "Nature" } }
         };
 
         _databaseService
@@ -262,6 +263,72 @@ public class TagHandlerTests
         _databaseService.Verify(
             s => s.SearchImagesAsync(null, null, 200, 0, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Test]
+    public async Task SearchImages_MissingFile_FilteredAndDeletedFromDb()
+    {
+        var existing = CreateTempFile();
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg");
+
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 200, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile>
+            {
+                new() { Path = existing },
+                new() { Path = missing }
+            });
+
+        var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"urlaub\"]");
+        var result = await _handler.HandleAsync("searchImages", new Dictionary<string, object> { ["tags"] = tagsJson });
+
+        var images = (List<ImageFile>)result!;
+        Assert.That(images, Has.Count.EqualTo(1));
+        Assert.That(images[0].Path, Is.EqualTo(existing));
+
+        _databaseService.Verify(
+            s => s.DeleteImagesAsync(
+                It.Is<List<string>>(p => p.Count == 1 && p[0] == missing),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Test]
+    public async Task SearchImages_CleanupFailure_StillReturnsFilteredResults()
+    {
+        var existing = CreateTempFile();
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg");
+
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 200, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile> { new() { Path = existing }, new() { Path = missing } });
+        _databaseService
+            .Setup(s => s.DeleteImagesAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("DB locked"));
+
+        var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"urlaub\"]");
+        var result = await _handler.HandleAsync("searchImages", new Dictionary<string, object> { ["tags"] = tagsJson });
+
+        // Cleanup errors are non-fatal — filtered results still come back.
+        // Cleanup-Fehler sind nicht fatal — gefilterte Ergebnisse kommen trotzdem.
+        var images = (List<ImageFile>)result!;
+        Assert.That(images, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task SearchImages_NoMissingFiles_DoesNotDelete()
+    {
+        var existing = CreateTempFile();
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 200, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile> { new() { Path = existing } });
+
+        var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"x\"]");
+        await _handler.HandleAsync("searchImages", new Dictionary<string, object> { ["tags"] = tagsJson });
+
+        _databaseService.Verify(
+            s => s.DeleteImagesAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // ========================================================================

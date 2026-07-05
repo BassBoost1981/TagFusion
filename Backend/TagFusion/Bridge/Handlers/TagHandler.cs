@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Extensions.Logging;
 using TagFusion.Database;
 using TagFusion.Services;
@@ -136,7 +137,7 @@ public class TagHandler : IBridgeHandler
 
     private async Task<List<Models.ImageFile>> SearchImagesAsync(Dictionary<string, object>? payload)
     {
-        List<string>? tags = null;
+        List<string>? terms = null;
         int? minRating = null;
         int limit = 200;
         int offset = 0;
@@ -145,7 +146,7 @@ public class TagHandler : IBridgeHandler
         {
             var tagsObj = payload.GetValueOrDefault("tags");
             var extracted = PayloadHelper.ExtractStringList(tagsObj);
-            if (extracted.Count > 0) tags = extracted;
+            if (extracted.Count > 0) terms = extracted;
 
             var ratingObj = payload.GetValueOrDefault("minRating");
             var rating = PayloadHelper.GetInt(ratingObj, 0);
@@ -159,6 +160,26 @@ public class TagHandler : IBridgeHandler
             offset = PayloadHelper.GetInt(offsetObj, 0);
         }
 
-        return await _databaseService.SearchImagesAsync(tags, minRating, limit, offset);
+        var results = await _databaseService.SearchImagesAsync(terms, minRating, limit, offset);
+
+        // Auto-cleanup: hide files that no longer exist; forget them in the DB only
+        // when their drive is online (protects unplugged external drives).
+        // Auto-Cleanup: fehlende Dateien ausblenden; DB-Löschung nur bei
+        // verbundenem Laufwerk (schützt abgestöpselte externe Platten).
+        var cleanup = SearchResultCleaner.Partition(results, SearchResultCleaner.IsRootAvailable, File.Exists);
+        if (cleanup.DeletablePaths.Count > 0)
+        {
+            try
+            {
+                await _databaseService.DeleteImagesAsync(cleanup.DeletablePaths);
+                _logger.LogInformation("Removed {Count} stale image entries during search", cleanup.DeletablePaths.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Stale-entry cleanup failed — returning filtered results anyway");
+            }
+        }
+
+        return cleanup.Visible;
     }
 }
