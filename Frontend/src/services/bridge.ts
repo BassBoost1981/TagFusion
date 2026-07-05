@@ -7,6 +7,8 @@ import type {
   Tag,
   GridItem,
   TagLibrary,
+  FaceReview,
+  Person,
 } from '../types';
 import { BRIDGE_ACTIONS, type BridgeActionName } from './bridgeActions';
 
@@ -284,6 +286,7 @@ class BridgeService {
     diskOk: boolean;
     diskFreeBytes: number;
     diskTotalBytes: number;
+    faceEngineOk: boolean;
   }> {
     return this.send(BRIDGE_ACTIONS.HEALTH_CHECK);
   }
@@ -292,6 +295,36 @@ class BridgeService {
   // Payload key stays `tags` for bridge-contract stability; semantics are "search terms".
   async searchImages(terms?: string[], minRating?: number, limit?: number, offset?: number): Promise<ImageFile[]> {
     return this.send<ImageFile[]>(BRIDGE_ACTIONS.SEARCH_IMAGES, { tags: terms, minRating, limit, offset });
+  }
+
+  // Face recognition — manual folder scan, review, confirmation
+  // Gesichtserkennung — manueller Ordner-Scan, Review, Bestätigung
+  async scanFacesInFolder(path: string): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.SCAN_FACES_IN_FOLDER, { path });
+  }
+
+  async cancelFaceScan(): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.CANCEL_FACE_SCAN);
+  }
+
+  async getFaceReview(path: string): Promise<FaceReview> {
+    return this.send<FaceReview>(BRIDGE_ACTIONS.GET_FACE_REVIEW, { path });
+  }
+
+  async confirmFaceGroup(faceIds: number[], personName: string): Promise<{ tagged: number; failed: number }> {
+    return this.send<{ tagged: number; failed: number }>(BRIDGE_ACTIONS.CONFIRM_FACE_GROUP, { faceIds, personName });
+  }
+
+  async rejectFaceSuggestion(faceIds: number[]): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.REJECT_FACE_SUGGESTION, { faceIds });
+  }
+
+  async ignoreFaces(faceIds: number[]): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.IGNORE_FACES, { faceIds });
+  }
+
+  async getPersons(): Promise<Person[]> {
+    return this.send<Person[]>(BRIDGE_ACTIONS.GET_PERSONS, undefined);
   }
 
   // Batch tag operations — write identical tags to multiple images
@@ -420,8 +453,18 @@ class BridgeService {
           diskOk: true,
           diskFreeBytes: 200 * 1024 ** 3,
           diskTotalBytes: 500 * 1024 ** 3,
+          faceEngineOk: false,
         };
       case 'searchImages':
+        return [];
+      case 'scanFacesInFolder':
+      case 'cancelFaceScan':
+      case 'rejectFaceSuggestion':
+      case 'ignoreFaces':
+        return true;
+      case 'getFaceReview':
+        return { suggestions: [], groups: [] };
+      case 'getPersons':
         return [];
       case 'writeBatchTags':
         return {};

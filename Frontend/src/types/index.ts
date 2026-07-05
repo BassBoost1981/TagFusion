@@ -126,3 +126,34 @@ export interface AppState {
   isLoading: boolean;
   error?: string;
 }
+
+// Face recognition types / Gesichtserkennung
+export interface FaceCrop {
+  faceId: number;
+  imagePath: string;
+  crop: string; // Base64 JPEG (96px)
+}
+
+export interface FaceSuggestion {
+  personId: number;
+  personName: string;
+  score: number;
+  faceIds: number[];
+  sample: FaceCrop[];
+}
+
+export interface UnknownFaceGroup {
+  faceIds: number[];
+  sample: FaceCrop[];
+}
+
+export interface FaceReview {
+  suggestions: FaceSuggestion[];
+  groups: UnknownFaceGroup[];
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  faceCount: number;
+}
