@@ -80,6 +80,51 @@ public interface IDatabaseService
 
     /// <summary>Load specific faces by id. / Lädt Gesichter per Id.</summary>
     Task<List<StoredFace>> GetFacesByIdsAsync(List<long> faceIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get all persons in the database with the count of confirmed faces per person.
+    /// Alle Personen mit Anzahl ihrer bestätigten Gesichter.
+    /// </summary>
+    Task<List<PersonInfo>> GetPersonsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get or create a person by name. Returns the person id (idempotent).
+    /// Findet oder erstellt eine Person — gibt ihre Id zurück.
+    /// </summary>
+    Task<long> GetOrCreatePersonAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Assign faces to a person: sets PersonId, Status='confirmed', and clears SuggestedPersonId/SuggestionScore.
+    /// Weist Gesichter einer Person zu — setzt PersonId, Status='confirmed', löscht Vorschlag.
+    /// </summary>
+    Task AssignFacesToPersonAsync(List<long> faceIds, long personId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reject a face suggestion: moves SuggestedPersonId to RejectedPersonId, clears suggestion, sets Status='unnamed'.
+    /// Only applies to faces currently in 'suggested' status.
+    /// Lehnt einen Vorschlag ab — speichert RejectedPersonId, löscht Vorschlag, Status='unnamed'.
+    /// Betrifft nur Zeilen mit Status 'suggested'.
+    /// </summary>
+    Task RejectFaceSuggestionsAsync(List<long> faceIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Mark faces as ignored: Status='ignored', clear suggestions.
+    /// Markiert Gesichter als ignoriert — Status='ignored', Vorschlag gelöscht.
+    /// </summary>
+    Task SetFacesIgnoredAsync(List<long> faceIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get confirmed face embeddings grouped by PersonId.
+    /// Gibt bestätigte Embeddings je Person zurück.
+    /// </summary>
+    Task<Dictionary<long, List<float[]>>> GetConfirmedEmbeddingsByPersonAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Apply face suggestions: set Status='suggested' ONLY on faces still in 'unnamed' status.
+    /// Never overwrites user decisions (confirmed, rejected, ignored).
+    /// Setzt Status='suggested' NUR auf 'unnamed'-Gesichter — überschreibt keine Nutzerentscheidungen.
+    /// </summary>
+    Task ApplyFaceSuggestionsAsync(IReadOnlyList<FaceSuggestionUpdate> suggestions, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

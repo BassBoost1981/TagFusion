@@ -814,6 +814,139 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
+    public async Task<List<PersonInfo>> GetPersonsAsync(CancellationToken cancellationToken = default)
+    {
+        var persons = new List<PersonInfo>();
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _readConnection.CreateCommand();
+            cmd.CommandText = @"
+                SELECT p.Id, p.Name, COUNT(f.Id)
+                FROM Persons p
+                LEFT JOIN Faces f ON f.PersonId = p.Id AND f.Status = 'confirmed'
+                GROUP BY p.Id, p.Name
+                ORDER BY p.Name";
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                persons.Add(new PersonInfo(reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2)));
+            return persons;
+        }
+        finally { _readSemaphore.Release(); }
+    }
+
+    public async Task<long> GetOrCreatePersonAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "INSERT OR IGNORE INTO Persons (Name) VALUES (@Name); SELECT Id FROM Persons WHERE Name = @Name;";
+            cmd.Parameters.AddWithValue("@Name", name);
+            return (long)(await cmd.ExecuteScalarAsync(cancellationToken))!;
+        }
+        finally { _writeSemaphore.Release(); }
+    }
+
+    /// <summary>Run one UPDATE per face id inside a single transaction. / Ein UPDATE pro Face-Id in einer Transaktion.</summary>
+    private async Task UpdateFacesAsync(List<long> faceIds, string setClause, Action<SQLiteCommand>? addParams, CancellationToken cancellationToken)
+    {
+        if (faceIds.Count == 0) return;
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.Transaction = transaction;
+                cmd.CommandText = $"UPDATE Faces SET {setClause} WHERE Id = @Id";
+                addParams?.Invoke(cmd);
+                var idParam = cmd.Parameters.Add("@Id", System.Data.DbType.Int64);
+                foreach (var id in faceIds)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    idParam.Value = id;
+                    await cmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+                transaction.Commit();
+            }
+            catch { transaction.Rollback(); throw; }
+        }
+        finally { _writeSemaphore.Release(); }
+    }
+
+    public Task AssignFacesToPersonAsync(List<long> faceIds, long personId, CancellationToken cancellationToken = default)
+        => UpdateFacesAsync(faceIds,
+            "PersonId = @PersonId, Status = 'confirmed', SuggestedPersonId = NULL, SuggestionScore = NULL",
+            cmd => cmd.Parameters.AddWithValue("@PersonId", personId),
+            cancellationToken);
+
+    public Task RejectFaceSuggestionsAsync(List<long> faceIds, CancellationToken cancellationToken = default)
+        => UpdateFacesAsync(faceIds,
+            "RejectedPersonId = SuggestedPersonId, SuggestedPersonId = NULL, SuggestionScore = NULL, Status = 'unnamed'",
+            addParams: null,
+            cancellationToken);
+
+    public Task SetFacesIgnoredAsync(List<long> faceIds, CancellationToken cancellationToken = default)
+        => UpdateFacesAsync(faceIds,
+            "Status = 'ignored', SuggestedPersonId = NULL, SuggestionScore = NULL",
+            addParams: null,
+            cancellationToken);
+
+    public async Task<Dictionary<long, List<float[]>>> GetConfirmedEmbeddingsByPersonAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<long, List<float[]>>();
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _readConnection.CreateCommand();
+            cmd.CommandText = "SELECT PersonId, Embedding FROM Faces WHERE Status = 'confirmed' AND PersonId IS NOT NULL";
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var personId = reader.GetInt64(0);
+                if (!result.TryGetValue(personId, out var list))
+                    result[personId] = list = new List<float[]>();
+                list.Add(EmbeddingConverter.ToFloats((byte[])reader[1]));
+            }
+            return result;
+        }
+        finally { _readSemaphore.Release(); }
+    }
+
+    public async Task ApplyFaceSuggestionsAsync(IReadOnlyList<FaceSuggestionUpdate> suggestions, CancellationToken cancellationToken = default)
+    {
+        if (suggestions.Count == 0) return;
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.Transaction = transaction;
+                // Only faces still unnamed take a suggestion — never overwrite user decisions.
+                // Nur unbenannte Gesichter erhalten Vorschläge — Nutzerentscheidungen bleiben unberührt.
+                cmd.CommandText = @"
+                    UPDATE Faces SET Status = 'suggested', SuggestedPersonId = @PersonId, SuggestionScore = @Score
+                    WHERE Id = @Id AND Status = 'unnamed'";
+                var pPerson = cmd.Parameters.Add("@PersonId", System.Data.DbType.Int64);
+                var pScore = cmd.Parameters.Add("@Score", System.Data.DbType.Double);
+                var pId = cmd.Parameters.Add("@Id", System.Data.DbType.Int64);
+                foreach (var s in suggestions)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    pPerson.Value = s.PersonId; pScore.Value = s.Score; pId.Value = s.FaceId;
+                    await cmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+                transaction.Commit();
+            }
+            catch { transaction.Rollback(); throw; }
+        }
+        finally { _writeSemaphore.Release(); }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

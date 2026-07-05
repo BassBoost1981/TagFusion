@@ -424,6 +424,90 @@ public class DatabaseServiceTests
     }
 
     // ========================================================================
+    // Persons & Face-Status
+    // ========================================================================
+
+    [Test]
+    public async Task GetOrCreatePerson_IsIdempotent()
+    {
+        var id1 = await _db.GetOrCreatePersonAsync("Max");
+        var id2 = await _db.GetOrCreatePersonAsync("Max");
+        Assert.That(id2, Is.EqualTo(id1));
+
+        var persons = await _db.GetPersonsAsync();
+        Assert.That(persons, Has.Count.EqualTo(1));
+        Assert.That(persons[0].Name, Is.EqualTo("Max"));
+    }
+
+    [Test]
+    public async Task AssignFaces_SetsConfirmedAndClearsSuggestion()
+    {
+        await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace() }, DateTime.UtcNow);
+        var face = (await _db.GetFacesForFolderAsync("C:\\f"))[0];
+        var personId = await _db.GetOrCreatePersonAsync("Max");
+        await _db.ApplyFaceSuggestionsAsync(new[] { new FaceSuggestionUpdate(face.Id, personId, 0.8) });
+
+        await _db.AssignFacesToPersonAsync(new List<long> { face.Id }, personId);
+
+        var after = (await _db.GetFacesByIdsAsync(new List<long> { face.Id }))[0];
+        Assert.That(after.Status, Is.EqualTo(FaceStatus.Confirmed));
+        Assert.That(after.PersonId, Is.EqualTo(personId));
+        Assert.That(after.SuggestedPersonId, Is.Null);
+
+        var persons = await _db.GetPersonsAsync();
+        Assert.That(persons[0].FaceCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task RejectSuggestion_RemembersRejectedPerson()
+    {
+        await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace() }, DateTime.UtcNow);
+        var face = (await _db.GetFacesForFolderAsync("C:\\f"))[0];
+        var personId = await _db.GetOrCreatePersonAsync("Max");
+        await _db.ApplyFaceSuggestionsAsync(new[] { new FaceSuggestionUpdate(face.Id, personId, 0.8) });
+
+        await _db.RejectFaceSuggestionsAsync(new List<long> { face.Id });
+
+        var after = (await _db.GetFacesByIdsAsync(new List<long> { face.Id }))[0];
+        Assert.That(after.Status, Is.EqualTo(FaceStatus.Unnamed));
+        Assert.That(after.SuggestedPersonId, Is.Null);
+        Assert.That(after.RejectedPersonId, Is.EqualTo(personId));
+    }
+
+    [Test]
+    public async Task ApplySuggestions_OnlyTouchesUnnamedFaces()
+    {
+        await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace(), TestFace(x: 200) }, DateTime.UtcNow);
+        var faces = await _db.GetFacesForFolderAsync("C:\\f");
+        var personId = await _db.GetOrCreatePersonAsync("Max");
+        await _db.SetFacesIgnoredAsync(new List<long> { faces[0].Id });
+
+        await _db.ApplyFaceSuggestionsAsync(new[]
+        {
+            new FaceSuggestionUpdate(faces[0].Id, personId, 0.9),  // ignored — must stay ignored
+            new FaceSuggestionUpdate(faces[1].Id, personId, 0.9),
+        });
+
+        var after = await _db.GetFacesByIdsAsync(faces.Select(f => f.Id).ToList());
+        Assert.That(after.Single(f => f.Id == faces[0].Id).Status, Is.EqualTo(FaceStatus.Ignored));
+        Assert.That(after.Single(f => f.Id == faces[1].Id).Status, Is.EqualTo(FaceStatus.Suggested));
+    }
+
+    [Test]
+    public async Task GetConfirmedEmbeddingsByPerson_GroupsCorrectly()
+    {
+        await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace(seed: 0.1f), TestFace(x: 200, seed: 0.2f) }, DateTime.UtcNow);
+        var faces = await _db.GetFacesForFolderAsync("C:\\f");
+        var max = await _db.GetOrCreatePersonAsync("Max");
+        await _db.AssignFacesToPersonAsync(faces.Select(f => f.Id).ToList(), max);
+
+        var byPerson = await _db.GetConfirmedEmbeddingsByPersonAsync();
+
+        Assert.That(byPerson, Has.Count.EqualTo(1));
+        Assert.That(byPerson[max], Has.Count.EqualTo(2));
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 
