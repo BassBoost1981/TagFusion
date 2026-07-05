@@ -242,9 +242,10 @@ public class DatabaseService : IDatabaseService, IDisposable
         using (var cmd = _connection.CreateCommand())
         {
             cmd.CommandText = @"
-                INSERT INTO Images (Path, LastModified, Rating, Width, Height, DateTaken)
-                VALUES (@Path, @LastModified, @Rating, @Width, @Height, @DateTaken)
+                INSERT INTO Images (Path, FileName, LastModified, Rating, Width, Height, DateTaken)
+                VALUES (@Path, @FileName, @LastModified, @Rating, @Width, @Height, @DateTaken)
                 ON CONFLICT(Path) DO UPDATE SET
+                    FileName = @FileName,
                     LastModified = @LastModified,
                     Rating = @Rating,
                     Width = @Width,
@@ -253,6 +254,8 @@ public class DatabaseService : IDatabaseService, IDisposable
                 RETURNING Id;
             ";
             cmd.Parameters.AddWithValue("@Path", image.Path);
+            cmd.Parameters.AddWithValue("@FileName",
+                string.IsNullOrEmpty(image.FileName) ? Path.GetFileName(image.Path) : image.FileName);
             cmd.Parameters.AddWithValue("@LastModified", image.DateModified.ToString("o"));
             cmd.Parameters.AddWithValue("@Rating", image.Rating);
             cmd.Parameters.AddWithValue("@Width", image.Width);
@@ -470,14 +473,15 @@ public class DatabaseService : IDatabaseService, IDisposable
 
             if (terms != null && terms.Count > 0)
             {
-                // Each term must match at least one tag name (substring, case-insensitive).
-                // Terms are AND-combined. / Jeder Begriff muss einen Tag treffen; UND-verknüpft.
+                // Each term must match at least one tag name or filename (substring, case-insensitive).
+                // Terms are AND-combined. / Jeder Begriff muss einen Tag oder Dateinamen treffen; UND-verknüpft.
                 for (int t = 0; t < terms.Count; t++)
                 {
-                    conditions.Add($@"EXISTS (
-                    SELECT 1 FROM ImageTags it
-                    JOIN Tags tg ON it.TagId = tg.Id
-                    WHERE it.ImageId = i.Id AND lower_inv(tg.Name) LIKE @term{t} ESCAPE '\')");
+                    conditions.Add($@"(EXISTS (
+                        SELECT 1 FROM ImageTags it
+                        JOIN Tags tg ON it.TagId = tg.Id
+                        WHERE it.ImageId = i.Id AND lower_inv(tg.Name) LIKE @term{t} ESCAPE '\')
+                    OR lower_inv(i.FileName) LIKE @term{t} ESCAPE '\')");
                     command.Parameters.AddWithValue($"@term{t}",
                         "%" + EscapeLikePattern(terms[t].ToLowerInvariant()) + "%");
                 }

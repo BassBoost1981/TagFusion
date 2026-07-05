@@ -258,6 +258,44 @@ public class DatabaseServiceTests
         Assert.That(DatabaseService.EscapeLikePattern(@"a%b_c\d"), Is.EqualTo(@"a\%b\_c\\d"));
     }
 
+    [Test]
+    public async Task Search_MatchesFileNameSubstring()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\IMG_2024_Sylt.jpg", Array.Empty<string>()));
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\anders.jpg", Array.Empty<string>()));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "sylt" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\fotos\\IMG_2024_Sylt.jpg"));
+    }
+
+    [Test]
+    public async Task Search_TermMatchesTagOrFileName()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\strand.jpg", Array.Empty<string>()));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\2.jpg", new[] { "Strandtag" }));
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\3.jpg", new[] { "Berge" }));
+
+        var results = await _db.SearchImagesAsync(new List<string> { "strand" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task SaveImage_EmptyFileName_DerivesFromPath()
+    {
+        // Some call sites build ImageFile manually without FileName — must still be searchable.
+        // Manche Aufrufer setzen FileName nicht — der Fallback aus Path muss greifen.
+        var image = CreateTestImage("C:\\t\\Sonnenuntergang.jpg", Array.Empty<string>());
+        image.FileName = string.Empty;
+
+        await _db.SaveImageAsync(image);
+        var results = await _db.SearchImagesAsync(new List<string> { "sonnenuntergang" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+    }
+
     // ========================================================================
     // Helpers
     // ========================================================================
