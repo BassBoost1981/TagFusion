@@ -1,5 +1,6 @@
 using System.Globalization;
 using NUnit.Framework;
+using TagFusion.Database;
 using TagFusion.Models;
 using TagFusion.Services;
 
@@ -324,6 +325,90 @@ public class DatabaseServiceTests
     public void DeleteImages_UnknownPath_DoesNotThrow()
     {
         Assert.DoesNotThrowAsync(() => _db.DeleteImagesAsync(new List<string> { "C:\\gibtsnicht.jpg" }));
+    }
+
+    // ========================================================================
+    // Faces — Persistenz / persistence
+    // ========================================================================
+
+    private static NewFace TestFace(float x = 10, float y = 20, float seed = 1f)
+    {
+        var embedding = new float[512];
+        embedding[0] = seed; // deterministic, distinguishable / deterministisch unterscheidbar
+        return new NewFace(x, y, 100, 120, embedding);
+    }
+
+    [Test]
+    public async Task SaveFaces_RoundTripsThroughFolderQuery()
+    {
+        var mtime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace(seed: 0.7f) }, mtime);
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
+
+        Assert.That(faces, Has.Count.EqualTo(1));
+        Assert.That(faces[0].ImagePath, Is.EqualTo("C:\\fotos\\a.jpg"));
+        Assert.That(faces[0].Status, Is.EqualTo(FaceStatus.Unnamed));
+        Assert.That(faces[0].Embedding[0], Is.EqualTo(0.7f));
+        Assert.That(faces[0].W, Is.EqualTo(100));
+    }
+
+    [Test]
+    public async Task SaveFaces_Rescan_ReplacesOldFaces()
+    {
+        var mtime = DateTime.UtcNow;
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace(), TestFace(x: 200) }, mtime);
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace(x: 300) }, mtime);
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
+        Assert.That(faces, Has.Count.EqualTo(1));
+        Assert.That(faces[0].X, Is.EqualTo(300));
+    }
+
+    [Test]
+    public async Task SaveFaces_ImageRowIsCreatedIfMissing_AndScanTimeStored()
+    {
+        var mtime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        await _db.SaveFacesAsync("C:\\neu\\x.jpg", Array.Empty<NewFace>(), mtime);
+
+        var times = await _db.GetFaceScanTimesAsync(new List<string> { "C:\\neu\\x.jpg", "C:\\neu\\niegescannt.jpg" });
+
+        Assert.That(times, Has.Count.EqualTo(1));
+        Assert.That(times["C:\\neu\\x.jpg"], Is.EqualTo(mtime.ToString("o")));
+    }
+
+    [Test]
+    public async Task GetFacesForFolder_IsNotRecursive()
+    {
+        var mtime = DateTime.UtcNow;
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace() }, mtime);
+        await _db.SaveFacesAsync("C:\\fotos\\sub\\b.jpg", new[] { TestFace() }, mtime);
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
+        Assert.That(faces, Has.Count.EqualTo(1));
+        Assert.That(faces[0].ImagePath, Is.EqualTo("C:\\fotos\\a.jpg"));
+    }
+
+    [Test]
+    public async Task GetFacesByIds_ReturnsRequestedFaces()
+    {
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace(), TestFace(x: 200) }, DateTime.UtcNow);
+        var all = await _db.GetFacesForFolderAsync("C:\\fotos");
+
+        var byIds = await _db.GetFacesByIdsAsync(new List<long> { all[0].Id });
+        Assert.That(byIds, Has.Count.EqualTo(1));
+        Assert.That(byIds[0].Id, Is.EqualTo(all[0].Id));
+    }
+
+    [Test]
+    public async Task DeleteImages_AlsoRemovesFaces()
+    {
+        await _db.SaveFacesAsync("C:\\fotos\\weg.jpg", new[] { TestFace() }, DateTime.UtcNow);
+
+        await _db.DeleteImagesAsync(new List<string> { "C:\\fotos\\weg.jpg" });
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
+        Assert.That(faces, Is.Empty);
     }
 
     // ========================================================================

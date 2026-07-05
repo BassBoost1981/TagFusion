@@ -63,6 +63,23 @@ public interface IDatabaseService
     /// die Tags selbst bleiben erhalten.
     /// </summary>
     Task DeleteImagesAsync(List<string> paths, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Replace all faces of an image and record the scan time. Creates a minimal
+    /// Images row when the image is not indexed yet.
+    /// Ersetzt alle Gesichter eines Bildes und vermerkt den Scan-Zeitpunkt; legt
+    /// bei Bedarf eine minimale Images-Zeile an.
+    /// </summary>
+    Task SaveFacesAsync(string imagePath, IReadOnlyList<NewFace> faces, DateTime fileLastWriteUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>Map path → stored FaceScanFileTime (ISO) for already-scanned images.</summary>
+    Task<Dictionary<string, string>> GetFaceScanTimesAsync(List<string> paths, CancellationToken cancellationToken = default);
+
+    /// <summary>Faces of images directly inside the folder (not recursive).</summary>
+    Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, CancellationToken cancellationToken = default);
+
+    /// <summary>Load specific faces by id. / Lädt Gesichter per Id.</summary>
+    Task<List<StoredFace>> GetFacesByIdsAsync(List<long> faceIds, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

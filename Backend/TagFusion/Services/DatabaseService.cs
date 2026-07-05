@@ -435,6 +435,11 @@ public class DatabaseService : IDatabaseService, IDisposable
             using var transaction = _connection.BeginTransaction();
             try
             {
+                using var faceCmd = _connection.CreateCommand();
+                faceCmd.Transaction = transaction;
+                faceCmd.CommandText = "DELETE FROM Faces WHERE ImageId IN (SELECT Id FROM Images WHERE Path = @Path)";
+                var faceParam = faceCmd.Parameters.Add("@Path", System.Data.DbType.String);
+
                 using var linkCmd = _connection.CreateCommand();
                 linkCmd.Transaction = transaction;
                 linkCmd.CommandText = "DELETE FROM ImageTags WHERE ImageId IN (SELECT Id FROM Images WHERE Path = @Path)";
@@ -448,6 +453,8 @@ public class DatabaseService : IDatabaseService, IDisposable
                 foreach (var path in paths)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    faceParam.Value = path;
+                    await faceCmd.ExecuteNonQueryAsync(cancellationToken);
                     linkParam.Value = path;
                     await linkCmd.ExecuteNonQueryAsync(cancellationToken);
                     imgParam.Value = path;
@@ -606,6 +613,209 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     internal static string EscapeLikePattern(string term)
         => term.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    public async Task SaveFacesAsync(string imagePath, IReadOnlyList<NewFace> faces, DateTime fileLastWriteUtc, CancellationToken cancellationToken = default)
+    {
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var transaction = _connection.BeginTransaction();
+            try
+            {
+                // Ensure the Images row exists; a face scan may hit images never browsed before.
+                // Stellt die Images-Zeile sicher — der Scan kann Bilder vor dem ersten Browsen treffen.
+                long imageId;
+                using (var ensure = _connection.CreateCommand())
+                {
+                    ensure.Transaction = transaction;
+                    ensure.CommandText = @"
+                        INSERT INTO Images (Path, FileName, LastModified) VALUES (@Path, @FileName, @LastModified)
+                        ON CONFLICT(Path) DO NOTHING;
+                        SELECT Id FROM Images WHERE Path = @Path;";
+                    ensure.Parameters.AddWithValue("@Path", imagePath);
+                    ensure.Parameters.AddWithValue("@FileName", Path.GetFileName(imagePath));
+                    ensure.Parameters.AddWithValue("@LastModified", fileLastWriteUtc.ToString("o"));
+                    imageId = (long)(await ensure.ExecuteScalarAsync(cancellationToken))!;
+                }
+
+                using (var del = _connection.CreateCommand())
+                {
+                    del.Transaction = transaction;
+                    del.CommandText = "DELETE FROM Faces WHERE ImageId = @ImageId";
+                    del.Parameters.AddWithValue("@ImageId", imageId);
+                    await del.ExecuteNonQueryAsync(cancellationToken);
+                }
+
+                using (var ins = _connection.CreateCommand())
+                {
+                    ins.Transaction = transaction;
+                    ins.CommandText = @"
+                        INSERT INTO Faces (ImageId, X, Y, W, H, Embedding, Status, ScannedAt)
+                        VALUES (@ImageId, @X, @Y, @W, @H, @Embedding, @Status, @ScannedAt)";
+                    var pImg = ins.Parameters.Add("@ImageId", System.Data.DbType.Int64);
+                    var pX = ins.Parameters.Add("@X", System.Data.DbType.Single);
+                    var pY = ins.Parameters.Add("@Y", System.Data.DbType.Single);
+                    var pW = ins.Parameters.Add("@W", System.Data.DbType.Single);
+                    var pH = ins.Parameters.Add("@H", System.Data.DbType.Single);
+                    var pEmb = ins.Parameters.Add("@Embedding", System.Data.DbType.Binary);
+                    var pStatus = ins.Parameters.Add("@Status", System.Data.DbType.String);
+                    var pAt = ins.Parameters.Add("@ScannedAt", System.Data.DbType.String);
+
+                    var now = DateTime.UtcNow.ToString("o");
+                    foreach (var face in faces)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        pImg.Value = imageId;
+                        pX.Value = face.X; pY.Value = face.Y; pW.Value = face.W; pH.Value = face.H;
+                        pEmb.Value = EmbeddingConverter.ToBytes(face.Embedding);
+                        pStatus.Value = FaceStatus.Unnamed;
+                        pAt.Value = now;
+                        await ins.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+
+                using (var mark = _connection.CreateCommand())
+                {
+                    mark.Transaction = transaction;
+                    mark.CommandText = "UPDATE Images SET FaceScanAt = @At, FaceScanFileTime = @FileTime WHERE Id = @Id";
+                    mark.Parameters.AddWithValue("@At", DateTime.UtcNow.ToString("o"));
+                    mark.Parameters.AddWithValue("@FileTime", fileLastWriteUtc.ToString("o"));
+                    mark.Parameters.AddWithValue("@Id", imageId);
+                    await mark.ExecuteNonQueryAsync(cancellationToken);
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+        finally
+        {
+            _writeSemaphore.Release();
+        }
+    }
+
+    public async Task<Dictionary<string, string>> GetFaceScanTimesAsync(List<string> paths, CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (paths.Count == 0) return result;
+
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            for (int i = 0; i < paths.Count; i += _chunkSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var chunk = paths.Skip(i).Take(_chunkSize).ToList();
+                var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
+
+                using var cmd = _readConnection.CreateCommand();
+                cmd.CommandText = $"SELECT Path, FaceScanFileTime FROM Images WHERE FaceScanFileTime IS NOT NULL AND Path IN ({placeholders})";
+                for (int j = 0; j < chunk.Count; j++) cmd.Parameters.AddWithValue($"@p{j}", chunk[j]);
+
+                using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    result[reader.GetString(0)] = reader.GetString(1);
+            }
+            return result;
+        }
+        finally
+        {
+            _readSemaphore.Release();
+        }
+    }
+
+    private const string FaceSelectColumns = @"
+        f.Id, f.ImageId, i.Path, f.X, f.Y, f.W, f.H, f.Embedding,
+        f.PersonId, f.SuggestedPersonId, f.SuggestionScore, f.RejectedPersonId, f.Status";
+
+    private static StoredFace ReadStoredFace(System.Data.Common.DbDataReader reader)
+    {
+        return new StoredFace(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetString(2),
+            reader.GetFloat(3), reader.GetFloat(4), reader.GetFloat(5), reader.GetFloat(6),
+            EmbeddingConverter.ToFloats((byte[])reader[7]),
+            reader.IsDBNull(8) ? null : reader.GetInt64(8),
+            reader.IsDBNull(9) ? null : reader.GetInt64(9),
+            reader.IsDBNull(10) ? null : reader.GetDouble(10),
+            reader.IsDBNull(11) ? null : reader.GetInt64(11),
+            reader.GetString(12));
+    }
+
+    public async Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, CancellationToken cancellationToken = default)
+    {
+        var results = new List<StoredFace>();
+        var normalized = folderPath.TrimEnd('\\');
+
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _readConnection.CreateCommand();
+            // Load all faces from images whose path starts with the folder prefix.
+            // Exact directory check happens in C# to avoid recursion.
+            // Lädt alle Gesichter, deren Pfad mit dem Ordner-Präfix beginnt,
+            // exakte Verzeichnis-Prüfung in C# (um Rekursion zu vermeiden).
+            cmd.CommandText = $@"
+                SELECT {FaceSelectColumns}
+                FROM Faces f JOIN Images i ON f.ImageId = i.Id
+                WHERE i.Path LIKE @Prefix ESCAPE '\'";
+            // Pattern with escaped backslashes: "C:\\fotos\" becomes "C:\\\\fotos\\\\" + "%"
+            // In C#: the string literal contains the actual bytes sent to SQLite.
+            var pattern = normalized.Replace("\\", "\\\\") + "\\\\%";
+            cmd.Parameters.AddWithValue("@Prefix", pattern);
+
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var face = ReadStoredFace(reader);
+                if (string.Equals(Path.GetDirectoryName(face.ImagePath), normalized, StringComparison.OrdinalIgnoreCase))
+                    results.Add(face);
+            }
+            return results;
+        }
+        finally
+        {
+            _readSemaphore.Release();
+        }
+    }
+
+    public async Task<List<StoredFace>> GetFacesByIdsAsync(List<long> faceIds, CancellationToken cancellationToken = default)
+    {
+        var results = new List<StoredFace>();
+        if (faceIds.Count == 0) return results;
+
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            for (int i = 0; i < faceIds.Count; i += _chunkSize)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var chunk = faceIds.Skip(i).Take(_chunkSize).ToList();
+                var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
+
+                using var cmd = _readConnection.CreateCommand();
+                cmd.CommandText = $@"
+                    SELECT {FaceSelectColumns}
+                    FROM Faces f JOIN Images i ON f.ImageId = i.Id
+                    WHERE f.Id IN ({placeholders})";
+                for (int j = 0; j < chunk.Count; j++) cmd.Parameters.AddWithValue($"@p{j}", chunk[j]);
+
+                using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    results.Add(ReadStoredFace(reader));
+            }
+            return results;
+        }
+        finally
+        {
+            _readSemaphore.Release();
+        }
+    }
 
     public void Dispose()
     {
