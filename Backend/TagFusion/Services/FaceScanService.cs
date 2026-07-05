@@ -54,7 +54,23 @@ public sealed class FaceScanService
         return true;
     }
 
-    public void Cancel() => _cts?.Cancel();
+    public void Cancel()
+    {
+        // Snapshot the reference; a concurrently finishing scan may dispose it —
+        // in that case there is nothing left to cancel.
+        // Referenz snapshotten; ein parallel endender Scan darf sie entsorgen —
+        // dann gibt es nichts mehr abzubrechen.
+        var cts = _cts;
+        if (cts == null) return;
+        try
+        {
+            cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Scan already finished. / Scan bereits beendet.
+        }
+    }
 
     private async Task RunScanAsync(string folderPath, CancellationToken ct)
     {
@@ -125,8 +141,8 @@ public sealed class FaceScanService
         }
         finally
         {
-            _cts?.Dispose();
-            _cts = null;
+            var cts = Interlocked.Exchange(ref _cts, null);
+            cts?.Dispose();
             Interlocked.Exchange(ref _running, 0);
             Completed?.Invoke(new ScanSummary(scanned, faces, skipped, cancelled));
         }

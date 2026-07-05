@@ -176,4 +176,16 @@ public class FaceScanServiceTests
 
         Assert.That(summary.Cancelled, Is.True);
     }
+
+    [Test]
+    public async Task Cancel_AfterScanCompleted_DoesNotThrow()
+    {
+        var p1 = CreateTempImage();
+        SetupFolder(p1);
+        _engine.Setup(e => e.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new List<DetectedFace>());
+        await RunScanAsync("C:\\egal");
+
+        Assert.DoesNotThrow(() => _service.Cancel());
+    }
 }
