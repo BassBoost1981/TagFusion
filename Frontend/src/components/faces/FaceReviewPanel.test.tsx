@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { act } from 'react';
 import { FaceReviewPanel } from './FaceReviewPanel';
 import { useFaceStore } from '../../stores/faceStore';
 import { useAppStore } from '../../stores/appStore';
@@ -42,5 +43,27 @@ describe('FaceReviewPanel', () => {
     useFaceStore.setState({ isPanelOpen: false });
     const { container } = render(<FaceReviewPanel />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('does not leak a typed name to another group after the review reloads', () => {
+    const groupA = { faceIds: [10], sample: [{ faceId: 10, imagePath: 'C:\\a.jpg', crop: 'QUJD' }] };
+    const groupB = { faceIds: [20], sample: [{ faceId: 20, imagePath: 'C:\\b.jpg', crop: 'QUJD' }] };
+    useFaceStore.setState({
+      isPanelOpen: true,
+      review: { suggestions: [], groups: [groupA, groupB] },
+      persons: [],
+    });
+    render(<FaceReviewPanel />);
+
+    const inputs = screen.getAllByPlaceholderText('Name eingeben…');
+    fireEvent.change(inputs[0], { target: { value: 'Anna' } });
+
+    // Simulate reload after confirming group A: only group B remains.
+    act(() => {
+      useFaceStore.setState({ review: { suggestions: [], groups: [groupB] } });
+    });
+
+    const remaining = screen.getAllByPlaceholderText('Name eingeben…');
+    expect((remaining[0] as HTMLInputElement).value).toBe('');
   });
 });

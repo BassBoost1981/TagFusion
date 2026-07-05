@@ -64,34 +64,37 @@ export function FaceReviewPanel() {
         {review.groups.length > 0 && (
           <section className="flex flex-col gap-4">
             <h3 className="text-sm font-semibold uppercase opacity-70">{t('faces.unknownHeading')}</h3>
-            {review.groups.map((g, index) => (
-              <div key={g.faceIds[0]} className="flex flex-col gap-2 rounded-xl border border-white/10 p-3">
-                <p className="text-xs opacity-60">{t('faces.groupSize', { count: g.faceIds.length })}</p>
-                <CropStrip crops={g.sample} />
-                <div className="flex items-center gap-2">
-                  <GlassInput
-                    value={groupNames[index] ?? ''}
-                    onChange={(e) => setGroupNames((prev) => ({ ...prev, [index]: e.target.value }))}
-                    placeholder={t('faces.namePlaceholder')}
-                    list={`persons-${index}`}
-                  />
-                  <datalist id={`persons-${index}`}>
-                    {persons.map((p) => (
-                      <option key={p.id} value={p.name} />
-                    ))}
-                  </datalist>
-                  <GlassButton
-                    disabled={!(groupNames[index] ?? '').trim()}
-                    onClick={() => void confirmGroup(g.faceIds, (groupNames[index] ?? '').trim(), currentFolder)}
-                  >
-                    <Check size={16} /> {t('faces.confirm')}
-                  </GlassButton>
-                  <GlassButton variant="ghost" onClick={() => void ignoreGroup(g.faceIds, currentFolder)}>
-                    <EyeOff size={16} /> {t('faces.ignore')}
-                  </GlassButton>
+            {review.groups.map((g) => {
+              const key = g.faceIds[0];
+              return (
+                <div key={key} className="flex flex-col gap-2 rounded-xl border border-white/10 p-3">
+                  <p className="text-xs opacity-60">{t('faces.groupSize', { count: g.faceIds.length })}</p>
+                  <CropStrip crops={g.sample} />
+                  <div className="flex items-center gap-2">
+                    <GlassInput
+                      value={groupNames[key] ?? ''}
+                      onChange={(e) => setGroupNames((prev) => ({ ...prev, [key]: e.target.value }))}
+                      placeholder={t('faces.namePlaceholder')}
+                      list={`persons-${key}`}
+                    />
+                    <datalist id={`persons-${key}`}>
+                      {persons.map((p) => (
+                        <option key={p.id} value={p.name} />
+                      ))}
+                    </datalist>
+                    <GlassButton
+                      disabled={!(groupNames[key] ?? '').trim()}
+                      onClick={() => void confirmGroup(g.faceIds, (groupNames[key] ?? '').trim(), currentFolder)}
+                    >
+                      <Check size={16} /> {t('faces.confirm')}
+                    </GlassButton>
+                    <GlassButton variant="ghost" onClick={() => void ignoreGroup(g.faceIds, currentFolder)}>
+                      <EyeOff size={16} /> {t('faces.ignore')}
+                    </GlassButton>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
         )}
 
