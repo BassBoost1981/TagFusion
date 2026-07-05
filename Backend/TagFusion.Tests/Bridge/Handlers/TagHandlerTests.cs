@@ -331,6 +331,68 @@ public class TagHandlerTests
             Times.Never);
     }
 
+    [Test]
+    public async Task SearchImages_FirstBatchAllMissing_RefillsFromNextOffset()
+    {
+        var missing1 = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg");
+        var missing2 = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg");
+        var existing1 = CreateTempFile();
+        var existing2 = CreateTempFile();
+
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 2, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile> { new() { Path = missing1 }, new() { Path = missing2 } });
+
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 2, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile> { new() { Path = existing1 }, new() { Path = existing2 } });
+
+        var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"urlaub\"]");
+        var payload = new Dictionary<string, object> { ["tags"] = tagsJson, ["limit"] = (long)2 };
+
+        var result = await _handler.HandleAsync("searchImages", payload);
+
+        var images = (List<ImageFile>)result!;
+        Assert.That(images.Select(i => i.Path), Is.EquivalentTo(new[] { existing1, existing2 }));
+
+        _databaseService.Verify(
+            s => s.DeleteImagesAsync(
+                It.Is<List<string>>(p => p.Count == 2 && p.Contains(missing1) && p.Contains(missing2)),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Test]
+    public async Task SearchImages_DbExhausted_StopsRequerying()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jpg");
+
+        _databaseService
+            .Setup(s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 2, 0, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ImageFile> { new() { Path = missing } });
+
+        var tagsJson = JsonSerializer.Deserialize<JsonElement>("[\"urlaub\"]");
+        var payload = new Dictionary<string, object> { ["tags"] = tagsJson, ["limit"] = (long)2 };
+
+        var result = await _handler.HandleAsync("searchImages", payload);
+
+        var images = (List<ImageFile>)result!;
+        Assert.That(images, Is.Empty);
+
+        _databaseService.Verify(
+            s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 2, 0, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _databaseService.Verify(
+            s => s.SearchImagesAsync(It.IsAny<List<string>>(), null, 2, 2, It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _databaseService.Verify(
+            s => s.DeleteImagesAsync(
+                It.Is<List<string>>(p => p.Count == 1 && p[0] == missing),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     // ========================================================================
     // Unsupported action Tests
     // ========================================================================

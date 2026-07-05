@@ -160,19 +160,55 @@ public class TagHandler : IBridgeHandler
             offset = PayloadHelper.GetInt(offsetObj, 0);
         }
 
-        var results = await _databaseService.SearchImagesAsync(terms, minRating, limit, offset);
+        // Auto-cleanup can hide an entire LIMIT window (e.g. newest matches all live on
+        // an unplugged drive) — refill by advancing the offset until enough visible
+        // results are gathered or the DB is exhausted, instead of returning a false empty.
+        // Auto-Cleanup kann ein ganzes LIMIT-Fenster ausblenden (z.B. wenn die neuesten
+        // Treffer alle auf einer abgestöpselten Platte liegen) — wir füllen auf, indem
+        // wir den Offset vorrücken, bis genug sichtbare Treffer da sind oder die DB
+        // erschöpft ist, statt fälschlich ein leeres Ergebnis zu liefern.
+        var visible = new List<Models.ImageFile>();
+        var deletablePaths = new List<string>();
 
-        // Auto-cleanup: hide files that no longer exist; forget them in the DB only
-        // when their drive is online (protects unplugged external drives).
-        // Auto-Cleanup: fehlende Dateien ausblenden; DB-Löschung nur bei
-        // verbundenem Laufwerk (schützt abgestöpselte externe Platten).
-        var cleanup = SearchResultCleaner.Partition(results, SearchResultCleaner.IsRootAvailable, File.Exists);
-        if (cleanup.DeletablePaths.Count > 0)
+        // Root availability is checked at most once per root for the whole search,
+        // not per batch — the lambda memoizes across all Partition calls below.
+        // Verfügbarkeit wird pro Suche höchstens einmal pro Laufwerk geprüft —
+        // das Lambda merkt sich das Ergebnis über alle Partition-Aufrufe hinweg.
+        var rootAvailabilityCache = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        bool IsRootAvailableMemoized(string root)
+        {
+            if (!rootAvailabilityCache.TryGetValue(root, out var available))
+            {
+                available = SearchResultCleaner.IsRootAvailable(root);
+                rootAvailabilityCache[root] = available;
+            }
+            return available;
+        }
+
+        var currentOffset = offset;
+        while (true)
+        {
+            var batch = await _databaseService.SearchImagesAsync(terms, minRating, limit, currentOffset);
+            var cleanup = SearchResultCleaner.Partition(batch, IsRootAvailableMemoized, File.Exists);
+
+            visible.AddRange(cleanup.Visible);
+            deletablePaths.AddRange(cleanup.DeletablePaths);
+
+            var exhausted = batch.Count < limit;
+            if (visible.Count >= limit || exhausted) break;
+
+            currentOffset += limit;
+        }
+
+        if (visible.Count > limit)
+            visible.RemoveRange(limit, visible.Count - limit);
+
+        if (deletablePaths.Count > 0)
         {
             try
             {
-                await _databaseService.DeleteImagesAsync(cleanup.DeletablePaths);
-                _logger.LogInformation("Removed {Count} stale image entries during search", cleanup.DeletablePaths.Count);
+                await _databaseService.DeleteImagesAsync(deletablePaths);
+                _logger.LogInformation("Removed {Count} stale image entries during search", deletablePaths.Count);
             }
             catch (Exception ex)
             {
@@ -180,6 +216,6 @@ public class TagHandler : IBridgeHandler
             }
         }
 
-        return cleanup.Visible;
+        return visible;
     }
 }
