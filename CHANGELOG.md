@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), versions fol
 ## [Unreleased]
 
 ### Added
+- Global search matches partial tag names AND filenames, case-insensitive incl. umlauts; multiple terms are AND-combined (comma/space separated)
+- Stale database entries (files deleted outside the app) are cleaned up automatically during global search; entries on unplugged drives are preserved
 - Search pagination, duplicate detection optimization, IndexedDB thumbnail eviction
 - Bridge handler tests and contract tests (frontend ↔ backend action names)
 - Service interfaces (`IExifToolService`, `IFileSystemService`, …) for testability
