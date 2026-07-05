@@ -66,4 +66,10 @@ public class SearchResultCleanerTests
         Assert.That(result.Visible.Select(i => i.Path), Is.EqualTo(new[] { "C:\\da.jpg" }));
         Assert.That(result.DeletablePaths, Is.EqualTo(new[] { "C:\\weg.jpg" }));
     }
+
+    [Test]
+    public void IsRootAvailable_InvalidRoot_ReturnsFalse()
+    {
+        Assert.That(SearchResultCleaner.IsRootAvailable("??:"), Is.False);
+    }
 }

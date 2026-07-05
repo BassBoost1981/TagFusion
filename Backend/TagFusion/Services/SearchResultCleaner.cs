@@ -42,19 +42,19 @@ public static class SearchResultCleaner
 
     /// <summary>
     /// Production root check: drive letters via DriveInfo.IsReady; UNC shares via
-    /// Directory.Exists bounded to 2s (dead shares can block for a long time).
-    /// Produktions-Check: Laufwerke via IsReady, UNC-Shares mit 2s-Schranke.
+    /// Directory.Exists — both bounded to 2s (dead mapped drives and dead shares
+    /// can otherwise block for the full SMB timeout, 10-30s).
+    /// Produktions-Check: Laufwerke via IsReady, UNC-Shares via Directory.Exists —
+    /// beide mit 2s-Schranke (tote gemappte Laufwerke/Shares blockieren sonst 10-30s).
     /// </summary>
     public static bool IsRootAvailable(string root)
     {
         try
         {
-            if (root.StartsWith(@"\\", StringComparison.Ordinal))
-            {
-                var probe = Task.Run(() => Directory.Exists(root));
-                return probe.Wait(TimeSpan.FromSeconds(2)) && probe.Result;
-            }
-            return new DriveInfo(root).IsReady;
+            var probe = root.StartsWith(@"\\", StringComparison.Ordinal)
+                ? Task.Run(() => Directory.Exists(root))
+                : Task.Run(() => new DriveInfo(root).IsReady);
+            return probe.Wait(TimeSpan.FromSeconds(2)) && probe.Result;
         }
         catch
         {
