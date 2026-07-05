@@ -494,6 +494,22 @@ public class DatabaseServiceTests
     }
 
     [Test]
+    public async Task RejectSuggestion_DoesNotTouchConfirmedFaces()
+    {
+        await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace() }, DateTime.UtcNow);
+        var face = (await _db.GetFacesForFolderAsync("C:\\f"))[0];
+        var personId = await _db.GetOrCreatePersonAsync("Max");
+        await _db.AssignFacesToPersonAsync(new List<long> { face.Id }, personId);
+
+        await _db.RejectFaceSuggestionsAsync(new List<long> { face.Id });
+
+        var after = (await _db.GetFacesByIdsAsync(new List<long> { face.Id }))[0];
+        Assert.That(after.Status, Is.EqualTo(FaceStatus.Confirmed));
+        Assert.That(after.PersonId, Is.EqualTo(personId));
+        Assert.That(after.RejectedPersonId, Is.Null);
+    }
+
+    [Test]
     public async Task GetConfirmedEmbeddingsByPerson_GroupsCorrectly()
     {
         await _db.SaveFacesAsync("C:\\f\\a.jpg", new[] { TestFace(seed: 0.1f), TestFace(x: 200, seed: 0.2f) }, DateTime.UtcNow);

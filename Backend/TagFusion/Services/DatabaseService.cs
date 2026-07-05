@@ -849,7 +849,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     }
 
     /// <summary>Run one UPDATE per face id inside a single transaction. / Ein UPDATE pro Face-Id in einer Transaktion.</summary>
-    private async Task UpdateFacesAsync(List<long> faceIds, string setClause, Action<SQLiteCommand>? addParams, CancellationToken cancellationToken)
+    private async Task UpdateFacesAsync(List<long> faceIds, string setClause, Action<SQLiteCommand>? addParams, CancellationToken cancellationToken, string extraWhere = "")
     {
         if (faceIds.Count == 0) return;
         await _writeSemaphore.WaitAsync(cancellationToken);
@@ -860,7 +860,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             {
                 using var cmd = _connection.CreateCommand();
                 cmd.Transaction = transaction;
-                cmd.CommandText = $"UPDATE Faces SET {setClause} WHERE Id = @Id";
+                cmd.CommandText = $"UPDATE Faces SET {setClause} WHERE Id = @Id{extraWhere}";
                 addParams?.Invoke(cmd);
                 var idParam = cmd.Parameters.Add("@Id", System.Data.DbType.Int64);
                 foreach (var id in faceIds)
@@ -886,7 +886,8 @@ public class DatabaseService : IDatabaseService, IDisposable
         => UpdateFacesAsync(faceIds,
             "RejectedPersonId = SuggestedPersonId, SuggestedPersonId = NULL, SuggestionScore = NULL, Status = 'unnamed'",
             addParams: null,
-            cancellationToken);
+            cancellationToken,
+            extraWhere: " AND Status = 'suggested'");
 
     public Task SetFacesIgnoredAsync(List<long> faceIds, CancellationToken cancellationToken = default)
         => UpdateFacesAsync(faceIds,
