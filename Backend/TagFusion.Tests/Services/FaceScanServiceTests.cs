@@ -167,6 +167,7 @@ public class FaceScanServiceTests
         _engine.Setup(e => e.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                .Returns(async (string _, CancellationToken ct) =>
                {
+                   await Task.CompletedTask;
                    _service.Cancel();
                    ct.ThrowIfCancellationRequested();
                    return (IReadOnlyList<DetectedFace>)new List<DetectedFace>();
