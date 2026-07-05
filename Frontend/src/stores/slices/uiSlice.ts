@@ -52,8 +52,8 @@ export interface UISlice {
   setFilterTags: (tags: string[]) => void;
   clearFilters: () => void;
   setupSubscriptions: () => void;
-  // Global search: search DB across all folders by tags/rating
-  executeGlobalSearch: (tags?: string[], minRating?: number) => Promise<void>;
+  // Global search: search DB across all folders by terms (tags/filenames) and rating
+  executeGlobalSearch: (terms?: string[], minRating?: number) => Promise<void>;
   exitGlobalSearch: () => void;
 }
 
@@ -121,10 +121,10 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
     }
   },
 
-  executeGlobalSearch: async (tags, minRating) => {
+  executeGlobalSearch: async (terms, minRating) => {
     set({ isGlobalSearch: true, isSearching: true });
     try {
-      const results = await bridge.searchImages(tags, minRating, 200);
+      const results = await bridge.searchImages(terms, minRating, 200);
       set({ searchResults: results, isSearching: false });
     } catch (error) {
       set({ isSearching: false, error: (error as Error).message });

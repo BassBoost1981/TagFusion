@@ -38,6 +38,7 @@ import { GlassIconButton } from '../ui/glass';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { SettingsMenu } from './SettingsMenu';
 import { useTranslation } from 'react-i18next';
+import { parseSearchTerms } from '../../utils/searchTerms';
 
 interface SearchSuggestion {
   value: string;
@@ -109,12 +110,13 @@ export function Toolbar() {
     }
   };
 
-  // Execute global cross-folder search via backend DB
+  // Execute global cross-folder search via backend DB.
+  // Terms are AND-combined; each matches tags or filenames (substring).
   const handleGlobalSearch = () => {
-    const searchTags = searchQuery.trim() ? [searchQuery.trim()] : undefined;
+    const terms = parseSearchTerms(searchQuery);
     const minRating = filterRating ?? undefined;
-    if (searchTags || minRating) {
-      executeGlobalSearch(searchTags, minRating);
+    if (terms.length > 0 || minRating) {
+      executeGlobalSearch(terms.length > 0 ? terms : undefined, minRating);
     }
   };
 

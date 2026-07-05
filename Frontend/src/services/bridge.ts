@@ -288,9 +288,10 @@ class BridgeService {
     return this.send(BRIDGE_ACTIONS.HEALTH_CHECK);
   }
 
-  // Search / Filter images by tags and/or rating
-  async searchImages(tags?: string[], minRating?: number, limit?: number, offset?: number): Promise<ImageFile[]> {
-    return this.send<ImageFile[]>(BRIDGE_ACTIONS.SEARCH_IMAGES, { tags, minRating, limit, offset });
+  // Global search — each term matches tags or filenames (substring, case-insensitive).
+  // Payload key stays `tags` for bridge-contract stability; semantics are "search terms".
+  async searchImages(terms?: string[], minRating?: number, limit?: number, offset?: number): Promise<ImageFile[]> {
+    return this.send<ImageFile[]>(BRIDGE_ACTIONS.SEARCH_IMAGES, { tags: terms, minRating, limit, offset });
   }
 
   // Batch tag operations — write identical tags to multiple images
