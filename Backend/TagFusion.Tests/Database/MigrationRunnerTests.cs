@@ -126,4 +126,38 @@ public class MigrationRunnerTests
         check.CommandText = "SELECT FileName FROM Images";
         Assert.That(check.ExecuteScalar(), Is.EqualTo("x.jpg"));
     }
+
+    [Test]
+    public void MigrationV4_CreatesPersonsAndFacesTables()
+    {
+        new MigrationRunner(_connection, NullLogger.Instance).ApplyMigrations();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('Persons','Faces')";
+        Assert.That(Convert.ToInt32(cmd.ExecuteScalar()), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void MigrationV4_AddsFaceScanColumnsWhenImagesTableExists()
+    {
+        // Simulate an existing Images table (post-v3 shape, FileName included).
+        // Simuliert eine bestehende Images-Tabelle (Stand nach v3, mit FileName).
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE Images (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Path TEXT NOT NULL UNIQUE,
+                    FileName TEXT NOT NULL DEFAULT '',
+                    LastModified TEXT NOT NULL
+                );";
+            cmd.ExecuteNonQuery();
+        }
+
+        new MigrationRunner(_connection, NullLogger.Instance).ApplyMigrations();
+
+        using var check = _connection.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Images') WHERE name IN ('FaceScanAt','FaceScanFileTime')";
+        Assert.That(Convert.ToInt32(check.ExecuteScalar()), Is.EqualTo(2));
+    }
 }

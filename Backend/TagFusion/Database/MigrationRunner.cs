@@ -37,7 +37,27 @@ public class MigrationRunner
                 ON ThumbnailAccess(LastAccessTicks);"),
         new(3, "FileName column on Images — enables global filename search (C# step, idempotent)",
             "",
-            AddFileNameColumnAndBackfill)
+            AddFileNameColumnAndBackfill),
+        new(4, "Persons/Faces tables and face-scan columns on Images — local face recognition",
+            @"CREATE TABLE IF NOT EXISTS Persons (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE IF NOT EXISTS Faces (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ImageId INTEGER NOT NULL,
+                X REAL NOT NULL, Y REAL NOT NULL, W REAL NOT NULL, H REAL NOT NULL,
+                Embedding BLOB NOT NULL,
+                PersonId INTEGER,
+                SuggestedPersonId INTEGER,
+                SuggestionScore REAL,
+                RejectedPersonId INTEGER,
+                Status TEXT NOT NULL DEFAULT 'unnamed',
+                ScannedAt TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_faces_imageid ON Faces(ImageId);
+            CREATE INDEX IF NOT EXISTS idx_faces_status ON Faces(Status);",
+            AddFaceScanColumnsToImages)
     ];
 
     public MigrationRunner(SQLiteConnection connection, ILogger logger)
@@ -161,6 +181,28 @@ public class MigrationRunner
             idParam.Value = id;
             update.ExecuteNonQuery();
         }
+    }
+
+    /// <summary>
+    /// Adds the face-scan bookkeeping columns to Images. Skips gracefully when the
+    /// Images table is absent (bare test connections) or the columns already exist.
+    /// Ergänzt die Face-Scan-Spalten auf Images — tolerant gegenüber fehlender
+    /// Tabelle (nackte Test-Verbindungen) und bereits vorhandenen Spalten.
+    /// </summary>
+    private static void AddFaceScanColumnsToImages(SQLiteConnection connection, SQLiteTransaction transaction)
+    {
+        if (!TableExists(connection, transaction, "Images")) return;
+        AddColumnIfMissing(connection, transaction, "Images", "FaceScanAt", "TEXT");
+        AddColumnIfMissing(connection, transaction, "Images", "FaceScanFileTime", "TEXT");
+    }
+
+    private static void AddColumnIfMissing(SQLiteConnection connection, SQLiteTransaction transaction, string table, string column, string type)
+    {
+        if (ColumnExists(connection, transaction, table, column)) return;
+        using var alter = connection.CreateCommand();
+        alter.Transaction = transaction;
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type}";
+        alter.ExecuteNonQuery();
     }
 
     private static bool TableExists(SQLiteConnection connection, SQLiteTransaction transaction, string name)
