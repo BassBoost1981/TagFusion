@@ -13,6 +13,8 @@ public static class FaceCropHelper
 {
     public static Rectangle ComputeCropRectangle(int imageWidth, int imageHeight, float x, float y, float w, float h, float marginFactor)
     {
+        // Square crop centered on the face box, enlarged by the margin on every side.
+        // Quadratischer Ausschnitt um die Box-Mitte, per Rand-Faktor vergrößert.
         var side = Math.Max(w, h) * (1 + 2 * marginFactor);
         var centerX = x + w / 2;
         var centerY = y + h / 2;
@@ -21,7 +23,11 @@ public static class FaceCropHelper
         var top = (int)Math.Round(centerY - side / 2);
         var size = (int)Math.Round(side);
 
-        // Clamp to image bounds, keep at least 1x1. / An Bildgrenzen klemmen, min. 1x1.
+        // Clamp strategy is shrink-and-clamp, NOT shift-to-fit: near the right/bottom
+        // edge the square shrinks instead of sliding back into the image. Intentional —
+        // keeps the face centered; do not "fix" by shifting.
+        // Klemm-Strategie ist Verkleinern statt Verschieben: am Rand schrumpft das
+        // Quadrat, statt ins Bild zurückzurutschen — hält das Gesicht zentriert.
         left = Math.Max(0, Math.Min(left, imageWidth - 1));
         top = Math.Max(0, Math.Min(top, imageHeight - 1));
         size = Math.Max(1, Math.Min(size, Math.Min(imageWidth - left, imageHeight - top)));
