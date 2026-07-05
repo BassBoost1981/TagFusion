@@ -315,13 +315,13 @@ public class DatabaseServiceTests
     }
 
     [Test]
-    public async Task DeleteImages_EmptyList_NoOp()
+    public void DeleteImages_EmptyList_NoOp()
     {
         Assert.DoesNotThrowAsync(() => _db.DeleteImagesAsync(new List<string>()));
     }
 
     [Test]
-    public async Task DeleteImages_UnknownPath_DoesNotThrow()
+    public void DeleteImages_UnknownPath_DoesNotThrow()
     {
         Assert.DoesNotThrowAsync(() => _db.DeleteImagesAsync(new List<string> { "C:\\gibtsnicht.jpg" }));
     }
