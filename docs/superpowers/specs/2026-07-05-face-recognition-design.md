@@ -119,7 +119,7 @@ ALTER TABLE Images ADD COLUMN FaceScanFileTime TEXT;    -- Datei-mtime beim Scan
 
 | Action | Payload | Ergebnis |
 |---|---|---|
-| `scanFacesInFolder` | `{ path }` | `{ scanned, faces, skipped }` (nach Abschluss) |
+| `scanFacesInFolder` | `{ path }` | `true` (Start bestätigt — Abschluss kommt als Event, da große Ordner den 120s-Bridge-Timeout sprengen würden) |
 | `cancelFaceScan` | – | `true` |
 | `getFaceReview` | `{ path }` | `{ suggestions: [{ personId, personName, score, faces: [{ faceId, imagePath, cropBase64 }] }], groups: [{ faces: [...] }] }` |
 | `confirmFaceGroup` | `{ faceIds, personName }` | `{ tagged, failed }` — legt Person ggf. an, schreibt Tag via bestehender Batch-Infra, setzt `confirmed` |
@@ -127,7 +127,7 @@ ALTER TABLE Images ADD COLUMN FaceScanFileTime TEXT;    -- Datei-mtime beim Scan
 | `ignoreFaces` | `{ faceIds }` | `true` — `ignored`, taucht nie wieder auf |
 | `getPersons` | – | `[{ id, name, faceCount }]` (für Autocomplete) |
 
-- Event: `faceScanProgress { current, total, faces }`.
+- Events: `faceScanProgress { current, total, faces }` und `faceScanCompleted { scanned, faces, skipped, cancelled }`.
 - Neuer `FaceHandler : IBridgeHandler`; Einträge in `bridge-actions.json`, `bridgeActions.ts`
   und beiden Contract-Tests (Erweiterung ist erlaubt — nur bestehende Signaturen sind tabu).
 - Gesichts-Ausschnitte: Backend cropt per ImageSharp (Rahmen + 20 % Rand, 96 px JPEG,
@@ -135,9 +135,11 @@ ALTER TABLE Images ADD COLUMN FaceScanFileTime TEXT;    -- Datei-mtime beim Scan
 
 ### 6. Tag-Schreiben (Bestätigungsmoment)
 
-`confirmFaceGroup` nutzt exakt den bestehenden Pfad von `updateBatchTag`/`writeBatchTags`
-(ExifTool-Batch, Teil-Erfolge, DB-Sync, `batchProgress`-Event): Personenname = Tag-Text,
-Operation „add". Fehlgeschlagene Dateien bleiben `suggested`/`unnamed` und werden gemeldet.
+`confirmFaceGroup` verwendet denselben Mechanismus wie `updateBatchTag` (Operation „add"):
+pro Datei Tags lesen → dedupliziert ergänzen → per ExifTool schreiben → DB-Sync, mit
+Teil-Erfolgen. Die kleine Logik wird im `FaceHandler` gespiegelt statt den unabhängigen
+`TagHandler` umzubauen; das Ergebnis wird als Toast gemeldet (kein `batchProgress`-Event).
+Fehlgeschlagene Dateien bleiben `suggested`/`unnamed` und werden gemeldet.
 
 **Dokumentierte v1-Grenze:** Person umbenennen ändert nur den Katalog (`Persons.Name`),
 nicht rückwirkend die Tags in bereits geschriebenen Dateien. Das Review-Panel weist darauf hin.
