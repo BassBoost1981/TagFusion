@@ -12,15 +12,18 @@ public class DiagnosticsService
 {
     private readonly IDatabaseService _databaseService;
     private readonly ExifToolService _exifToolService;
+    private readonly IFaceEngine _faceEngine;
     private readonly ILogger<DiagnosticsService> _logger;
 
     public DiagnosticsService(
         IDatabaseService databaseService,
         ExifToolService exifToolService,
+        IFaceEngine faceEngine,
         ILogger<DiagnosticsService> logger)
     {
         _databaseService = databaseService;
         _exifToolService = exifToolService;
+        _faceEngine = faceEngine;
         _logger = logger;
     }
 
@@ -74,6 +77,10 @@ public class DiagnosticsService
             report.DiskError = ex.Message;
         }
 
+        // Face engine is optional — informational only, never part of AllOk.
+        // Die Gesichts-Engine ist optional — nur informativ, fließt nie in AllOk ein.
+        report.FaceEngineOk = _faceEngine.IsAvailable;
+
         report.AllOk = report.DatabaseOk && report.ExifToolOk && report.DiskOk;
         report.CheckedAt = DateTime.UtcNow;
 
@@ -100,4 +107,7 @@ public class HealthReport
     public long DiskFreeBytes { get; set; }
     public long DiskTotalBytes { get; set; }
     public string? DiskError { get; set; }
+
+    /// <summary>Local face engine loaded? / Lokale Gesichts-Engine geladen?</summary>
+    public bool FaceEngineOk { get; set; }
 }

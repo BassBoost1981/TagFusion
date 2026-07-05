@@ -85,6 +85,7 @@ public partial class App : Application
         services.AddSingleton<IFileSystemService>(sp => sp.GetRequiredService<FileSystemService>());
         services.AddSingleton<ImageEditService>();
         services.AddSingleton<IImageEditService>(sp => sp.GetRequiredService<ImageEditService>());
+        services.AddSingleton<IFaceEngine, FaceAiSharpEngine>();
         services.AddSingleton<DiagnosticsService>();
         services.AddSingleton<TagExportService>();
 
