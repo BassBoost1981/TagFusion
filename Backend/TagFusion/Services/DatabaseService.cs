@@ -764,10 +764,7 @@ public class DatabaseService : IDatabaseService, IDisposable
                 SELECT {FaceSelectColumns}
                 FROM Faces f JOIN Images i ON f.ImageId = i.Id
                 WHERE i.Path LIKE @Prefix ESCAPE '\'";
-            // Pattern with escaped backslashes: "C:\\fotos\" becomes "C:\\\\fotos\\\\" + "%"
-            // In C#: the string literal contains the actual bytes sent to SQLite.
-            var pattern = normalized.Replace("\\", "\\\\") + "\\\\%";
-            cmd.Parameters.AddWithValue("@Prefix", pattern);
+            cmd.Parameters.AddWithValue("@Prefix", EscapeLikePattern(normalized) + "\\\\%");
 
             using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))

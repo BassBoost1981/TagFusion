@@ -1,6 +1,5 @@
 using System.Globalization;
 using NUnit.Framework;
-using TagFusion.Database;
 using TagFusion.Models;
 using TagFusion.Services;
 
@@ -409,6 +408,19 @@ public class DatabaseServiceTests
 
         var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
         Assert.That(faces, Is.Empty);
+    }
+
+    [Test]
+    public async Task GetFacesForFolder_FolderNameWithLikeWildcards_MatchesLiterally()
+    {
+        var mtime = DateTime.UtcNow;
+        await _db.SaveFacesAsync("C:\\100%_Fertig\\a.jpg", new[] { TestFace() }, mtime);
+        await _db.SaveFacesAsync("C:\\100x_Fertig\\b.jpg", new[] { TestFace() }, mtime);
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\100%_Fertig");
+
+        Assert.That(faces, Has.Count.EqualTo(1));
+        Assert.That(faces[0].ImagePath, Is.EqualTo("C:\\100%_Fertig\\a.jpg"));
     }
 
     // ========================================================================
