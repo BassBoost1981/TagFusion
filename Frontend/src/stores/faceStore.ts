@@ -43,20 +43,29 @@ export const useFaceStore = create<FaceState>((set, get) => ({
 
   startScan: async (path) => {
     try {
-      await bridge.scanFacesInFolder(path);
       set({ isScanning: true, progress: null });
+      await bridge.scanFacesInFolder(path);
     } catch (error) {
+      set({ isScanning: false });
       useToastStore.getState().warning((error as Error).message);
     }
   },
 
   cancelScan: async () => {
-    await bridge.cancelFaceScan();
+    try {
+      await bridge.cancelFaceScan();
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
   },
 
   loadReview: async (path) => {
-    const [review, persons] = await Promise.all([bridge.getFaceReview(path), bridge.getPersons()]);
-    set({ review, persons, isPanelOpen: true });
+    try {
+      const [review, persons] = await Promise.all([bridge.getFaceReview(path), bridge.getPersons()]);
+      set({ review, persons, isPanelOpen: true });
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
   },
 
   confirmGroup: async (faceIds, personName, path) => {
@@ -75,13 +84,21 @@ export const useFaceStore = create<FaceState>((set, get) => ({
   },
 
   rejectSuggestion: async (faceIds, path) => {
-    await bridge.rejectFaceSuggestion(faceIds);
-    await get().loadReview(path);
+    try {
+      await bridge.rejectFaceSuggestion(faceIds);
+      await get().loadReview(path);
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
   },
 
   ignoreGroup: async (faceIds, path) => {
-    await bridge.ignoreFaces(faceIds);
-    await get().loadReview(path);
+    try {
+      await bridge.ignoreFaces(faceIds);
+      await get().loadReview(path);
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
   },
 
   closePanel: () => set({ isPanelOpen: false, review: null }),
@@ -96,7 +113,7 @@ export const useFaceStore = create<FaceState>((set, get) => ({
     });
 
     bridge.on('faceScanCompleted', (data) => {
-      const { scanned, faces, cancelled } = data as {
+      const { scanned, faces, skipped, cancelled } = data as {
         scanned: number; faces: number; skipped: number; cancelled: boolean;
       };
       set({ isScanning: false, progress: null });
@@ -105,7 +122,11 @@ export const useFaceStore = create<FaceState>((set, get) => ({
         toast.warning('Gesichter-Scan abgebrochen');
         return;
       }
-      toast.success(`Scan fertig: ${faces} Gesichter in ${scanned} Bildern`);
+      if (skipped > 0) {
+        toast.warning(`Scan fertig: ${faces} Gesichter in ${scanned} Bildern, ${skipped} übersprungen`);
+      } else {
+        toast.success(`Scan fertig: ${faces} Gesichter in ${scanned} Bildern`);
+      }
       const folder = getCurrentFolder();
       if (folder) void get().loadReview(folder);
     });

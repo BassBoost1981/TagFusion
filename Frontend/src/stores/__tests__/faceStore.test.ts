@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useFaceStore } from '../faceStore';
+import { useToastStore } from '../toastStore';
 import { bridge } from '../../services/bridge';
 
 vi.mock('../../services/bridge', () => ({
@@ -69,5 +70,64 @@ describe('faceStore', () => {
     await useFaceStore.getState().checkEngine();
 
     expect(useFaceStore.getState().engineAvailable).toBe(true);
+  });
+
+  it('loadReview surfaces a warning toast and does not open the panel when the bridge rejects', async () => {
+    mockedBridge.getFaceReview.mockRejectedValue(new Error('timeout'));
+    mockedBridge.getPersons.mockResolvedValue([]);
+
+    await expect(useFaceStore.getState().loadReview('C:\\x')).resolves.not.toThrow();
+
+    expect(useFaceStore.getState().isPanelOpen).toBe(false);
+  });
+
+  it('rejectSuggestion surfaces a warning toast when the bridge rejects', async () => {
+    mockedBridge.rejectFaceSuggestion.mockRejectedValue(new Error('timeout'));
+
+    await expect(useFaceStore.getState().rejectSuggestion([1], 'C:\\x')).resolves.not.toThrow();
+  });
+
+  it('ignoreGroup surfaces a warning toast when the bridge rejects', async () => {
+    mockedBridge.ignoreFaces.mockRejectedValue(new Error('timeout'));
+
+    await expect(useFaceStore.getState().ignoreGroup([1], 'C:\\x')).resolves.not.toThrow();
+  });
+
+  it('cancelScan surfaces a warning toast when the bridge rejects', async () => {
+    mockedBridge.cancelFaceScan.mockRejectedValue(new Error('timeout'));
+
+    await expect(useFaceStore.getState().cancelScan()).resolves.not.toThrow();
+  });
+
+  it('startScan sets isScanning before awaiting the bridge and reverts on failure', async () => {
+    mockedBridge.scanFacesInFolder.mockRejectedValue(new Error('boom'));
+
+    await useFaceStore.getState().startScan('C:\\fotos');
+
+    expect(useFaceStore.getState().isScanning).toBe(false);
+  });
+
+  it('faceScanCompleted toasts a warning with the skipped count, or success when nothing was skipped', () => {
+    mockedBridge.getFaceReview.mockResolvedValue({ suggestions: [], groups: [] });
+    mockedBridge.getPersons.mockResolvedValue([]);
+    useToastStore.setState({ toasts: [] });
+
+    // setupFaceSubscriptions is guarded to run once per module lifetime, so both
+    // scenarios are exercised against the single registered handler here.
+    useFaceStore.getState().setupFaceSubscriptions(() => null);
+    const handler = mockedBridge.on.mock.calls.find(([event]) => event === 'faceScanCompleted')![1];
+
+    handler({ scanned: 10, faces: 3, skipped: 2, cancelled: false });
+    let toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].type).toBe('warning');
+    expect(toasts[0].message).toBe('Scan fertig: 3 Gesichter in 10 Bildern, 2 übersprungen');
+
+    useToastStore.setState({ toasts: [] });
+    handler({ scanned: 10, faces: 3, skipped: 0, cancelled: false });
+    toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0].type).toBe('success');
+    expect(toasts[0].message).toBe('Scan fertig: 3 Gesichter in 10 Bildern');
   });
 });
