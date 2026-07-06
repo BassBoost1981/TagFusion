@@ -24,6 +24,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageReference Include="FaceAiSharp.Bundle" Version="0.6.35" />
+    <!-- Native ONNX runtime (CPU). FaceAiSharp references only the MANAGED wrapper and expects
+         the app to pick the native runtime; version MUST match Microsoft.ML.OnnxRuntime.Managed.
+         Native ONNX-Runtime (CPU) — FaceAiSharp bringt nur den Managed-Wrapper mit; ohne dieses
+         Paket fehlt onnxruntime.dll im Publish und der App-Start crasht mit AccessViolation. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.26.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.118" />

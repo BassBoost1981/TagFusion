@@ -64,6 +64,13 @@ if (-not $OnnxModels -or $OnnxModels.Count -eq 0) {
     throw "Publish verification failed: no ONNX face models found under $PublishDir (FaceAiSharp.Bundle content missing)"
 }
 
+# The NATIVE runtime must ship too — the managed wrapper alone crashes the app at
+# startup with an uncatchable AccessViolation when it binds a mismatched system DLL.
+$NativeOnnxRuntime = Get-ChildItem -Path $PublishDir -Recurse -Filter 'onnxruntime.dll' -ErrorAction SilentlyContinue
+if (-not $NativeOnnxRuntime -or $NativeOnnxRuntime.Count -eq 0) {
+    throw "Publish verification failed: native onnxruntime.dll missing under $PublishDir (add/restore the Microsoft.ML.OnnxRuntime package)"
+}
+
 if ($env:CERT_PFX -and $env:CERT_PASS) {
     Write-Host '3. Signing release executable...' -ForegroundColor Cyan
     & (Join-Path $RootDir 'sign_release.ps1')
