@@ -47,4 +47,29 @@ public static class FaceCropHelper
         await image.SaveAsJpegAsync(ms, ct);
         return Convert.ToBase64String(ms.ToArray());
     }
+
+    /// <summary>
+    /// Produce crops for several faces of ONE image with a single decode.
+    /// Erzeugt mehrere Ausschnitte EINES Bildes mit nur einem Dekodier-Vorgang.
+    /// </summary>
+    public static async Task<Dictionary<long, string>> CreateCropsBase64Async(
+        string imagePath,
+        IReadOnlyList<(long FaceId, float X, float Y, float W, float H)> boxes,
+        int targetSize = 96, float marginFactor = 0.2f, CancellationToken ct = default)
+    {
+        var result = new Dictionary<long, string>();
+        using var image = await Image.LoadAsync<Rgb24>(imagePath, ct);
+        foreach (var (faceId, x, y, w, h) in boxes)
+        {
+            ct.ThrowIfCancellationRequested();
+            var rect = ComputeCropRectangle(image.Width, image.Height, x, y, w, h, marginFactor);
+            // Clone processes on a copy — the decoded original stays untouched for the next box.
+            // Clone arbeitet auf einer Kopie — das dekodierte Original bleibt für die nächste Box intakt.
+            using var crop = image.Clone(ctx => ctx.Crop(rect).Resize(targetSize, targetSize));
+            using var ms = new MemoryStream();
+            await crop.SaveAsJpegAsync(ms, ct);
+            result[faceId] = Convert.ToBase64String(ms.ToArray());
+        }
+        return result;
+    }
 }

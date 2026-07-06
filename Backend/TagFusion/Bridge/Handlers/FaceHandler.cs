@@ -121,22 +121,37 @@ public class FaceHandler : IBridgeHandler
 
     private async Task<List<object>> BuildCropsAsync(IReadOnlyList<StoredFace> faces)
     {
-        var crops = new List<object>();
-        foreach (var face in faces.Take(MaxCropsPerGroup))
+        var selected = faces.Take(MaxCropsPerGroup).ToList();
+        var cropsByFaceId = new Dictionary<long, string>();
+
+        // One decode per distinct image, no matter how many faces it contributes.
+        // Ein Dekodier-Vorgang pro eindeutigem Bild, unabhängig von der Anzahl Gesichter.
+        foreach (var group in selected.GroupBy(f => f.ImagePath, StringComparer.OrdinalIgnoreCase))
         {
+            var boxes = group.Select(f => (f.Id, f.X, f.Y, f.W, f.H)).ToList();
             try
             {
-                var crop = await FaceCropHelper.CreateCropBase64Async(face.ImagePath, face.X, face.Y, face.W, face.H);
-                crops.Add(new { faceId = face.Id, imagePath = face.ImagePath, crop });
+                var crops = await FaceCropHelper.CreateCropsBase64Async(group.Key, boxes);
+                foreach (var (faceId, crop) in crops)
+                    cropsByFaceId[faceId] = crop;
             }
             catch (Exception ex)
             {
                 // A missing/broken source image must not break the whole review.
                 // Ein fehlendes/defektes Bild darf das Review nicht abbrechen.
-                _logger.LogWarning(ex, "Face crop failed for {Path}", face.ImagePath);
+                _logger.LogWarning(ex, "Face crop failed for {Path}", group.Key);
             }
         }
-        return crops;
+
+        // Preserve original face order in the response.
+        // Ursprüngliche Reihenfolge der Gesichter in der Antwort beibehalten.
+        var result = new List<object>();
+        foreach (var face in selected)
+        {
+            if (cropsByFaceId.TryGetValue(face.Id, out var crop))
+                result.Add(new { faceId = face.Id, imagePath = face.ImagePath, crop });
+        }
+        return result;
     }
 
     private async Task<object> ConfirmFaceGroupAsync(Dictionary<string, object>? payload)

@@ -51,4 +51,36 @@ public class FaceCropHelperTests
             if (File.Exists(path)) File.Delete(path);
         }
     }
+
+    [Test]
+    public async Task CreateCropsBase64_TwoBoxesOnOneImage_ProducesTwoDecodableJpegsKeyedByFaceId()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+        try
+        {
+            using (var img = new Image<Rgb24>(200, 200))
+                await img.SaveAsPngAsync(path);
+
+            var boxes = new List<(long FaceId, float X, float Y, float W, float H)>
+            {
+                (1L, 50, 50, 40, 40),
+                (2L, 100, 100, 30, 30),
+            };
+
+            var crops = await FaceCropHelper.CreateCropsBase64Async(path, boxes);
+
+            Assert.That(crops.Keys, Is.EquivalentTo(new long[] { 1, 2 }));
+            foreach (var base64 in crops.Values)
+            {
+                var bytes = Convert.FromBase64String(base64);
+                using var crop = Image.Load(bytes);
+                Assert.That(crop.Width, Is.EqualTo(96));
+                Assert.That(crop.Height, Is.EqualTo(96));
+            }
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
 }
