@@ -59,6 +59,11 @@ if (-not (Test-Path -LiteralPath $WwwrootIndex)) {
     throw "Publish verification failed: missing $WwwrootIndex"
 }
 
+$OnnxModels = Get-ChildItem -Path $PublishDir -Recurse -Filter '*.onnx' -ErrorAction SilentlyContinue
+if (-not $OnnxModels -or $OnnxModels.Count -eq 0) {
+    throw "Publish verification failed: no ONNX face models found under $PublishDir (FaceAiSharp.Bundle content missing)"
+}
+
 if ($env:CERT_PFX -and $env:CERT_PASS) {
     Write-Host '3. Signing release executable...' -ForegroundColor Cyan
     & (Join-Path $RootDir 'sign_release.ps1')
