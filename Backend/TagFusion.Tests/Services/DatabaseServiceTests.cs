@@ -411,6 +411,33 @@ public class DatabaseServiceTests
     }
 
     [Test]
+    public async Task SaveImage_AfterFaceScan_RefreshesFaceScanFileTime()
+    {
+        // Our own metadata writes (tags/rating) bump the file's mtime via ExifTool.
+        // That must NOT invalidate the face scan — pixels are unchanged.
+        // Eigene Metadaten-Schreibvorgänge ändern die Datei-mtime — das darf den
+        // Gesichts-Scan nicht entwerten, die Pixel sind unverändert.
+        var scanTime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace() }, scanTime);
+
+        var image = CreateTestImage("C:\\fotos\\a.jpg", new[] { "Max" });
+        image.DateModified = scanTime.AddMinutes(5);
+        await _db.SaveImageAsync(image);
+
+        var times = await _db.GetFaceScanTimesAsync(new List<string> { "C:\\fotos\\a.jpg" });
+        Assert.That(times["C:\\fotos\\a.jpg"], Is.EqualTo(scanTime.AddMinutes(5).ToString("o")));
+    }
+
+    [Test]
+    public async Task SaveImage_WithoutFaceScan_LeavesFaceScanFileTimeUnset()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\neu.jpg", new[] { "X" }));
+
+        var times = await _db.GetFaceScanTimesAsync(new List<string> { "C:\\fotos\\neu.jpg" });
+        Assert.That(times, Is.Empty);
+    }
+
+    [Test]
     public async Task GetFacesForFolder_FolderNameWithLikeWildcards_MatchesLiterally()
     {
         var mtime = DateTime.UtcNow;

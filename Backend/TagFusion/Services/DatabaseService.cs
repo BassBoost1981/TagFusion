@@ -250,7 +250,17 @@ public class DatabaseService : IDatabaseService, IDisposable
                     Rating = @Rating,
                     Width = @Width,
                     Height = @Height,
-                    DateTaken = @DateTaken
+                    DateTaken = @DateTaken,
+                    -- This upsert only runs after OUR OWN metadata writes (tags/rating), which
+                    -- bump the file mtime without touching pixels — keep the face scan valid.
+                    -- Pixel edits (rotate/flip) never route through here, so real changes
+                    -- still trigger a rescan.
+                    -- Läuft nur nach EIGENEN Metadaten-Schreibvorgängen (mtime ändert sich,
+                    -- Pixel nicht) — der Gesichts-Scan bleibt gültig. Pixel-Änderungen
+                    -- (Drehen/Spiegeln) laufen nie über diesen Pfad.
+                    FaceScanFileTime = CASE WHEN Images.FaceScanAt IS NOT NULL
+                                            THEN @LastModified
+                                            ELSE Images.FaceScanFileTime END
                 RETURNING Id;
             ";
             cmd.Parameters.AddWithValue("@Path", image.Path);
