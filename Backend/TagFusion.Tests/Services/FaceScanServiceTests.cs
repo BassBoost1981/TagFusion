@@ -107,6 +107,25 @@ public class FaceScanServiceTests
     }
 
     [Test]
+    public async Task Scan_SkipsWhenStoredTimeHasDifferentFormatButSameInstant()
+    {
+        // Rows written via the metadata-sync refresh may carry a local-offset
+        // format ("+02:00"); the skip check must compare instants, not strings.
+        // Zeilen aus dem Metadaten-Sync können lokales Offset-Format tragen —
+        // der Skip-Vergleich muss Zeitpunkte vergleichen, nicht Strings.
+        var p1 = CreateTempImage();
+        SetupFolder(p1);
+        var localFormat = File.GetLastWriteTimeUtc(p1).ToLocalTime().ToString("o");
+        _db.Setup(d => d.GetFaceScanTimesAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync(new Dictionary<string, string> { [p1] = localFormat });
+
+        var summary = await RunScanAsync("C:\\egal");
+
+        Assert.That(summary.Scanned, Is.EqualTo(0));
+        _engine.Verify(e => e.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Test]
     public async Task Scan_BrokenImage_CountsAsSkipped_AndContinues()
     {
         var p1 = CreateTempImage();

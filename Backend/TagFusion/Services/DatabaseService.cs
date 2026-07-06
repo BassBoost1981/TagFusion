@@ -259,7 +259,7 @@ public class DatabaseService : IDatabaseService, IDisposable
                     -- Pixel nicht) — der Gesichts-Scan bleibt gültig. Pixel-Änderungen
                     -- (Drehen/Spiegeln) laufen nie über diesen Pfad.
                     FaceScanFileTime = CASE WHEN Images.FaceScanAt IS NOT NULL
-                                            THEN @LastModified
+                                            THEN @FaceScanTime
                                             ELSE Images.FaceScanFileTime END
                 RETURNING Id;
             ";
@@ -267,6 +267,11 @@ public class DatabaseService : IDatabaseService, IDisposable
             cmd.Parameters.AddWithValue("@FileName",
                 string.IsNullOrEmpty(image.FileName) ? Path.GetFileName(image.Path) : image.FileName);
             cmd.Parameters.AddWithValue("@LastModified", image.DateModified.ToString("o"));
+            // Always normalized UTC — the scan writer stores UTC ("Z") and DateModified
+            // usually comes from FileInfo.LastWriteTime, which is LOCAL kind.
+            // Immer normalisiertes UTC — der Scan speichert UTC ("Z"), DateModified
+            // kommt aus FileInfo.LastWriteTime und ist LOKAL.
+            cmd.Parameters.AddWithValue("@FaceScanTime", image.DateModified.ToUniversalTime().ToString("o"));
             cmd.Parameters.AddWithValue("@Rating", image.Rating);
             cmd.Parameters.AddWithValue("@Width", image.Width);
             cmd.Parameters.AddWithValue("@Height", image.Height);

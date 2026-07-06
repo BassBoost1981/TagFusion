@@ -420,12 +420,17 @@ public class DatabaseServiceTests
         var scanTime = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
         await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace() }, scanTime);
 
+        // ImageFile.FromPath reads FileInfo.LastWriteTime — LOCAL kind. The stored
+        // refresh value must still come out as normalized UTC ("Z"), because the
+        // scan writer stores UTC and legacy rows must stay comparable.
+        // FromPath liefert LOKALE Zeit — gespeichert werden muss trotzdem UTC ("Z").
+        var localWriteTime = scanTime.AddMinutes(5).ToLocalTime();
         var image = CreateTestImage("C:\\fotos\\a.jpg", new[] { "Max" });
-        image.DateModified = scanTime.AddMinutes(5);
+        image.DateModified = localWriteTime;
         await _db.SaveImageAsync(image);
 
         var times = await _db.GetFaceScanTimesAsync(new List<string> { "C:\\fotos\\a.jpg" });
-        Assert.That(times["C:\\fotos\\a.jpg"], Is.EqualTo(scanTime.AddMinutes(5).ToString("o")));
+        Assert.That(times["C:\\fotos\\a.jpg"], Is.EqualTo(localWriteTime.ToUniversalTime().ToString("o")));
     }
 
     [Test]

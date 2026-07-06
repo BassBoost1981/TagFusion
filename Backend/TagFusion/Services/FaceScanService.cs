@@ -83,12 +83,21 @@ public sealed class FaceScanService
             var paths = images.Select(i => i.Path).ToList();
             var scanTimes = await _databaseService.GetFaceScanTimesAsync(paths, ct);
 
-            // Only new or changed files. / Nur neue oder geänderte Dateien.
+            // Only new or changed files. Compare INSTANTS, not strings — stored values
+            // can carry different ISO offsets (UTC "Z" from the scan, local offset from
+            // legacy metadata-sync rows) for the very same moment.
+            // Nur neue oder geänderte Dateien. Verglichen werden ZEITPUNKTE, keine
+            // Strings — gespeicherte Werte können denselben Moment mit verschiedenen
+            // ISO-Offsets tragen.
             var todo = new List<string>();
             foreach (var path in paths)
             {
-                var mtime = File.GetLastWriteTimeUtc(path).ToString("o");
-                if (scanTimes.TryGetValue(path, out var stored) && stored == mtime) continue;
+                var mtimeUtc = File.GetLastWriteTimeUtc(path);
+                if (scanTimes.TryGetValue(path, out var stored)
+                    && DatabaseService.ParseStoredDateTime(stored).ToUniversalTime() == mtimeUtc)
+                {
+                    continue;
+                }
                 todo.Add(path);
             }
 
