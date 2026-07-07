@@ -43,6 +43,7 @@ public class WebViewBridge
         IFaceEngine faceEngine,
         DescriptionScanService descriptionScanService,
         IAiCaptionClient aiCaptionClient,
+        IAiServerProcessService aiServerProcessService,
         ILoggerFactory loggerFactory)
     {
         _webView = webView;
@@ -70,7 +71,7 @@ public class WebViewBridge
                 loggerFactory.CreateLogger<FaceHandler>()),
             new AiHandler(
                 descriptionScanService, aiCaptionClient, exifToolService, fileSystemService,
-                loggerFactory.CreateLogger<AiHandler>()),
+                aiServerProcessService, loggerFactory.CreateLogger<AiHandler>()),
         };
 
         // Build action → handler lookup

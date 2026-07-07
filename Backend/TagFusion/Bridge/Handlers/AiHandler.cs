@@ -14,11 +14,13 @@ public class AiHandler : IBridgeHandler
     private readonly IAiCaptionClient _client;
     private readonly IExifToolService _exifToolService;
     private readonly IFileSystemService _fileSystemService;
+    private readonly IAiServerProcessService _serverProcess;
     private readonly ILogger<AiHandler> _logger;
 
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
-        "getAiServerStatus", "getDescriptionPrecheck", "startDescriptionScan", "cancelDescriptionScan"
+        "getAiServerStatus", "getDescriptionPrecheck", "startDescriptionScan", "cancelDescriptionScan",
+        "startAiServer", "stopAiServer"
     };
 
     public IReadOnlySet<string> SupportedActions => _supported;
@@ -28,12 +30,14 @@ public class AiHandler : IBridgeHandler
         IAiCaptionClient client,
         IExifToolService exifToolService,
         IFileSystemService fileSystemService,
+        IAiServerProcessService serverProcess,
         ILogger<AiHandler> logger)
     {
         _scanService = scanService;
         _client = client;
         _exifToolService = exifToolService;
         _fileSystemService = fileSystemService;
+        _serverProcess = serverProcess;
         _logger = logger;
     }
 
@@ -45,6 +49,8 @@ public class AiHandler : IBridgeHandler
             "getDescriptionPrecheck" => await GetDescriptionPrecheckAsync(payload),
             "startDescriptionScan" => await StartDescriptionScanAsync(payload),
             "cancelDescriptionScan" => CancelScan(),
+            "startAiServer" => StartAiServer(),
+            "stopAiServer" => StopAiServer(),
             _ => throw new NotSupportedException($"Unknown action: {action}")
         };
     }
@@ -61,6 +67,7 @@ public class AiHandler : IBridgeHandler
             progress = status.Progress,
             message = status.Message,
             models,
+            managedByApp = _serverProcess.IsManagedByApp,
         };
     }
 
@@ -101,6 +108,18 @@ public class AiHandler : IBridgeHandler
     private object CancelScan()
     {
         _scanService.Cancel();
+        return true;
+    }
+
+    private object StartAiServer()
+    {
+        _serverProcess.StartServer();
+        return true;
+    }
+
+    private object StopAiServer()
+    {
+        _serverProcess.StopServer();
         return true;
     }
 }

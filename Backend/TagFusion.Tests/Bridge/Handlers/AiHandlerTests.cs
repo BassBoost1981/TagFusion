@@ -17,6 +17,7 @@ public class AiHandlerTests
     private Mock<IExifToolService> _exifTool = null!;
     private Mock<IDatabaseService> _db = null!;
     private Mock<IFileSystemService> _fs = null!;
+    private Mock<IAiServerProcessService> _serverProcess = null!;
     private DescriptionScanService _scanService = null!;
     private AiHandler _handler = null!;
 
@@ -27,10 +28,11 @@ public class AiHandlerTests
         _exifTool = new Mock<IExifToolService>();
         _db = new Mock<IDatabaseService>();
         _fs = new Mock<IFileSystemService>();
+        _serverProcess = new Mock<IAiServerProcessService>();
         _scanService = new DescriptionScanService(_client.Object, _exifTool.Object, _db.Object, _fs.Object,
             NullLogger<DescriptionScanService>.Instance);
         _handler = new AiHandler(_scanService, _client.Object, _exifTool.Object, _fs.Object,
-            NullLogger<AiHandler>.Instance);
+            _serverProcess.Object, NullLogger<AiHandler>.Instance);
     }
 
     private static Dictionary<string, object> Payload(string json)
@@ -98,5 +100,48 @@ public class AiHandlerTests
     {
         var result = await _handler.HandleAsync("cancelDescriptionScan", null);
         Assert.That(result, Is.EqualTo(true));
+    }
+
+    [Test]
+    public async Task GetAiServerStatus_IncludesManagedByApp()
+    {
+        _client.Setup(c => c.GetStatusAsync(It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new AiServerStatus(true, "idle", "", -1, ""));
+        _client.Setup(c => c.GetCaptionModelsAsync(It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new List<string> { "qwen" });
+        _serverProcess.Setup(s => s.IsManagedByApp).Returns(true);
+
+        var result = await _handler.HandleAsync("getAiServerStatus", null);
+
+        var json = JsonSerializer.Serialize(result);
+        Assert.That(json, Does.Contain("\"managedByApp\":true"));
+    }
+
+    [Test]
+    public async Task StartAiServer_DelegatesToService()
+    {
+        var result = await _handler.HandleAsync("startAiServer", null);
+
+        Assert.That(result, Is.EqualTo(true));
+        _serverProcess.Verify(s => s.StartServer(), Times.Once);
+    }
+
+    [Test]
+    public async Task StopAiServer_DelegatesToService()
+    {
+        var result = await _handler.HandleAsync("stopAiServer", null);
+
+        Assert.That(result, Is.EqualTo(true));
+        _serverProcess.Verify(s => s.StopServer(), Times.Once);
+    }
+
+    [Test]
+    public void StartAiServer_ServiceThrows_PropagatesBridgeException()
+    {
+        _serverProcess.Setup(s => s.StartServer())
+                      .Throws(new TagFusion.Bridge.BridgeException("Python nicht gefunden — Pfad in den Einstellungen (AiServer:PythonExecutable) setzen.", internalMessage: "x"));
+
+        var ex = Assert.ThrowsAsync<TagFusion.Bridge.BridgeException>(() => _handler.HandleAsync("startAiServer", null));
+        Assert.That(ex!.UserMessage, Does.Contain("Python nicht gefunden"));
     }
 }
