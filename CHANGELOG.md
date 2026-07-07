@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), versions fol
 ## [Unreleased]
 
 ### Added
+- Local AI image descriptions via the bundled AiApiServer: manual per-folder run with model/prompt dialog (German templates, editable), skip-or-overwrite choice for existing descriptions, MWG metadata + database mirror
+- Global search now also matches AI descriptions (tags OR filename OR description)
 - Local face recognition: manual per-folder scan (FaceAiSharp/ONNX, fully offline), similarity-grouped naming, suggestions for known persons with confirm/reject, confirmed names written as regular tags
 - Face data stored in SQLite (Persons/Faces, migration v4); face engine is optional — the app runs normally without model files
 - Global search matches partial tag names AND filenames, case-insensitive incl. umlauts; multiple terms are AND-combined (comma/space separated)
