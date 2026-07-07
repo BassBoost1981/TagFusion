@@ -1,9 +1,11 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TagFusion.Configuration;
 using TagFusion.Database;
 using TagFusion.Logging;
@@ -51,6 +53,7 @@ public partial class App : Application
         services.Configure<FileLoggingSettings>(configuration.GetSection("FileLogging"));
         services.Configure<TagSettings>(configuration.GetSection("Tags"));
         services.Configure<UiSettings>(configuration.GetSection("Ui"));
+        services.Configure<AiServerSettings>(configuration.GetSection("AiServer"));
 
         // Logging: Console (debug) + File (persistent)
         var fileLogging = configuration.GetSection("FileLogging").Get<FileLoggingSettings>() ?? new FileLoggingSettings();
@@ -89,6 +92,10 @@ public partial class App : Application
         services.AddSingleton<FaceScanService>();
         services.AddSingleton<DiagnosticsService>();
         services.AddSingleton<TagExportService>();
+        services.AddSingleton<IAiCaptionClient>(sp => new AiCaptionClient(
+            new HttpClient(),
+            sp.GetRequiredService<IOptions<AiServerSettings>>(),
+            sp.GetRequiredService<ILogger<AiCaptionClient>>()));
 
         Services = services.BuildServiceProvider();
         _appLogger = Services.GetRequiredService<ILogger<App>>();

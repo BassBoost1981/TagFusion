@@ -89,3 +89,17 @@ public record UiSettings
     public bool EnableDevTools { get; init; }
     public bool ClearDiskCacheOnStartup { get; init; } = true;
 }
+
+/// <summary>
+/// Local AI caption server (AiApiServer) connection settings.
+/// Verbindungseinstellungen für den lokalen KI-Server (AiApiServer).
+/// </summary>
+public record AiServerSettings
+{
+    public string BaseUrl { get; init; } = "http://127.0.0.1:50051";
+    /// <summary>Per-caption timeout — first call may trigger a model download/load.</summary>
+    public int CaptionTimeoutMinutes { get; init; } = 10;
+    /// <summary>Timeout for status/model-list calls.</summary>
+    public int QuickTimeoutSeconds { get; init; } = 5;
+    public int MaxImageDimension { get; init; } = 1536;
+}
