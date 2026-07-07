@@ -151,5 +151,24 @@
         "ignore": "Ignore",
         "empty": "No open faces in this folder.",
         "renameHint": "Note: a confirmed name is written into the files as a tag. Renaming a person later does not change tags already written."
+    },
+    "descriptions": {
+        "button": "Describe images",
+        "dialogTitle": "Describe images with AI",
+        "serverOk": "AI server connected",
+        "serverDown": "AI server unreachable — please start AiApiServer (AiApiServer\\main.py)",
+        "serverBusy": "Loading model … {{progress}} %",
+        "model": "Model",
+        "promptTemplate": "Template",
+        "promptStandard": "Standard",
+        "promptNsfw": "NSFW",
+        "promptShort": "Short & factual",
+        "promptLabel": "Instruction for the model",
+        "existing": "{{count}} of {{total}} images already have a description",
+        "skipExisting": "Skip existing",
+        "overwriteExisting": "Overwrite existing",
+        "start": "Start describing",
+        "cancel": "Cancel",
+        "scanning": "Describing … {{current}}/{{total}}"
     }
 }

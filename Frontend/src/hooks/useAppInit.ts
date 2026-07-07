@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useTagStore } from '../stores/tagStore';
 import { useFaceStore } from '../stores/faceStore';
+import { useDescriptionStore } from '../stores/descriptionStore';
 
 /**
  * App initialization hook - runs once on mount.
@@ -18,6 +19,7 @@ export function useAppInit() {
   useEffect(() => {
     setupSubscriptions();
     useFaceStore.getState().setupFaceSubscriptions(() => useAppStore.getState().currentFolder ?? null);
+    useDescriptionStore.getState().setupDescriptionSubscriptions();
 
     let cancelled = false;
 

@@ -21,6 +21,7 @@ import {
   Globe,
   Tags,
   ScanFace,
+  Sparkles,
 } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 import {
@@ -36,6 +37,7 @@ import {
   useCurrentFolder,
 } from '../../stores/appStore';
 import { useFaceStore } from '../../stores/faceStore';
+import { useDescriptionStore } from '../../stores/descriptionStore';
 import { bridge } from '../../services/bridge';
 import { GlassIconButton, GlassButton } from '../ui/glass';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -80,6 +82,12 @@ export function Toolbar() {
   const { isGlobalSearch, isSearching, executeGlobalSearch, exitGlobalSearch } = useGlobalSearch();
   const currentFolderForFaces = useCurrentFolder();
   const { engineAvailable, isScanning, progress, checkEngine, startScan, cancelScan } = useFaceStore();
+  const {
+    isScanning: isDescribing,
+    progress: descriptionProgress,
+    openDialog: openDescriptionDialog,
+    cancelScan: cancelDescriptionScan,
+  } = useDescriptionStore();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isBatchTagging, setIsBatchTagging] = useState(false);
@@ -409,6 +417,24 @@ export function Toolbar() {
               title={t('faces.scan')}
             >
               <ScanFace size={18} />
+            </GlassButton>
+          ))}
+
+        {/* Describe Images Button */}
+        {currentFolderForFaces &&
+          (isDescribing ? (
+            <GlassButton variant="ghost" onClick={() => void cancelDescriptionScan()} title={t('descriptions.cancel')}>
+              {descriptionProgress
+                ? t('descriptions.scanning', { current: descriptionProgress.current, total: descriptionProgress.total })
+                : t('descriptions.button')}
+            </GlassButton>
+          ) : (
+            <GlassButton
+              variant="ghost"
+              onClick={() => void openDescriptionDialog(currentFolderForFaces)}
+              title={t('descriptions.button')}
+            >
+              <Sparkles size={18} />
             </GlassButton>
           ))}
 

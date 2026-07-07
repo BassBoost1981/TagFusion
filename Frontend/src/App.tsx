@@ -5,6 +5,7 @@ import { GlassContextMenu } from './components/ui/glass';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { KeyboardShortcutsOverlay } from './components/common/KeyboardShortcutsOverlay';
 import { FaceReviewPanel } from './components/faces';
+import { DescriptionDialog } from './components/descriptions';
 import { useError, useSetError } from './stores/appStore';
 import { useToastStore } from './stores/toastStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -77,6 +78,9 @@ function App() {
 
       {/* Face Review Panel */}
       <FaceReviewPanel />
+
+      {/* Description Dialog */}
+      <DescriptionDialog />
 
       {/* Context Menu */}
       <GlassContextMenu />

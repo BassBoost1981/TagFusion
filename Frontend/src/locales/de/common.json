@@ -151,5 +151,24 @@
         "ignore": "Ignorieren",
         "empty": "Keine offenen Gesichter in diesem Ordner.",
         "renameHint": "Hinweis: Ein bestätigter Name wird als Tag in die Dateien geschrieben. Späteres Umbenennen einer Person ändert bereits geschriebene Tags nicht."
+    },
+    "descriptions": {
+        "button": "Bilder beschreiben",
+        "dialogTitle": "Bilder mit KI beschreiben",
+        "serverOk": "KI-Server verbunden",
+        "serverDown": "KI-Server nicht erreichbar — bitte AiApiServer starten (AiApiServer\\main.py)",
+        "serverBusy": "Modell wird geladen … {{progress}} %",
+        "model": "Modell",
+        "promptTemplate": "Vorlage",
+        "promptStandard": "Standard",
+        "promptNsfw": "NSFW",
+        "promptShort": "Kurz & sachlich",
+        "promptLabel": "Anweisung an das Modell",
+        "existing": "{{count}} von {{total}} Bildern haben bereits eine Beschreibung",
+        "skipExisting": "Vorhandene überspringen",
+        "overwriteExisting": "Vorhandene überschreiben",
+        "start": "Beschreiben starten",
+        "cancel": "Abbrechen",
+        "scanning": "Beschreibe … {{current}}/{{total}}"
     }
 }
