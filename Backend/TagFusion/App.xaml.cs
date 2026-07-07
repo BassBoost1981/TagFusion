@@ -90,6 +90,7 @@ public partial class App : Application
         services.AddSingleton<IImageEditService>(sp => sp.GetRequiredService<ImageEditService>());
         services.AddSingleton<IFaceEngine, FaceAiSharpEngine>();
         services.AddSingleton<FaceScanService>();
+        services.AddSingleton<DescriptionScanService>();
         services.AddSingleton<DiagnosticsService>();
         services.AddSingleton<TagExportService>();
         services.AddSingleton<IAiCaptionClient>(sp => new AiCaptionClient(
