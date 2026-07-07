@@ -1,0 +1,90 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useDescriptionStore } from '../descriptionStore';
+import { bridge } from '../../services/bridge';
+
+vi.mock('../../services/bridge', () => ({
+  bridge: {
+    getAiServerStatus: vi.fn(),
+    getDescriptionPrecheck: vi.fn(),
+    startDescriptionScan: vi.fn(),
+    cancelDescriptionScan: vi.fn(),
+    on: vi.fn(),
+  },
+}));
+
+const mockedBridge = vi.mocked(bridge);
+
+describe('descriptionStore', () => {
+  beforeEach(() => {
+    useDescriptionStore.setState({
+      isDialogOpen: false,
+      serverStatus: null,
+      precheck: null,
+      isScanning: false,
+      progress: null,
+      selectedModel: '',
+      promptText: '',
+      overwriteExisting: false,
+    });
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('openDialog loads server status and precheck in parallel', async () => {
+    mockedBridge.getAiServerStatus.mockResolvedValue({
+      reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen'],
+    });
+    mockedBridge.getDescriptionPrecheck.mockResolvedValue({ total: 10, withDescription: 3 });
+
+    await useDescriptionStore.getState().openDialog('C:\\fotos');
+
+    const state = useDescriptionStore.getState();
+    expect(state.isDialogOpen).toBe(true);
+    expect(state.serverStatus?.models).toEqual(['qwen']);
+    expect(state.precheck).toEqual({ total: 10, withDescription: 3 });
+  });
+
+  it('openDialog with unreachable server still opens with status', async () => {
+    mockedBridge.getAiServerStatus.mockResolvedValue({
+      reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [],
+    });
+    mockedBridge.getDescriptionPrecheck.mockResolvedValue({ total: 5, withDescription: 0 });
+
+    await useDescriptionStore.getState().openDialog('C:\\fotos');
+
+    expect(useDescriptionStore.getState().isDialogOpen).toBe(true);
+    expect(useDescriptionStore.getState().serverStatus?.reachable).toBe(false);
+  });
+
+  it('startScan passes the dialog selection and closes the dialog', async () => {
+    mockedBridge.startDescriptionScan.mockResolvedValue(true);
+    useDescriptionStore.setState({
+      isDialogOpen: true, selectedModel: 'qwen', promptText: 'Beschreibe', overwriteExisting: true,
+    });
+
+    await useDescriptionStore.getState().startScan('C:\\fotos');
+
+    expect(mockedBridge.startDescriptionScan).toHaveBeenCalledWith('C:\\fotos', 'qwen', 'Beschreibe', true);
+    const state = useDescriptionStore.getState();
+    expect(state.isScanning).toBe(true);
+    expect(state.isDialogOpen).toBe(false);
+  });
+
+  it('startScan failure reverts isScanning and keeps state consistent', async () => {
+    mockedBridge.startDescriptionScan.mockRejectedValue(new Error('Eine Beschreibung läuft bereits.'));
+    useDescriptionStore.setState({ isDialogOpen: true, selectedModel: 'q', promptText: 'p' });
+
+    await useDescriptionStore.getState().startScan('C:\\fotos');
+
+    expect(useDescriptionStore.getState().isScanning).toBe(false);
+  });
+
+  it('remembers the last model and prompt via localStorage', async () => {
+    useDescriptionStore.getState().setModel('qwen');
+    useDescriptionStore.getState().setPrompt('Mein Prompt');
+
+    const raw = localStorage.getItem('tagfusion.descriptionDialog');
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw!)).toMatchObject({ model: 'qwen', prompt: 'Mein Prompt' });
+  });
+});

@@ -157,3 +157,18 @@ export interface Person {
   name: string;
   faceCount: number;
 }
+
+// AI description types / KI-Beschreibungen
+export interface AiServerStatusInfo {
+  reachable: boolean;
+  state: string;
+  model: string;
+  progress: number;
+  message: string;
+  models: string[];
+}
+
+export interface DescriptionPrecheck {
+  total: number;
+  withDescription: number;
+}

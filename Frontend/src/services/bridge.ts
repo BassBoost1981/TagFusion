@@ -9,6 +9,8 @@ import type {
   TagLibrary,
   FaceReview,
   Person,
+  AiServerStatusInfo,
+  DescriptionPrecheck,
 } from '../types';
 import { BRIDGE_ACTIONS, type BridgeActionName } from './bridgeActions';
 
@@ -297,6 +299,23 @@ class BridgeService {
     return this.send<ImageFile[]>(BRIDGE_ACTIONS.SEARCH_IMAGES, { tags: terms, minRating, limit, offset });
   }
 
+  // AI descriptions — server status, precheck, scan / KI-Beschreibungen
+  async getAiServerStatus(): Promise<AiServerStatusInfo> {
+    return this.send<AiServerStatusInfo>(BRIDGE_ACTIONS.GET_AI_SERVER_STATUS);
+  }
+
+  async getDescriptionPrecheck(path: string): Promise<DescriptionPrecheck> {
+    return this.send<DescriptionPrecheck>(BRIDGE_ACTIONS.GET_DESCRIPTION_PRECHECK, { path });
+  }
+
+  async startDescriptionScan(path: string, model: string, prompt: string, overwriteExisting: boolean): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.START_DESCRIPTION_SCAN, { path, model, prompt, overwriteExisting });
+  }
+
+  async cancelDescriptionScan(): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.CANCEL_DESCRIPTION_SCAN);
+  }
+
   // Face recognition — manual folder scan, review, confirmation
   // Gesichtserkennung — manueller Ordner-Scan, Review, Bestätigung
   async scanFacesInFolder(path: string): Promise<boolean> {
@@ -466,6 +485,13 @@ class BridgeService {
         return { suggestions: [], groups: [] };
       case 'getPersons':
         return [];
+      case 'getAiServerStatus':
+        return { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [] };
+      case 'getDescriptionPrecheck':
+        return { total: 0, withDescription: 0 };
+      case 'startDescriptionScan':
+      case 'cancelDescriptionScan':
+        return true;
       case 'writeBatchTags':
         return {};
       case 'watchFolder':
