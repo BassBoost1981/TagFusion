@@ -72,20 +72,24 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
     }
 
     // Poll /status while the dialog is open so model load/download progress ticks live.
+    // Guard against the dialog having been closed while the awaits above were pending.
     // Status-Polling, solange der Dialog offen ist — Ladefortschritt tickt live.
+    // Schutz falls der Dialog während der obigen Awaits bereits geschlossen wurde.
     if (statusPollTimer !== null) clearInterval(statusPollTimer);
-    statusPollTimer = setInterval(() => {
-      if (!get().isDialogOpen) return;
-      void bridge.getAiServerStatus()
-        .then((status) => {
-          const current = get();
-          const model = status.models.includes(current.selectedModel)
-            ? current.selectedModel
-            : (status.models[0] ?? '');
-          set({ serverStatus: status, selectedModel: model });
-        })
-        .catch(() => { /* transient poll errors stay silent / stille Poll-Fehler */ });
-    }, STATUS_POLL_MS);
+    if (get().isDialogOpen) {
+      statusPollTimer = setInterval(() => {
+        if (!get().isDialogOpen) return;
+        void bridge.getAiServerStatus()
+          .then((status) => {
+            const current = get();
+            const model = status.models.includes(current.selectedModel)
+              ? current.selectedModel
+              : (status.models[0] ?? '');
+            set({ serverStatus: status, selectedModel: model });
+          })
+          .catch(() => { /* transient poll errors stay silent / stille Poll-Fehler */ });
+      }, STATUS_POLL_MS);
+    }
   },
 
   closeDialog: () => {
@@ -110,7 +114,12 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
 
   startScan: async (path) => {
     const { selectedModel, promptText, overwriteExisting } = get();
-    set({ isScanning: true, progress: null, isDialogOpen: false });
+    // closeDialog() clears the status-poll timer too — a raw isDialogOpen:false here
+    // would leave the 2s interval running (no-op ticks) until the dialog reopens.
+    // closeDialog() räumt auch den Status-Poll-Timer ab — ein rohes isDialogOpen:false
+    // würde das 2s-Intervall bis zum nächsten Öffnen unnötig weiterlaufen lassen.
+    set({ isScanning: true, progress: null });
+    get().closeDialog();
     try {
       await bridge.startDescriptionScan(path, selectedModel, promptText, overwriteExisting);
     } catch (error) {
