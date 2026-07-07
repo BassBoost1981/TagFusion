@@ -8,6 +8,8 @@ vi.mock('../../services/bridge', () => ({
     getDescriptionPrecheck: vi.fn(),
     startDescriptionScan: vi.fn(),
     cancelDescriptionScan: vi.fn(),
+    startAiServer: vi.fn(),
+    stopAiServer: vi.fn(),
     on: vi.fn(),
   },
 }));
@@ -54,7 +56,7 @@ describe('descriptionStore', () => {
 
   it('openDialog loads server status and precheck in parallel', async () => {
     mockedBridge.getAiServerStatus.mockResolvedValue({
-      reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen'],
+      reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen'], managedByApp: false,
     });
     mockedBridge.getDescriptionPrecheck.mockResolvedValue({ total: 10, withDescription: 3 });
 
@@ -68,7 +70,7 @@ describe('descriptionStore', () => {
 
   it('openDialog with unreachable server still opens with status', async () => {
     mockedBridge.getAiServerStatus.mockResolvedValue({
-      reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [],
+      reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false,
     });
     mockedBridge.getDescriptionPrecheck.mockResolvedValue({ total: 5, withDescription: 0 });
 
@@ -108,5 +110,36 @@ describe('descriptionStore', () => {
     const raw = localStorage.getItem('tagfusion.descriptionDialog');
     expect(raw).not.toBeNull();
     expect(JSON.parse(raw!)).toMatchObject({ model: 'qwen', prompt: 'Mein Prompt' });
+  });
+
+  it('startServer calls the bridge and refreshes status', async () => {
+    mockedBridge.startAiServer.mockResolvedValue(true);
+    mockedBridge.getAiServerStatus.mockResolvedValue({
+      reachable: false, state: 'idle', model: '', progress: -1, message: '', models: [], managedByApp: true,
+    });
+
+    await useDescriptionStore.getState().startServer();
+
+    expect(mockedBridge.startAiServer).toHaveBeenCalled();
+    expect(mockedBridge.getAiServerStatus).toHaveBeenCalled();
+  });
+
+  it('stopServer calls the bridge and refreshes status', async () => {
+    mockedBridge.stopAiServer.mockResolvedValue(true);
+    mockedBridge.getAiServerStatus.mockResolvedValue({
+      reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false,
+    });
+
+    await useDescriptionStore.getState().stopServer();
+
+    expect(mockedBridge.stopAiServer).toHaveBeenCalled();
+    expect(useDescriptionStore.getState().serverStatus?.managedByApp).toBe(false);
+  });
+
+  it('startServer failure shows a toast and does not throw', async () => {
+    mockedBridge.startAiServer.mockRejectedValue(new Error('Python nicht gefunden'));
+
+    await useDescriptionStore.getState().startServer();
+    // resolves without throwing
   });
 });

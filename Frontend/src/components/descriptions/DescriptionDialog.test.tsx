@@ -19,7 +19,7 @@ describe('DescriptionDialog', () => {
     useAppStore.setState({ currentFolder: 'C:\\Test' });
     useDescriptionStore.setState({
       isDialogOpen: true,
-      serverStatus: { reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen', 'joycaption'] },
+      serverStatus: { reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen', 'joycaption'], managedByApp: false },
       precheck: { total: 87, withDescription: 12 },
       isScanning: false,
       progress: null,
@@ -39,7 +39,7 @@ describe('DescriptionDialog', () => {
 
   it('disables start when the server is unreachable', () => {
     useDescriptionStore.setState({
-      serverStatus: { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [] },
+      serverStatus: { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false },
       selectedModel: '',
     });
     render(<DescriptionDialog />);

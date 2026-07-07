@@ -316,6 +316,14 @@ class BridgeService {
     return this.send<boolean>(BRIDGE_ACTIONS.CANCEL_DESCRIPTION_SCAN);
   }
 
+  async startAiServer(): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.START_AI_SERVER);
+  }
+
+  async stopAiServer(): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.STOP_AI_SERVER);
+  }
+
   // Face recognition — manual folder scan, review, confirmation
   // Gesichtserkennung — manueller Ordner-Scan, Review, Bestätigung
   async scanFacesInFolder(path: string): Promise<boolean> {
@@ -480,13 +488,15 @@ class BridgeService {
       case 'cancelFaceScan':
       case 'rejectFaceSuggestion':
       case 'ignoreFaces':
+      case 'startAiServer':
+      case 'stopAiServer':
         return true;
       case 'getFaceReview':
         return { suggestions: [], groups: [] };
       case 'getPersons':
         return [];
       case 'getAiServerStatus':
-        return { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [] };
+        return { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false };
       case 'getDescriptionPrecheck':
         return { total: 0, withDescription: 0 };
       case 'startDescriptionScan':

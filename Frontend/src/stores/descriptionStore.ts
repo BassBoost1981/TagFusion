@@ -41,6 +41,8 @@ interface DescriptionState {
   setOverwrite: (overwrite: boolean) => void;
   startScan: (path: string) => Promise<void>;
   cancelScan: () => Promise<void>;
+  startServer: () => Promise<void>;
+  stopServer: () => Promise<void>;
   setupDescriptionSubscriptions: () => void;
 }
 
@@ -68,7 +70,7 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
       set({ serverStatus: status, precheck, selectedModel: model });
     } catch (error) {
       useToastStore.getState().warning((error as Error).message);
-      set({ serverStatus: { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [] } });
+      set({ serverStatus: { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false } });
     }
 
     // Poll /status while the dialog is open so model load/download progress ticks live.
@@ -131,6 +133,28 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
   cancelScan: async () => {
     try {
       await bridge.cancelDescriptionScan();
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
+  },
+
+  startServer: async () => {
+    try {
+      await bridge.startAiServer();
+      // Reflect the new state immediately; the 2s poll keeps it fresh afterwards.
+      // Neuen Zustand sofort spiegeln; das 2s-Polling hält ihn danach aktuell.
+      const status = await bridge.getAiServerStatus();
+      set({ serverStatus: status });
+    } catch (error) {
+      useToastStore.getState().warning((error as Error).message);
+    }
+  },
+
+  stopServer: async () => {
+    try {
+      await bridge.stopAiServer();
+      const status = await bridge.getAiServerStatus();
+      set({ serverStatus: status });
     } catch (error) {
       useToastStore.getState().warning((error as Error).message);
     }

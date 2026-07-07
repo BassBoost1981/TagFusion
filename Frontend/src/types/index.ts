@@ -166,6 +166,7 @@ export interface AiServerStatusInfo {
   progress: number;
   message: string;
   models: string[];
+  managedByApp: boolean;
 }
 
 export interface DescriptionPrecheck {
