@@ -125,6 +125,13 @@ public interface IDatabaseService
     /// Setzt Status='suggested' NUR auf 'unnamed'-Gesichter — überschreibt keine Nutzerentscheidungen.
     /// </summary>
     Task ApplyFaceSuggestionsAsync(IReadOnlyList<FaceSuggestionUpdate> suggestions, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Set the AI description mirror for an already-indexed image (no-op when the
+    /// row does not exist). Setzt den DB-Spiegel der KI-Beschreibung; No-Op wenn
+    /// das Bild nicht indexiert ist.
+    /// </summary>
+    Task SetImageDescriptionAsync(string imagePath, string description, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

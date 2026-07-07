@@ -556,6 +556,52 @@ public class DatabaseServiceTests
     }
 
     // ========================================================================
+    // Beschreibungen / AI descriptions
+    // ========================================================================
+
+    [Test]
+    public async Task SetDescription_MakesImageFindableBySearch()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\a.jpg", Array.Empty<string>()));
+
+        await _db.SetImageDescriptionAsync("C:\\fotos\\a.jpg", "Ein Sonnenuntergang über dem Meer");
+
+        var results = await _db.SearchImagesAsync(new List<string> { "sonnenuntergang" }, null);
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\fotos\\a.jpg"));
+    }
+
+    [Test]
+    public async Task SetDescription_UmlautSearchIsCaseInsensitive()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\a.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\fotos\\a.jpg", "Ein müder Bär im Wald");
+
+        var results = await _db.SearchImagesAsync(new List<string> { "MÜDER" }, null);
+        Assert.That(results, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Search_ImagesWithoutDescription_AreUnaffected()
+    {
+        // NULL descriptions must neither match nor break the query.
+        // NULL-Beschreibungen dürfen weder treffen noch die Query brechen.
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\ohne.jpg", new[] { "Urlaub" }));
+
+        var byDesc = await _db.SearchImagesAsync(new List<string> { "sonnenuntergang" }, null);
+        Assert.That(byDesc, Is.Empty);
+
+        var byTag = await _db.SearchImagesAsync(new List<string> { "urlaub" }, null);
+        Assert.That(byTag, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void SetDescription_UnknownPath_DoesNotThrow()
+    {
+        Assert.DoesNotThrowAsync(() => _db.SetImageDescriptionAsync("C:\\gibtsnicht.jpg", "x"));
+    }
+
+    // ========================================================================
     // Helpers
     // ========================================================================
 

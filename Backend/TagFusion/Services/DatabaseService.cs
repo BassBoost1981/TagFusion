@@ -537,15 +537,16 @@ public class DatabaseService : IDatabaseService, IDisposable
 
             if (terms != null && terms.Count > 0)
             {
-                // Each term must match at least one tag name or filename (substring, case-insensitive).
-                // Terms are AND-combined. / Jeder Begriff muss einen Tag oder Dateinamen treffen; UND-verknüpft.
+                // Each term must match at least one tag name, filename, or description (substring, case-insensitive).
+                // Terms are AND-combined. / Jeder Begriff muss Tag, Dateinamen oder Beschreibung treffen; UND-verknüpft.
                 for (int t = 0; t < terms.Count; t++)
                 {
                     conditions.Add($@"(EXISTS (
                         SELECT 1 FROM ImageTags it
                         JOIN Tags tg ON it.TagId = tg.Id
                         WHERE it.ImageId = i.Id AND lower_inv(tg.Name) LIKE @term{t} ESCAPE '\')
-                    OR lower_inv(i.FileName) LIKE @term{t} ESCAPE '\')");
+                    OR lower_inv(i.FileName) LIKE @term{t} ESCAPE '\'
+                    OR lower_inv(i.Description) LIKE @term{t} ESCAPE '\')");
                     command.Parameters.AddWithValue($"@term{t}",
                         "%" + EscapeLikePattern(terms[t].ToLowerInvariant()) + "%");
                 }
@@ -619,6 +620,23 @@ public class DatabaseService : IDatabaseService, IDisposable
         finally
         {
             _readSemaphore.Release();
+        }
+    }
+
+    public async Task SetImageDescriptionAsync(string imagePath, string description, CancellationToken cancellationToken = default)
+    {
+        await _writeSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = "UPDATE Images SET Description = @Desc WHERE Path = @Path";
+            cmd.Parameters.AddWithValue("@Desc", description);
+            cmd.Parameters.AddWithValue("@Path", imagePath);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            _writeSemaphore.Release();
         }
     }
 

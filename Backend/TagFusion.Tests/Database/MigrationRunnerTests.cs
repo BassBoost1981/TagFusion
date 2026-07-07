@@ -160,4 +160,26 @@ public class MigrationRunnerTests
         check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Images') WHERE name IN ('FaceScanAt','FaceScanFileTime')";
         Assert.That(Convert.ToInt32(check.ExecuteScalar()), Is.EqualTo(2));
     }
+
+    [Test]
+    public void MigrationV5_AddsDescriptionColumnWhenImagesTableExists()
+    {
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE Images (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Path TEXT NOT NULL UNIQUE,
+                    FileName TEXT NOT NULL DEFAULT '',
+                    LastModified TEXT NOT NULL
+                );";
+            cmd.ExecuteNonQuery();
+        }
+
+        new MigrationRunner(_connection, NullLogger.Instance).ApplyMigrations();
+
+        using var check = _connection.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Images') WHERE name = 'Description'";
+        Assert.That(Convert.ToInt32(check.ExecuteScalar()), Is.EqualTo(1));
+    }
 }

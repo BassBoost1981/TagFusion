@@ -57,7 +57,10 @@ public class MigrationRunner
             );
             CREATE INDEX IF NOT EXISTS idx_faces_imageid ON Faces(ImageId);
             CREATE INDEX IF NOT EXISTS idx_faces_status ON Faces(Status);",
-            AddFaceScanColumnsToImages)
+            AddFaceScanColumnsToImages),
+        new(5, "Description column on Images — AI descriptions searchable (C# step, idempotent)",
+            "",
+            AddDescriptionColumnToImages)
     ];
 
     public MigrationRunner(SQLiteConnection connection, ILogger logger)
@@ -194,6 +197,18 @@ public class MigrationRunner
         if (!TableExists(connection, transaction, "Images")) return;
         AddColumnIfMissing(connection, transaction, "Images", "FaceScanAt", "TEXT");
         AddColumnIfMissing(connection, transaction, "Images", "FaceScanFileTime", "TEXT");
+    }
+
+    /// <summary>
+    /// Adds the AI description column. Skips gracefully when the Images table is
+    /// absent (bare test connections) or the column already exists.
+    /// Ergänzt die KI-Beschreibungsspalte — tolerant gegenüber fehlender Tabelle
+    /// und bereits vorhandener Spalte.
+    /// </summary>
+    private static void AddDescriptionColumnToImages(SQLiteConnection connection, SQLiteTransaction transaction)
+    {
+        if (!TableExists(connection, transaction, "Images")) return;
+        AddColumnIfMissing(connection, transaction, "Images", "Description", "TEXT");
     }
 
     private static void AddColumnIfMissing(SQLiteConnection connection, SQLiteTransaction transaction, string table, string column, string type)
