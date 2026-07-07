@@ -2,7 +2,6 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
@@ -37,10 +36,6 @@ public sealed class AiCaptionClient : IAiCaptionClient
         _logger = logger;
     }
 
-    private CancellationTokenSource QuickTimeout(CancellationToken ct)
-        => CancellationTokenSource.CreateLinkedTokenSource(ct, new CancellationTokenSource(
-            TimeSpan.FromSeconds(_settings.QuickTimeoutSeconds)).Token);
-
     // --- /status ---------------------------------------------------------
     private sealed record StatusDto(string? state, string? model, double? progress, string? message);
 
@@ -48,7 +43,8 @@ public sealed class AiCaptionClient : IAiCaptionClient
     {
         try
         {
-            using var cts = QuickTimeout(ct);
+            using var timerCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.QuickTimeoutSeconds));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timerCts.Token);
             var dto = await _http.GetFromJsonAsync<StatusDto>("/status", _json, cts.Token);
             return new AiServerStatus(true, dto?.state ?? "idle", dto?.model ?? "", dto?.progress ?? -1, dto?.message ?? "");
         }
@@ -70,7 +66,8 @@ public sealed class AiCaptionClient : IAiCaptionClient
         var captionModels = new List<string>();
         try
         {
-            using var cts = QuickTimeout(ct);
+            using var timerCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.QuickTimeoutSeconds));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct, timerCts.Token);
             var list = await _http.GetFromJsonAsync<ListModelsDto>("/listmodelsbytype", _json, cts.Token);
             foreach (var model in list?.Interrogators ?? new List<ModelBaseInfoDto>())
             {
@@ -79,7 +76,8 @@ public sealed class AiCaptionClient : IAiCaptionClient
 
                 // Capability probe: captioning models expose a "prompt" parameter,
                 // taggers only a "threshold". Fähigkeits-Check über den prompt-Parameter.
-                using var probeCts = QuickTimeout(ct);
+                using var probeTimerCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.QuickTimeoutSeconds));
+                using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct, probeTimerCts.Token);
                 var payloadStr = JsonSerializer.Serialize(new { Name = model.ModelName }, _json);
                 var probeContent = new StringContent(payloadStr, System.Text.Encoding.UTF8, "application/json");
                 var resp = await _http.PostAsync("/getmodelparams", probeContent, probeCts.Token);
