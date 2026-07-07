@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useDescriptionStore } from '../descriptionStore';
 import { bridge } from '../../services/bridge';
 
@@ -16,6 +16,24 @@ const mockedBridge = vi.mocked(bridge);
 
 describe('descriptionStore', () => {
   beforeEach(() => {
+    // Stub localStorage locally for this test file only, matching jsdom's absence
+    const localStorageMock = (() => {
+      let store: Record<string, string> = {};
+      return {
+        getItem: (key: string) => store[key] ?? null,
+        setItem: (key: string, value: string) => {
+          store[key] = value.toString();
+        },
+        removeItem: (key: string) => {
+          delete store[key];
+        },
+        clear: () => {
+          store = {};
+        },
+      };
+    })();
+    vi.stubGlobal('localStorage', localStorageMock);
+
     useDescriptionStore.setState({
       isDialogOpen: false,
       serverStatus: null,
@@ -28,6 +46,10 @@ describe('descriptionStore', () => {
     });
     vi.clearAllMocks();
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('openDialog loads server status and precheck in parallel', async () => {
