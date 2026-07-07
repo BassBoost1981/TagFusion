@@ -97,6 +97,7 @@ public partial class App : Application
             new HttpClient(),
             sp.GetRequiredService<IOptions<AiServerSettings>>(),
             sp.GetRequiredService<ILogger<AiCaptionClient>>()));
+        services.AddSingleton<IAiServerProcessService, AiServerProcessService>();
 
         Services = services.BuildServiceProvider();
         _appLogger = Services.GetRequiredService<ILogger<App>>();

@@ -102,4 +102,8 @@ public record AiServerSettings
     /// <summary>Timeout for status/model-list calls.</summary>
     public int QuickTimeoutSeconds { get; init; } = 5;
     public int MaxImageDimension { get; init; } = 1536;
+    /// <summary>Python executable used to launch the server (PATH name or full path).</summary>
+    public string PythonExecutable { get; init; } = "python";
+    /// <summary>AiApiServer directory; empty = auto-search upward from the app for AiApiServer/main.py.</summary>
+    public string ServerDirectory { get; init; } = "";
 }
