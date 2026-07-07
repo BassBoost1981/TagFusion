@@ -6,6 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), versions fol
 ## [Unreleased]
 
 ### Added
+- Start/stop the local AiApiServer directly from the "Describe images" dialog; a server TagFusion started is shut down on exit
 - Local AI image descriptions via the bundled AiApiServer: manual per-folder run with model/prompt dialog (German templates, editable), skip-or-overwrite choice for existing descriptions, MWG metadata + database mirror
 - Global search now also matches AI descriptions (tags OR filename OR description)
 - Local face recognition: manual per-folder scan (FaceAiSharp/ONNX, fully offline), similarity-grouped naming, suggestions for known persons with confirm/reject, confirmed names written as regular tags

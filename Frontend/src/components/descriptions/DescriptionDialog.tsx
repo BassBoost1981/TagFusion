@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Play, X } from 'lucide-react';
+import { Play, X, Power } from 'lucide-react';
 import { useDescriptionStore } from '../../stores/descriptionStore';
 import { useCurrentFolder } from '../../stores/appStore';
 import { GlassModal, GlassButton } from '../ui/glass';
@@ -16,7 +16,7 @@ export function DescriptionDialog() {
   const currentFolder = useCurrentFolder();
   const {
     isDialogOpen, serverStatus, precheck, selectedModel, promptText, overwriteExisting,
-    closeDialog, setModel, setPrompt, setOverwrite, startScan,
+    closeDialog, setModel, setPrompt, setOverwrite, startScan, startServer, stopServer,
   } = useDescriptionStore();
 
   if (!isDialogOpen || !currentFolder) return null;
@@ -28,16 +28,30 @@ export function DescriptionDialog() {
   return (
     <GlassModal isOpen={isDialogOpen} onClose={closeDialog} title={t('descriptions.dialogTitle')}>
       <div className="flex flex-col gap-4 p-1">
-        {/* Server status / Serverstatus */}
-        <p className={`text-sm ${reachable ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {loading
-            ? '…'
-            : reachable
-              ? serverStatus!.state === 'loading' || serverStatus!.state === 'downloading'
-                ? t('descriptions.serverBusy', { progress: Math.max(0, Math.round(serverStatus!.progress)) })
-                : t('descriptions.serverOk')
-              : t('descriptions.serverDown')}
-        </p>
+        {/* Server status + control / Serverstatus + Steuerung */}
+        <div className="flex items-center justify-between gap-2">
+          <p className={`text-sm ${reachable ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {loading
+              ? '…'
+              : reachable
+                ? serverStatus!.state === 'loading' || serverStatus!.state === 'downloading'
+                  ? t('descriptions.serverBusy', { progress: Math.max(0, Math.round(serverStatus!.progress)) })
+                  : t('descriptions.serverOk')
+                : serverStatus?.managedByApp
+                  ? t('descriptions.serverStarting')
+                  : t('descriptions.serverDown')}
+          </p>
+          {!reachable && (
+            <GlassButton variant="ghost" onClick={() => void startServer()}>
+              <Power size={16} /> {t('descriptions.startServer')}
+            </GlassButton>
+          )}
+          {reachable && serverStatus?.managedByApp && (
+            <GlassButton variant="ghost" onClick={() => void stopServer()}>
+              <Power size={16} /> {t('descriptions.stopServer')}
+            </GlassButton>
+          )}
+        </div>
 
         {/* Model / Modell */}
         <label className="flex flex-col gap-1 text-sm">

@@ -44,12 +44,37 @@ describe('DescriptionDialog', () => {
     });
     render(<DescriptionDialog />);
 
-    expect(screen.getByRole('button', { name: /starten/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /beschreiben starten/i })).toBeDisabled();
   });
 
   it('renders nothing when closed', () => {
     useDescriptionStore.setState({ isDialogOpen: false });
     const { container } = render(<DescriptionDialog />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('shows a start-server button when the server is unreachable', () => {
+    useDescriptionStore.setState({
+      serverStatus: { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false },
+      selectedModel: '',
+    });
+    render(<DescriptionDialog />);
+    expect(screen.getByRole('button', { name: /server starten/i })).toBeInTheDocument();
+  });
+
+  it('shows a stop-server button when reachable and app-managed', () => {
+    useDescriptionStore.setState({
+      serverStatus: { reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen'], managedByApp: true },
+    });
+    render(<DescriptionDialog />);
+    expect(screen.getByRole('button', { name: /server stoppen/i })).toBeInTheDocument();
+  });
+
+  it('shows no server button when reachable but not app-managed', () => {
+    useDescriptionStore.setState({
+      serverStatus: { reachable: true, state: 'idle', model: '', progress: -1, message: '', models: ['qwen'], managedByApp: false },
+    });
+    render(<DescriptionDialog />);
+    expect(screen.queryByRole('button', { name: /server st/i })).not.toBeInTheDocument();
   });
 });
