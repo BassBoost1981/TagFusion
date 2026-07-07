@@ -1,4 +1,8 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Moq;
 using NUnit.Framework;
+using TagFusion.Configuration;
 using TagFusion.Services;
 
 namespace TagFusion.Tests.Services;
@@ -266,6 +270,81 @@ public class ExifToolServiceTests
     {
         var args = new List<string> { "C:\\photo\r.jpg" };
         Assert.Throws<ArgumentException>(() => ExifToolService.EnsureNoLineBreaks(args));
+    }
+
+    // ========================================================================
+    // BuildWriteDescriptionArgs Tests
+    // ========================================================================
+
+    [Test]
+    public void BuildWriteDescriptionArgs_ProducesMwgAndOverwriteArgs()
+    {
+        var args = ExifToolService.BuildWriteDescriptionArgs("C:\\photo.jpg", "Ein Testbild mit Bäumen");
+
+        Assert.That(args, Is.EqualTo(new[]
+        {
+            "-MWG:Description=Ein Testbild mit Bäumen",
+            "-overwrite_original",
+            "C:\\photo.jpg"
+        }));
+    }
+
+    [Test]
+    public void BuildWriteDescriptionArgs_DescriptionWithUmlautsAndEquals_PreservedVerbatim()
+    {
+        var args = ExifToolService.BuildWriteDescriptionArgs("C:\\photo.jpg", "Ein Bär = süß");
+
+        Assert.That(args[0], Is.EqualTo("-MWG:Description=Ein Bär = süß"));
+    }
+
+    // ========================================================================
+    // ParseDescriptionsFromJson Tests
+    // ========================================================================
+
+    [Test]
+    public void ParseDescriptionsFromJson_ReturnsOnlyNonEmptyEntries()
+    {
+        var json = "[" +
+            "{\"SourceFile\":\"C:/tmp/a.jpg\",\"Description\":\"Ein Testbild\"}," +
+            "{\"SourceFile\":\"C:/tmp/b.jpg\",\"Description\":\"\"}," +
+            "{\"SourceFile\":\"C:/tmp/c.jpg\"}]";
+
+        var result = ExifToolService.ParseDescriptionsFromJson(json);
+
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result["C:\\tmp\\a.jpg"], Is.EqualTo("Ein Testbild"));
+        // Keys are case-insensitive / Keys sind case-insensitiv
+        Assert.That(result.ContainsKey("c:\\TMP\\A.JPG"), Is.True);
+    }
+
+    [Test]
+    public void ParseDescriptionsFromJson_NormalizesForwardSlashPaths()
+    {
+        var json = "[{\"SourceFile\":\"C:/tmp/a.jpg\",\"Description\":\"Text\"}]";
+
+        var result = ExifToolService.ParseDescriptionsFromJson(json);
+
+        Assert.That(result.ContainsKey("C:\\tmp\\a.jpg"), Is.True);
+    }
+
+    // ========================================================================
+    // ReadDescriptionsBatchAsync Tests
+    // ========================================================================
+
+    [Test]
+    public async Task ReadDescriptionsBatchAsync_EmptyList_ReturnsEmpty()
+    {
+        // Empty input returns before any ExifTool invocation, so a real service
+        // instance with a mocked thumbnail service is safe here.
+        // Leere Eingabe kehrt vor jedem ExifTool-Aufruf zurueck.
+        using var service = new ExifToolService(
+            new Mock<IThumbnailService>().Object,
+            NullLogger<ExifToolService>.Instance,
+            Options.Create(new ExifToolSettings()));
+
+        var result = await service.ReadDescriptionsBatchAsync(new List<string>());
+
+        Assert.That(result, Is.Empty);
     }
 }
 

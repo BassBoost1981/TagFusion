@@ -447,6 +447,109 @@ public class ExifToolService : IExifToolService, IDisposable
     }
 
     /// <summary>
+    /// Read MWG descriptions for many files in one batched call; only non-empty
+    /// entries are returned. Liest MWG-Beschreibungen gebatcht; nur nicht-leere.
+    /// </summary>
+    public async Task<Dictionary<string, string>> ReadDescriptionsBatchAsync(List<string> imagePaths, CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (imagePaths.Count == 0)
+            return result;
+
+        // Process in batches to avoid command line length limits
+        var batchSize = _batchSize;
+        var batches = imagePaths
+            .Select((path, index) => new { path, index })
+            .GroupBy(x => x.index / batchSize)
+            .Select(g => g.Select(x => x.path).ToList())
+            .ToList();
+
+        foreach (var batch in batches)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var args = new List<string> { "-MWG:Description", "-j" };
+                args.AddRange(batch);
+
+                var output = await RunExifToolAsync(args, cancellationToken);
+
+                foreach (var (path, text) in ParseDescriptionsFromJson(output))
+                    result[path] = text;
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse batch descriptions");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read batch descriptions");
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Write the description via the MWG composite tag (keeps XMP/IPTC/EXIF in sync).
+    /// Schreibt die Beschreibung über das MWG-Komposit (XMP/IPTC/EXIF konsistent).
+    /// </summary>
+    public async Task<bool> WriteDescriptionAsync(string imagePath, string description, CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(imagePath))
+            throw new FileNotFoundException($"Image not found: {imagePath}");
+
+        _logger.LogDebug("WriteDescriptionAsync called for: {ImagePath}", imagePath);
+
+        // Backup is best-effort: a backup failure must not block the metadata write
+        // (same policy as WriteTagsBatchAsync). Cancellation always propagates.
+        // Backup ist tolerant — ein Backup-Fehler blockiert den Schreibvorgang nicht.
+        try
+        {
+            await _backupService.CreateBackupAsync(imagePath, "metadata-description-write", cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception backupEx)
+        {
+            _logger.LogWarning(backupEx,
+                "WriteDescriptionAsync: backup skipped for '{Path}' — write will proceed without backup / " +
+                "Backup uebersprungen fuer '{Path2}', Schreibvorgang wird ohne Backup fortgesetzt",
+                imagePath, imagePath);
+        }
+
+        var args = BuildWriteDescriptionArgs(imagePath, description);
+
+        var output = await RunExifToolAsync(args, cancellationToken);
+        _logger.LogDebug("WriteDescriptionAsync output: '{Output}'", output.Trim());
+
+        // Check for errors in output (warnings are often harmless, only throw on actual errors)
+        if (OutputIndicatesError(output))
+        {
+            _logger.LogError("WriteDescriptionAsync ERROR detected in output");
+            throw new InvalidOperationException($"ExifTool error: {output}");
+        }
+
+        // Log warnings but don't fail
+        if (output.Contains("Warning", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("WriteDescriptionAsync non-fatal warning: {Output}", output.Trim());
+        }
+
+        // Check if file was updated (ExifTool reports "1 image files updated")
+        if (!output.Contains("1 image files updated", StringComparison.OrdinalIgnoreCase) &&
+            !output.Contains("1 image file updated", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("WriteDescriptionAsync - No 'image files updated' confirmation found in output");
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Write rating to an image file (XMP:Rating, 0-5)
     /// </summary>
     public async Task<bool> WriteRatingAsync(string imagePath, int rating, CancellationToken cancellationToken = default)
@@ -723,6 +826,40 @@ public class ExifToolService : IExifToolService, IDisposable
         return tags;
     }
 
+    /// <summary>
+    /// Parse MWG descriptions from ExifTool -j output. Returns only non-empty
+    /// descriptions keyed by the normalized SourceFile path (case-insensitive).
+    /// Nur nicht-leere Beschreibungen; Keys per Path.GetFullPath normalisiert.
+    /// </summary>
+    internal static Dictionary<string, string> ParseDescriptionsFromJson(string json)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        using var doc = JsonDocument.Parse(json);
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (!item.TryGetProperty("SourceFile", out var sourceFileProp))
+                continue;
+            var sourcePath = sourceFileProp.GetString();
+            if (string.IsNullOrEmpty(sourcePath))
+                continue;
+
+            // Normalize path (ExifTool may use forward slashes)
+            var normalizedPath = Path.GetFullPath(sourcePath);
+
+            if (!item.TryGetProperty("Description", out var descProp) || descProp.ValueKind != JsonValueKind.String)
+                continue;
+
+            var text = descProp.GetString();
+            if (string.IsNullOrEmpty(text))
+                continue;
+
+            result[normalizedPath] = text;
+        }
+
+        return result;
+    }
+
     internal static List<string> ParseArguments(string arguments)
     {
         var result = new List<string>();
@@ -802,6 +939,21 @@ public class ExifToolService : IExifToolService, IDisposable
         args.Add(imagePath);
 
         return (uniqueTags, args);
+    }
+
+    /// <summary>
+    /// Build the ExifTool argument list for writing an MWG description.
+    /// Extracted as internal static for testability (see BuildWriteTagArgs).
+    /// Argumentliste für das Schreiben der MWG-Beschreibung; testbar als internal static.
+    /// </summary>
+    internal static List<string> BuildWriteDescriptionArgs(string imagePath, string description)
+    {
+        return new List<string>
+        {
+            $"-MWG:Description={description}",
+            "-overwrite_original",
+            imagePath
+        };
     }
 
     /// <summary>
