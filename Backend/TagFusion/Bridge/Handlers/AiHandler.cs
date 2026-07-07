@@ -68,6 +68,7 @@ public class AiHandler : IBridgeHandler
             message = status.Message,
             models,
             managedByApp = _serverProcess.IsManagedByApp,
+            lastStartError = _serverProcess.LastStartError,
         };
     }
 

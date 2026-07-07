@@ -118,6 +118,20 @@ public class AiHandlerTests
     }
 
     [Test]
+    public async Task GetAiServerStatus_IncludesLastStartError()
+    {
+        _client.Setup(c => c.GetStatusAsync(It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new AiServerStatus(false, "unreachable", "", -1, ""));
+        _serverProcess.Setup(s => s.LastStartError).Returns("ModuleNotFoundError: No module named 'flask'");
+
+        var result = await _handler.HandleAsync("getAiServerStatus", null);
+
+        var json = JsonSerializer.Serialize(result);
+        Assert.That(json, Does.Contain("lastStartError"));
+        Assert.That(json, Does.Contain("flask"));
+    }
+
+    [Test]
     public async Task StartAiServer_DelegatesToService()
     {
         var result = await _handler.HandleAsync("startAiServer", null);

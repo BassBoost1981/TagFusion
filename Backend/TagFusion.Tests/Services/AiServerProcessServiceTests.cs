@@ -84,4 +84,43 @@ public class AiServerProcessServiceTests
 
         Assert.That(AiServerProcessService.ResolveServerDirectory("", startDir), Is.Null);
     }
+
+    [Test]
+    public void ResolvePythonExecutable_AbsolutePath_ReturnedAsIs()
+    {
+        var abs = Path.Combine(_tempRoot, "some", "python.exe");
+
+        Assert.That(AiServerProcessService.ResolvePythonExecutable(abs, _tempRoot), Is.EqualTo(abs));
+    }
+
+    [Test]
+    public void ResolvePythonExecutable_RelativePath_ResolvedAgainstServerDir()
+    {
+        var result = AiServerProcessService.ResolvePythonExecutable(@"venv\Scripts\python.exe", _tempRoot);
+
+        Assert.That(result, Is.EqualTo(Path.Combine(_tempRoot, "venv", "Scripts", "python.exe")));
+    }
+
+    [Test]
+    public void ResolvePythonExecutable_BareCommand_BundledVenvWins()
+    {
+        // A venv bundled inside the server folder is preferred over PATH — keeps the folder portable.
+        var venvPy = Path.Combine(_tempRoot, "venv", "Scripts", "python.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(venvPy)!);
+        File.WriteAllText(venvPy, "# fake");
+
+        Assert.That(AiServerProcessService.ResolvePythonExecutable("python", _tempRoot), Is.EqualTo(venvPy));
+    }
+
+    [Test]
+    public void ResolvePythonExecutable_BareCommand_NoBundle_FallsBackToCommand()
+    {
+        Assert.That(AiServerProcessService.ResolvePythonExecutable("python", _tempRoot), Is.EqualTo("python"));
+    }
+
+    [Test]
+    public void ResolvePythonExecutable_Empty_TreatedAsPathLookup()
+    {
+        Assert.That(AiServerProcessService.ResolvePythonExecutable("", _tempRoot), Is.EqualTo("python"));
+    }
 }
