@@ -74,8 +74,12 @@ public sealed class AiCaptionClient : IAiCaptionClient
                 if (string.IsNullOrEmpty(model.ModelName)) continue;
                 ct.ThrowIfCancellationRequested();
 
-                // Capability probe: captioning models expose a "prompt" parameter,
-                // taggers only a "threshold". Fähigkeits-Check über den prompt-Parameter.
+                // Capability probe: captioning models expose a free-text prompt parameter,
+                // taggers only a "threshold". The key differs per model: florence2 calls it
+                // "prompt", every other captioner (joycaption/qwen25/qwen3/moondream2/keye/
+                // llamacpp) calls it "query" — accept either.
+                // Fähigkeits-Check über den Prompt-Parameter: florence2 nennt ihn "prompt",
+                // alle anderen Caption-Modelle "query" — beide akzeptieren.
                 using var probeTimerCts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.QuickTimeoutSeconds));
                 using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct, probeTimerCts.Token);
                 var payloadStr = JsonSerializer.Serialize(new { Name = model.ModelName }, _json);
@@ -83,7 +87,8 @@ public sealed class AiCaptionClient : IAiCaptionClient
                 var resp = await _http.PostAsync("/getmodelparams", probeContent, probeCts.Token);
                 if (!resp.IsSuccessStatusCode) continue;
                 var pars = await resp.Content.ReadFromJsonAsync<ModelParamsResponseDto>(_json, probeCts.Token);
-                if (pars?.Parameters?.Any(p => string.Equals(p.Key, "prompt", StringComparison.OrdinalIgnoreCase)) == true)
+                if (pars?.Parameters?.Any(p => string.Equals(p.Key, "prompt", StringComparison.OrdinalIgnoreCase)
+                                             || string.Equals(p.Key, "query", StringComparison.OrdinalIgnoreCase)) == true)
                     captionModels.Add(model.ModelName!);
             }
         }
@@ -113,9 +118,17 @@ public sealed class AiCaptionClient : IAiCaptionClient
                 new
                 {
                     ModelName = model,
+                    // Send the prompt under both keys: florence2 reads "prompt", every other
+                    // caption model reads "query". The server builds a plain dict from
+                    // AdditionalParameters and each model only looks up the key it knows,
+                    // so the unused entry is harmless.
+                    // Prompt unter beiden Keys senden: florence2 = prompt, alle anderen
+                    // Caption-Modelle = query. Der Server baut ein simples Dict; jedes Modell
+                    // liest nur seinen bekannten Key — der ungenutzte Eintrag ist unschädlich.
                     AdditionalParameters = new[]
                     {
-                        new { Key = "prompt", Value = prompt, Type = "string", Comment = "" }
+                        new { Key = "prompt", Value = prompt, Type = "string", Comment = "" },
+                        new { Key = "query", Value = prompt, Type = "string", Comment = "" }
                     }
                 }
             }

@@ -79,10 +79,12 @@ public class AiCaptionClientTests
                 return (HttpStatusCode.OK,
                     "{\"Interrogators\":[{\"ModelName\":\"qwen-caption\",\"SupportedVideo\":false,\"RepositoryLink\":\"\"}," +
                     "{\"ModelName\":\"wd-tagger\",\"SupportedVideo\":false,\"RepositoryLink\":\"\"}],\"Editors\":[],\"Translators\":[]}");
-            // getmodelparams: qwen has a prompt parameter, the tagger only a threshold
+            // getmodelparams: qwen is query-based (like joycaption/qwen25/qwen3/moondream2/
+            // keye/llamacpp), the tagger only exposes a threshold — proves the filter accepts
+            // "query" too, not just florence2's "prompt".
             var body = handler.RequestBodies[^1];
             if (body.Contains("qwen-caption"))
-                return (HttpStatusCode.OK, "{\"Parameters\":[{\"Key\":\"prompt\",\"Value\":\"describe\",\"Type\":\"string\",\"Comment\":\"\"}]}");
+                return (HttpStatusCode.OK, "{\"Parameters\":[{\"Key\":\"query\",\"Value\":\"describe\",\"Type\":\"string\",\"Comment\":\"\"}]}");
             return (HttpStatusCode.OK, "{\"Parameters\":[{\"Key\":\"threshold\",\"Value\":\"0.25\",\"Type\":\"float1\",\"Comment\":\"\"}]}");
         };
 
@@ -115,6 +117,7 @@ public class AiCaptionClientTests
             Assert.That(body, Does.Contain("\"DataType\":1"));
             Assert.That(body, Does.Contain("\"ModelName\":\"qwen\""));
             Assert.That(body, Does.Contain("\"Key\":\"prompt\""));
+            Assert.That(body, Does.Contain("\"Key\":\"query\""));
             Assert.That(body, Does.Contain("Beschreibe das Bild"));
         }
         finally
