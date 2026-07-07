@@ -47,6 +47,11 @@ public sealed class AiServerProcessService : IAiServerProcessService, IDisposabl
             if (_process is { HasExited: false })
                 return; // already running under our control / läuft bereits unter unserer Kontrolle
 
+            // Previous process crashed — release its handle before starting a new one.
+            // Vorheriger Prozess ist abgestürzt — Handle freigeben, bevor neu gestartet wird.
+            _process?.Dispose();
+            _process = null;
+
             var serverDir = ResolveServerDirectory(_settings.ServerDirectory, AppContext.BaseDirectory);
             if (serverDir == null)
                 throw new BridgeException(
@@ -69,7 +74,14 @@ public sealed class AiServerProcessService : IAiServerProcessService, IDisposabl
             {
                 var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 process.OutputDataReceived += (_, e) => { if (e.Data != null) _logger.LogInformation("[AiApiServer] {Line}", e.Data); };
-                process.ErrorDataReceived += (_, e) => { if (e.Data != null) _logger.LogInformation("[AiApiServer] {Line}", e.Data); };
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) _logger.LogWarning("[AiApiServer] {Line}", e.Data); };
+                process.Exited += (_, _) =>
+                {
+                    // Unexpected death is the user's only diagnostic besides the log — make it loud.
+                    // Unerwartetes Prozess-Ende laut loggen — sonst sieht der User nur „Server startet …" verschwinden.
+                    try { _logger.LogWarning("AiApiServer exited (code {ExitCode})", process.ExitCode); }
+                    catch { /* ExitCode unavailable in rare races / ExitCode in seltenen Races nicht lesbar */ }
+                };
                 process.Start();
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
