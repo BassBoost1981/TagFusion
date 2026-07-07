@@ -1,5 +1,6 @@
 {
   "actions": [
+    "cancelDescriptionScan",
     "cancelFaceScan",
     "confirmFaceGroup",
     "copyFiles",
@@ -9,7 +10,9 @@
     "exportTagsXmp",
     "findDuplicates",
     "flipImages",
+    "getAiServerStatus",
     "getAllTags",
+    "getDescriptionPrecheck",
     "getDrives",
     "getFaceReview",
     "getFolderContents",
@@ -37,6 +40,7 @@
     "searchImages",
     "selectFolder",
     "setRating",
+    "startDescriptionScan",
     "stopWatching",
     "updateBatchTag",
     "watchFolder",

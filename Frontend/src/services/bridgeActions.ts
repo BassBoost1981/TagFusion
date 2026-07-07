@@ -1,4 +1,5 @@
 export const BRIDGE_ACTIONS = {
+  CANCEL_DESCRIPTION_SCAN: 'cancelDescriptionScan',
   CANCEL_FACE_SCAN: 'cancelFaceScan',
   CONFIRM_FACE_GROUP: 'confirmFaceGroup',
   COPY_FILES: 'copyFiles',
@@ -8,7 +9,9 @@ export const BRIDGE_ACTIONS = {
   EXPORT_TAGS_XMP: 'exportTagsXmp',
   FIND_DUPLICATES: 'findDuplicates',
   FLIP_IMAGES: 'flipImages',
+  GET_AI_SERVER_STATUS: 'getAiServerStatus',
   GET_ALL_TAGS: 'getAllTags',
+  GET_DESCRIPTION_PRECHECK: 'getDescriptionPrecheck',
   GET_DRIVES: 'getDrives',
   GET_FACE_REVIEW: 'getFaceReview',
   GET_FOLDER_CONTENTS: 'getFolderContents',
@@ -36,6 +39,7 @@ export const BRIDGE_ACTIONS = {
   SEARCH_IMAGES: 'searchImages',
   SELECT_FOLDER: 'selectFolder',
   SET_RATING: 'setRating',
+  START_DESCRIPTION_SCAN: 'startDescriptionScan',
   STOP_WATCHING: 'stopWatching',
   UPDATE_BATCH_TAG: 'updateBatchTag',
   WATCH_FOLDER: 'watchFolder',

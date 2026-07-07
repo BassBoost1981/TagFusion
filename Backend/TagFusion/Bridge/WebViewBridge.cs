@@ -41,6 +41,8 @@ public class WebViewBridge
         DuplicateDetectionService duplicateDetectionService,
         FaceScanService faceScanService,
         IFaceEngine faceEngine,
+        DescriptionScanService descriptionScanService,
+        IAiCaptionClient aiCaptionClient,
         ILoggerFactory loggerFactory)
     {
         _webView = webView;
@@ -66,6 +68,9 @@ public class WebViewBridge
             new FaceHandler(
                 faceScanService, faceEngine, databaseService, exifToolService,
                 loggerFactory.CreateLogger<FaceHandler>()),
+            new AiHandler(
+                descriptionScanService, aiCaptionClient, exifToolService, fileSystemService,
+                loggerFactory.CreateLogger<AiHandler>()),
         };
 
         // Build action → handler lookup
@@ -90,6 +95,19 @@ public class WebViewBridge
             SendEvent("faceScanProgress", new { current, total, faces });
         faceScanService.Completed += summary =>
             SendEvent("faceScanCompleted", new { scanned = summary.Scanned, faces = summary.Faces, skipped = summary.Skipped, cancelled = summary.Cancelled });
+
+        // AI description scan events → frontend. / Beschreibungs-Scan-Events ans Frontend.
+        descriptionScanService.Progress += (current, total, described) =>
+            SendEvent("descriptionScanProgress", new { current, total, described });
+        descriptionScanService.Completed += summary =>
+            SendEvent("descriptionScanCompleted", new
+            {
+                described = summary.Described,
+                skipped = summary.Skipped,
+                failed = summary.Failed,
+                cancelled = summary.Cancelled,
+                aborted = summary.Aborted,
+            });
 
         _logger.LogInformation("WebViewBridge initialized with {HandlerCount} handlers, {ActionCount} actions",
             handlers.Length, _actionMap.Count);
