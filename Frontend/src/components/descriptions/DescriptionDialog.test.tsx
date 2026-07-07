@@ -77,4 +77,10 @@ describe('DescriptionDialog', () => {
     render(<DescriptionDialog />);
     expect(screen.queryByRole('button', { name: /server st/i })).not.toBeInTheDocument();
   });
+
+  it('shows no server button while the status is still loading', () => {
+    useDescriptionStore.setState({ serverStatus: null });
+    render(<DescriptionDialog />);
+    expect(screen.queryByRole('button', { name: /server st/i })).not.toBeInTheDocument();
+  });
 });

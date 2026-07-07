@@ -41,7 +41,7 @@ export function DescriptionDialog() {
                   ? t('descriptions.serverStarting')
                   : t('descriptions.serverDown')}
           </p>
-          {!reachable && (
+          {!loading && !reachable && (
             <GlassButton variant="ghost" onClick={() => void startServer()}>
               <Power size={16} /> {t('descriptions.startServer')}
             </GlassButton>
