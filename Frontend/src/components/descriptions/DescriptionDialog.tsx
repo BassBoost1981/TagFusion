@@ -39,7 +39,9 @@ export function DescriptionDialog() {
                   : t('descriptions.serverOk')
                 : serverStatus?.managedByApp
                   ? t('descriptions.serverStarting')
-                  : t('descriptions.serverDown')}
+                  : serverStatus?.lastStartError
+                    ? t('descriptions.serverFailed', { reason: serverStatus.lastStartError })
+                    : t('descriptions.serverDown')}
           </p>
           {!loading && !reachable && (
             <GlassButton variant="ghost" onClick={() => void startServer()}>

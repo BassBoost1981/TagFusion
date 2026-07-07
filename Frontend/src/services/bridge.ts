@@ -496,7 +496,7 @@ class BridgeService {
       case 'getPersons':
         return [];
       case 'getAiServerStatus':
-        return { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false };
+        return { reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [], managedByApp: false, lastStartError: null };
       case 'getDescriptionPrecheck':
         return { total: 0, withDescription: 0 };
       case 'startDescriptionScan':

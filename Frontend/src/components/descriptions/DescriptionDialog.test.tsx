@@ -83,4 +83,16 @@ describe('DescriptionDialog', () => {
     render(<DescriptionDialog />);
     expect(screen.queryByRole('button', { name: /server st/i })).not.toBeInTheDocument();
   });
+
+  it('shows the crash reason when the server failed to start', () => {
+    useDescriptionStore.setState({
+      serverStatus: {
+        reachable: false, state: 'unreachable', model: '', progress: -1, message: '', models: [],
+        managedByApp: false, lastStartError: "ModuleNotFoundError: No module named 'flask'",
+      },
+      selectedModel: '',
+    });
+    render(<DescriptionDialog />);
+    expect(screen.getByText(/flask/)).toBeInTheDocument();
+  });
 });

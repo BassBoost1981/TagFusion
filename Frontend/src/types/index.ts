@@ -167,6 +167,8 @@ export interface AiServerStatusInfo {
   message: string;
   models: string[];
   managedByApp: boolean;
+  /** Reason the last app-started server died (e.g. missing dependency), or null. / Absturzgrund oder null. */
+  lastStartError?: string | null;
 }
 
 export interface DescriptionPrecheck {

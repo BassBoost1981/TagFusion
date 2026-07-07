@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), versions fol
 ## [Unreleased]
 
 ### Added
+- AiApiServer start is now USB-portable: a Python bundled inside the AiApiServer folder (venv/.venv/python) is auto-detected, and `AiServer:PythonExecutable` may be a relative path resolved against the server folder
+- If the AI server crashes on start (e.g. missing dependency), the "Describe images" dialog now shows the reason instead of silently staying unreachable
 - Start/stop the local AiApiServer directly from the "Describe images" dialog; a server TagFusion started is shut down on exit
 - Local AI image descriptions via the bundled AiApiServer: manual per-folder run with model/prompt dialog (German templates, editable), skip-or-overwrite choice for existing descriptions, MWG metadata + database mirror
 - Global search now also matches AI descriptions (tags OR filename OR description)
