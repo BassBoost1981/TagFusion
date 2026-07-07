@@ -156,6 +156,21 @@ public class DescriptionScanServiceTests
     }
 
     [Test]
+    public async Task Scan_HttpTimeout_CountsAsFailureNotCancellation()
+    {
+        var paths = new[] { CreateTempImage(), CreateTempImage(), CreateTempImage(), CreateTempImage() };
+        SetupFolder(paths);
+        _client.Setup(c => c.CaptionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new TaskCanceledException("timeout"));
+
+        var summary = await RunScanAsync("C:\\egal");
+
+        Assert.That(summary.Cancelled, Is.False);
+        Assert.That(summary.Aborted, Is.True);
+        Assert.That(summary.Failed, Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task Scan_SecondStartWhileRunning_ReturnsFalse()
     {
         var p1 = CreateTempImage();

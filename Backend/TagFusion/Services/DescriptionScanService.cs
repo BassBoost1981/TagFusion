@@ -129,8 +129,15 @@ public sealed class DescriptionScanService
                     described++;
                     consecutiveFailures = 0;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
+                    // Genuine user cancellation only. HttpClient timeouts throw
+                    // TaskCanceledException (an OperationCanceledException) WITHOUT ct being
+                    // cancelled — those must fall through to the failure counter below,
+                    // not abort the whole run as "Cancelled".
+                    // Nur echter Abbruch durch den Nutzer. HttpClient-Timeouts werfen
+                    // TaskCanceledException OHNE ct-Cancel — die zählen als Fehler,
+                    // nicht als Abbruch des gesamten Laufs.
                     throw;
                 }
                 catch (Exception ex)
