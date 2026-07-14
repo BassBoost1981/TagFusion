@@ -27,6 +27,7 @@
         "selectFolder": "Select folder",
         "recentFolders": "Recent folders",
         "favorites": "Favorites",
+        "persons": "People",
         "noFavorites": "No favorites",
         "noRecentFolders": "No folders",
         "dropFailed": "Could not open folder.",
@@ -85,7 +86,8 @@
         "flipVertical": "Flip vertical",
         "zoomOut": "Zoom out (-)",
         "zoomIn": "Zoom in (+)",
-        "filmstrip": "Filmstrip"
+        "filmstrip": "Filmstrip",
+        "description": "Description"
     },
     "mainContent": {
         "selectedTags": "Selection tags"

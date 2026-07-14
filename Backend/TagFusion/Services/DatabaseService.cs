@@ -647,6 +647,26 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
+    public async Task<string?> GetImageDescriptionAsync(string path, CancellationToken cancellationToken = default)
+    {
+        await _readSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            using var command = _readConnection.CreateCommand();
+            command.CommandText = "SELECT Description FROM Images WHERE Path = @Path";
+            command.Parameters.AddWithValue("@Path", path);
+
+            // No row → null; DBNull → not a string → null. / Keine Zeile oder DBNull → null.
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            var description = result as string;
+            return string.IsNullOrEmpty(description) ? null : description;
+        }
+        finally
+        {
+            _readSemaphore.Release();
+        }
+    }
+
     /// <summary>
     /// Escape LIKE wildcards in user input so they match literally (used with ESCAPE '\').
     /// Escaped LIKE-Wildcards in Nutzereingaben, damit sie wörtlich matchen.

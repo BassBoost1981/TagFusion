@@ -18,6 +18,7 @@
     "getFolderContents",
     "getFolders",
     "getFullImage",
+    "getImageDescription",
     "getImages",
     "getPersons",
     "getProperties",

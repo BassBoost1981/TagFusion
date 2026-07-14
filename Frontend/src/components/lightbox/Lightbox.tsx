@@ -54,6 +54,12 @@ export function Lightbox() {
   const filmstripRef = useRef<HTMLDivElement>(null);
   const activeThumbRef = useRef<HTMLButtonElement>(null);
 
+  // AI description — cached per path so filmstrip navigation doesn't refetch.
+  // KI-Beschreibung — pro Pfad gecacht, damit Blättern nicht erneut lädt.
+  const [description, setDescription] = useState<string | null>(null);
+  const descriptionCacheRef = useRef<Map<string, string | null>>(new Map());
+  const descriptionPathRef = useRef<string | null>(null);
+
   // Pan state
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
@@ -97,6 +103,35 @@ export function Lightbox() {
           setIsLoading(false);
         });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, currentImage?.path]);
+
+  // Load the AI description on demand when the image changes.
+  // KI-Beschreibung bei Bildwechsel on-demand laden.
+  useEffect(() => {
+    if (!isOpen || !currentImage) return;
+    const path = currentImage.path;
+    descriptionPathRef.current = path;
+
+    const cached = descriptionCacheRef.current.get(path);
+    if (cached !== undefined) {
+      setDescription(cached);
+      return;
+    }
+
+    setDescription(null);
+    bridge
+      .getImageDescription(path)
+      .then((text) => {
+        descriptionCacheRef.current.set(path, text);
+        // Out-of-order guard: apply only if this image is still the current one.
+        // Out-of-Order-Guard: nur übernehmen, wenn das Bild noch das aktuelle ist.
+        if (descriptionPathRef.current === path) setDescription(text);
+      })
+      .catch(() => {
+        // Silent — the description row simply stays hidden.
+        // Stumm — die Beschreibungszeile bleibt einfach ausgeblendet.
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentImage?.path]);
 
@@ -449,36 +484,49 @@ export function Lightbox() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className="flex items-center gap-4"
+                    className="flex flex-col items-start gap-2"
                   >
-                    {/* Rating */}
-                    <div className="flex items-center gap-1">
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <Star
-                          key={i}
-                          size={16}
-                          className={i < (currentImage.rating || 0) ? 'text-cyan-400' : 'text-slate-600'}
-                          fill={i < (currentImage.rating || 0) ? 'currentColor' : 'none'}
-                        />
-                      ))}
+                    <div className="flex items-center gap-4">
+                      {/* Rating */}
+                      <div className="flex items-center gap-1">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <Star
+                            key={i}
+                            size={16}
+                            className={i < (currentImage.rating || 0) ? 'text-cyan-400' : 'text-slate-600'}
+                            fill={i < (currentImage.rating || 0) ? 'currentColor' : 'none'}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Tags */}
+                      {currentImage.tags && currentImage.tags.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Tag size={14} className="text-cyan-400" />
+                          <span className="text-slate-300 text-sm">
+                            {currentImage.tags.slice(0, 5).join(', ')}
+                            {currentImage.tags.length > 5 && ` +${currentImage.tags.length - 5}`}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Dimensions */}
+                      {currentImage.width && currentImage.height && (
+                        <span className="text-slate-400 text-sm">
+                          {currentImage.width} × {currentImage.height}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Tags */}
-                    {currentImage.tags && currentImage.tags.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Tag size={14} className="text-cyan-400" />
-                        <span className="text-slate-300 text-sm">
-                          {currentImage.tags.slice(0, 5).join(', ')}
-                          {currentImage.tags.length > 5 && ` +${currentImage.tags.length - 5}`}
-                        </span>
+                    {/* AI description — display only, hidden when none exists */}
+                    {/* KI-Beschreibung — nur Anzeige, ohne Beschreibung ausgeblendet */}
+                    {description && (
+                      <div className="flex items-start gap-2 max-w-xl">
+                        <span className="text-cyan-400 text-sm flex-shrink-0">{t('lightbox.description')}:</span>
+                        <p className="text-slate-300 text-sm max-h-24 overflow-y-auto whitespace-pre-wrap">
+                          {description}
+                        </p>
                       </div>
-                    )}
-
-                    {/* Dimensions */}
-                    {currentImage.width && currentImage.height && (
-                      <span className="text-slate-400 text-sm">
-                        {currentImage.width} × {currentImage.height}
-                      </span>
                     )}
                   </motion.div>
                 )}

@@ -17,6 +17,7 @@ export const BRIDGE_ACTIONS = {
   GET_FOLDER_CONTENTS: 'getFolderContents',
   GET_FOLDERS: 'getFolders',
   GET_FULL_IMAGE: 'getFullImage',
+  GET_IMAGE_DESCRIPTION: 'getImageDescription',
   GET_IMAGES: 'getImages',
   GET_PERSONS: 'getPersons',
   GET_PROPERTIES: 'getProperties',

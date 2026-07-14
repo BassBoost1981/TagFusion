@@ -27,6 +27,7 @@
         "selectFolder": "Ordner auswählen",
         "recentFolders": "Zuletzt geöffnet",
         "favorites": "Favoriten",
+        "persons": "Personen",
         "noFavorites": "Keine Favoriten",
         "noRecentFolders": "Keine Ordner",
         "dropFailed": "Ordner konnte nicht geöffnet werden.",
@@ -85,7 +86,8 @@
         "flipVertical": "Vertikal spiegeln",
         "zoomOut": "Verkleinern (-)",
         "zoomIn": "Vergrößern (+)",
-        "filmstrip": "Filmstreifen"
+        "filmstrip": "Filmstreifen",
+        "description": "Beschreibung"
     },
     "mainContent": {
         "selectedTags": "Tags der Auswahl"

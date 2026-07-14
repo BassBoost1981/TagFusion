@@ -32,7 +32,7 @@ public class AiHandlerTests
         _scanService = new DescriptionScanService(_client.Object, _exifTool.Object, _db.Object, _fs.Object,
             NullLogger<DescriptionScanService>.Instance);
         _handler = new AiHandler(_scanService, _client.Object, _exifTool.Object, _fs.Object,
-            _serverProcess.Object, NullLogger<AiHandler>.Instance);
+            _db.Object, _serverProcess.Object, NullLogger<AiHandler>.Instance);
     }
 
     private static Dictionary<string, object> Payload(string json)
@@ -147,6 +147,28 @@ public class AiHandlerTests
 
         Assert.That(result, Is.EqualTo(true));
         _serverProcess.Verify(s => s.StopServer(), Times.Once);
+    }
+
+    [Test]
+    public async Task GetImageDescription_ReturnsDescriptionFromDatabase()
+    {
+        _db.Setup(d => d.GetImageDescriptionAsync("C:\\fotos\\a.jpg", It.IsAny<CancellationToken>()))
+           .ReturnsAsync("Ein Sonnenuntergang über dem Meer");
+
+        var result = await _handler.HandleAsync("getImageDescription", Payload("{\"path\":\"C:\\\\fotos\\\\a.jpg\"}"));
+
+        Assert.That(result, Is.EqualTo("Ein Sonnenuntergang über dem Meer"));
+    }
+
+    [Test]
+    public async Task GetImageDescription_NoDescription_ReturnsNull()
+    {
+        _db.Setup(d => d.GetImageDescriptionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+           .ReturnsAsync((string?)null);
+
+        var result = await _handler.HandleAsync("getImageDescription", Payload("{\"path\":\"C:\\\\fotos\\\\ohne.jpg\"}"));
+
+        Assert.That(result, Is.Null);
     }
 
     [Test]

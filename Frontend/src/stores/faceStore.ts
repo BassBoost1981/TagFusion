@@ -15,6 +15,7 @@ interface FaceState {
   persons: Person[];
 
   checkEngine: () => Promise<void>;
+  loadPersons: () => Promise<void>;
   startScan: (path: string) => Promise<void>;
   cancelScan: () => Promise<void>;
   loadReview: (path: string) => Promise<void>;
@@ -39,6 +40,16 @@ export const useFaceStore = create<FaceState>((set, get) => ({
       set({ engineAvailable: health.faceEngineOk });
     } catch {
       set({ engineAvailable: false });
+    }
+  },
+
+  loadPersons: async () => {
+    try {
+      const persons = await bridge.getPersons();
+      set({ persons });
+    } catch (error) {
+      // Silent — the sidebar section simply stays hidden / Stumm — der Sidebar-Abschnitt bleibt einfach ausgeblendet
+      console.warn('[faceStore] loadPersons failed:', error);
     }
   },
 
@@ -123,6 +134,9 @@ export const useFaceStore = create<FaceState>((set, get) => ({
       // Aktuellen Ordner neu laden, damit Status-Badges ohne Ordnerwechsel erscheinen.
       // Läuft in jedem Abschlussfall — Teilergebnisse nach Abbruch zählen auch.
       void useAppStore.getState().refreshImages();
+      // Keep the sidebar person list fresh without opening the review panel.
+      // Personen-Liste in der Sidebar aktuell halten, ohne das Review-Panel zu öffnen.
+      void get().loadPersons();
       const toast = useToastStore.getState();
       if (cancelled) {
         toast.warning('Gesichter-Scan abgebrochen');

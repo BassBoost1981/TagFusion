@@ -71,7 +71,7 @@ public class WebViewBridge
                 loggerFactory.CreateLogger<FaceHandler>()),
             new AiHandler(
                 descriptionScanService, aiCaptionClient, exifToolService, fileSystemService,
-                aiServerProcessService, loggerFactory.CreateLogger<AiHandler>()),
+                databaseService, aiServerProcessService, loggerFactory.CreateLogger<AiHandler>()),
         };
 
         // Build action → handler lookup

@@ -3,13 +3,15 @@ import { useToastStore } from '../../stores/toastStore';
 import { Collapsible } from '@base-ui-components/react/collapsible';
 import { ScrollArea } from '@base-ui-components/react/scroll-area';
 import { motion } from 'framer-motion';
-import { HardDrive, FolderClosed, ChevronDown, FolderOpen, Loader2, Star, Plus, X, Monitor } from 'lucide-react';
+import { HardDrive, FolderClosed, ChevronDown, FolderOpen, Loader2, Star, Plus, X, Monitor, Users, User } from 'lucide-react';
 import {
+  useAppStore,
   useSidebarState,
   useCurrentFolder,
   useNavigateToFolder,
   useAddCurrentFolderToFavorites,
 } from '../../stores/appStore';
+import { useFaceStore } from '../../stores/faceStore';
 import type { FolderItem } from '../../types';
 import { GlassIconButton } from '../ui/glass';
 import { Skeleton } from '../ui/Skeleton';
@@ -35,6 +37,10 @@ export function Sidebar() {
   const currentFolder = useCurrentFolder();
   const navigateToFolder = useNavigateToFolder();
   const addCurrentFolderToFavorites = useAddCurrentFolderToFavorites();
+  const persons = useFaceStore((state) => state.persons);
+  const loadPersons = useFaceStore((state) => state.loadPersons);
+  const setSearchQuery = useAppStore((state) => state.setSearchQuery);
+  const executeGlobalSearch = useAppStore((state) => state.executeGlobalSearch);
   const panelRef = useRef<HTMLElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -104,6 +110,17 @@ export function Sidebar() {
     loadDrives();
   }, [loadDrives]);
 
+  useEffect(() => {
+    void loadPersons();
+  }, [loadPersons]);
+
+  // Person click — same path as the toolbar search: set the query, run the global search.
+  // Personen-Klick — derselbe Pfad wie die Toolbar-Suche: Suchfeld setzen, globale Suche starten.
+  const handlePersonSelect = (name: string) => {
+    setSearchQuery(name);
+    void executeGlobalSearch([name]);
+  };
+
   return (
     <aside
       ref={panelRef}
@@ -156,6 +173,33 @@ export function Sidebar() {
           )}
         </ul>
       </div>
+
+      {/* Persons Section - hidden when no persons exist / Personen — ohne Personen komplett ausgeblendet */}
+      {persons.length > 0 && (
+        <div className="p-2 m-2 mb-0 flex-shrink-0 glass-section">
+          {/* Glass Specular Highlight */}
+          <div className="absolute inset-x-0 top-0 h-[1px] glass-specular" />
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <Users size={14} className="text-cyan-400" />
+            <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">{t('sidebar.persons')}</h3>
+          </div>
+          <ul aria-label={t('sidebar.persons')} className="space-y-0.5 max-h-48 overflow-y-auto">
+            {persons.map((person) => (
+              <motion.li
+                key={person.id}
+                whileHover={{ x: 4 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer text-sm text-[var(--color-text-primary)] hover:bg-[var(--glass-bg-hover)] border border-transparent transition-colors duration-150"
+                onClick={() => handlePersonSelect(person.name)}
+              >
+                <User size={16} className="text-cyan-400 flex-shrink-0" />
+                <span className="flex-1 truncate font-medium">{person.name}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">{person.faceCount}</span>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Drives Section - Scrollable */}
       <ScrollArea.Root className="flex-1 overflow-hidden">

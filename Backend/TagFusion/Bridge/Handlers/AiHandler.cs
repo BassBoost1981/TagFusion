@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
+using TagFusion.Database;
 using TagFusion.Services;
 
 namespace TagFusion.Bridge.Handlers;
@@ -14,13 +15,14 @@ public class AiHandler : IBridgeHandler
     private readonly IAiCaptionClient _client;
     private readonly IExifToolService _exifToolService;
     private readonly IFileSystemService _fileSystemService;
+    private readonly IDatabaseService _databaseService;
     private readonly IAiServerProcessService _serverProcess;
     private readonly ILogger<AiHandler> _logger;
 
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
         "getAiServerStatus", "getDescriptionPrecheck", "startDescriptionScan", "cancelDescriptionScan",
-        "startAiServer", "stopAiServer"
+        "startAiServer", "stopAiServer", "getImageDescription"
     };
 
     public IReadOnlySet<string> SupportedActions => _supported;
@@ -30,6 +32,7 @@ public class AiHandler : IBridgeHandler
         IAiCaptionClient client,
         IExifToolService exifToolService,
         IFileSystemService fileSystemService,
+        IDatabaseService databaseService,
         IAiServerProcessService serverProcess,
         ILogger<AiHandler> logger)
     {
@@ -37,6 +40,7 @@ public class AiHandler : IBridgeHandler
         _client = client;
         _exifToolService = exifToolService;
         _fileSystemService = fileSystemService;
+        _databaseService = databaseService;
         _serverProcess = serverProcess;
         _logger = logger;
     }
@@ -51,6 +55,7 @@ public class AiHandler : IBridgeHandler
             "cancelDescriptionScan" => CancelScan(),
             "startAiServer" => StartAiServer(),
             "stopAiServer" => StopAiServer(),
+            "getImageDescription" => await GetImageDescriptionAsync(payload),
             _ => throw new NotSupportedException($"Unknown action: {action}")
         };
     }
@@ -79,6 +84,14 @@ public class AiHandler : IBridgeHandler
         var paths = images.Select(i => i.Path).ToList();
         var existing = await _exifToolService.ReadDescriptionsBatchAsync(paths);
         return new { total = paths.Count, withDescription = existing.Count };
+    }
+
+    // Returns the stored AI description or null when there is none.
+    // Liefert die gespeicherte KI-Beschreibung oder null, wenn keine existiert.
+    private async Task<object?> GetImageDescriptionAsync(Dictionary<string, object>? payload)
+    {
+        var path = PayloadHelper.GetString(payload ?? new(), "path");
+        return await _databaseService.GetImageDescriptionAsync(path);
     }
 
     private async Task<object> StartDescriptionScanAsync(Dictionary<string, object>? payload)

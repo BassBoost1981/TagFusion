@@ -316,6 +316,17 @@ class BridgeService {
     return this.send<boolean>(BRIDGE_ACTIONS.CANCEL_DESCRIPTION_SCAN);
   }
 
+  // Stored AI description of a single image — null when none exists.
+  // The backend omits the data field for null responses (WhenWritingNull),
+  // so undefined must be normalized to null here.
+  // Gespeicherte KI-Beschreibung eines Bildes — null, wenn keine existiert.
+  // Das Backend lässt das data-Feld bei null weg (WhenWritingNull),
+  // daher wird undefined hier zu null normalisiert.
+  async getImageDescription(path: string): Promise<string | null> {
+    const description = await this.send<string | null | undefined>(BRIDGE_ACTIONS.GET_IMAGE_DESCRIPTION, { path });
+    return description ?? null;
+  }
+
   async startAiServer(): Promise<boolean> {
     return this.send<boolean>(BRIDGE_ACTIONS.START_AI_SERVER);
   }
@@ -502,6 +513,8 @@ class BridgeService {
       case 'startDescriptionScan':
       case 'cancelDescriptionScan':
         return true;
+      case 'getImageDescription':
+        return 'Ein sonniger Nachmittag im Park: Zwei Personen sitzen auf einer Bank unter alten Kastanienbäumen, im Hintergrund spielen Kinder auf einer Wiese.';
       case 'writeBatchTags':
         return {};
       case 'watchFolder':

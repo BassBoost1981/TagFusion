@@ -132,6 +132,14 @@ public interface IDatabaseService
     /// das Bild nicht indexiert ist.
     /// </summary>
     Task SetImageDescriptionAsync(string imagePath, string description, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get the stored AI description of an image. Returns null when the image
+    /// is not indexed or the description is NULL or empty.
+    /// Liest die gespeicherte KI-Beschreibung eines Bildes — null, wenn das Bild
+    /// nicht indexiert ist oder die Beschreibung NULL bzw. leer ist.
+    /// </summary>
+    Task<string?> GetImageDescriptionAsync(string path, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

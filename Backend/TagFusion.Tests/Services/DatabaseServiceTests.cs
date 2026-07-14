@@ -650,6 +650,38 @@ public class DatabaseServiceTests
         Assert.DoesNotThrowAsync(() => _db.SetImageDescriptionAsync("C:\\gibtsnicht.jpg", "x"));
     }
 
+    [Test]
+    public async Task GetImageDescription_ReturnsStoredText()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\a.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\fotos\\a.jpg", "Ein Sonnenuntergang über dem Meer");
+
+        var description = await _db.GetImageDescriptionAsync("C:\\fotos\\a.jpg");
+
+        Assert.That(description, Is.EqualTo("Ein Sonnenuntergang über dem Meer"));
+    }
+
+    [Test]
+    public async Task GetImageDescription_EmptyString_ReturnsNull()
+    {
+        // Empty string counts as "no description" — same as NULL.
+        // Leerer String zählt wie NULL als "keine Beschreibung".
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\leer.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\fotos\\leer.jpg", "");
+
+        var description = await _db.GetImageDescriptionAsync("C:\\fotos\\leer.jpg");
+
+        Assert.That(description, Is.Null);
+    }
+
+    [Test]
+    public async Task GetImageDescription_UnknownPath_ReturnsNull()
+    {
+        var description = await _db.GetImageDescriptionAsync("C:\\gibtsnicht.jpg");
+
+        Assert.That(description, Is.Null);
+    }
+
     // ========================================================================
     // Helpers
     // ========================================================================
