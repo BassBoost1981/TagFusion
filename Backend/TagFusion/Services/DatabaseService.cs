@@ -337,12 +337,15 @@ public class DatabaseService : IDatabaseService, IDisposable
                 using var command = _readConnection.CreateCommand();
                 command.CommandText = $@"
                     SELECT i.Path, i.Rating, GROUP_CONCAT(t.Name, '||') as TagList,
-                           i.LastModified, i.Width, i.Height, i.DateTaken
+                           i.LastModified, i.Width, i.Height, i.DateTaken,
+                           (i.FaceScanAt IS NOT NULL) as FaceScanned,
+                           (i.Description IS NOT NULL AND i.Description != '') as HasDescription
                     FROM Images i
                     LEFT JOIN ImageTags it ON i.Id = it.ImageId
                     LEFT JOIN Tags t ON it.TagId = t.Id
                     WHERE i.Path IN ({placeholders})
-                    GROUP BY i.Id, i.Path, i.Rating, i.LastModified, i.Width, i.Height, i.DateTaken";
+                    GROUP BY i.Id, i.Path, i.Rating, i.LastModified, i.Width, i.Height, i.DateTaken,
+                             i.FaceScanAt, i.Description";
 
                 for (int j = 0; j < chunk.Count; j++)
                 {
@@ -359,11 +362,15 @@ public class DatabaseService : IDatabaseService, IDisposable
                     var width = reader.GetInt32(4);
                     var height = reader.GetInt32(5);
                     var dateTaken = reader.IsDBNull(6) ? (DateTime?)null : ParseStoredDateTime(reader.GetString(6));
+                    // SQLite returns boolean expressions as 0/1 integers.
+                    // SQLite liefert boolesche Ausdrücke als 0/1-Integer.
+                    var faceScanned = reader.GetInt64(7) != 0;
+                    var hasDescription = reader.GetInt64(8) != 0;
 
                     var tags = tagList?.Split("||", StringSplitOptions.RemoveEmptyEntries)?.ToList()
                         ?? new List<string>();
 
-                    result[path] = new ImageMetadata(tags, rating, lastModified, width, height, dateTaken);
+                    result[path] = new ImageMetadata(tags, rating, lastModified, width, height, dateTaken, faceScanned, hasDescription);
                 }
             }
 

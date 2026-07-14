@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { bridge } from '../services/bridge';
 import type { FaceReview, Person } from '../types';
+import { useAppStore } from './appStore';
 import { useToastStore } from './toastStore';
 
 let subscriptionsInitialized = false;
@@ -117,6 +118,11 @@ export const useFaceStore = create<FaceState>((set, get) => ({
         scanned: number; faces: number; skipped: number; cancelled: boolean;
       };
       set({ isScanning: false, progress: null });
+      // Reload the current folder so the status badges appear without re-navigating.
+      // Runs in every completion case — partial results after cancel count too.
+      // Aktuellen Ordner neu laden, damit Status-Badges ohne Ordnerwechsel erscheinen.
+      // Läuft in jedem Abschlussfall — Teilergebnisse nach Abbruch zählen auch.
+      void useAppStore.getState().refreshImages();
       const toast = useToastStore.getState();
       if (cancelled) {
         toast.warning('Gesichter-Scan abgebrochen');

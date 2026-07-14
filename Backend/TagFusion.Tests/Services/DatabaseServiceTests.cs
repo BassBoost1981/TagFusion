@@ -138,6 +138,55 @@ public class DatabaseServiceTests
         Assert.That(metadata.ContainsKey("C:\\exists.jpg"), Is.True);
     }
 
+    [Test]
+    public async Task GetMetadataForPaths_AfterFaceScan_FaceScannedIsTrue()
+    {
+        // A scan with 0 found faces still sets FaceScanAt — counts as scanned.
+        // Auch ein Scan mit 0 Gesichtern setzt FaceScanAt — gilt als gescannt.
+        await _db.SaveFacesAsync("C:\\t\\gescannt.jpg", Array.Empty<NewFace>(), DateTime.UtcNow);
+
+        var metadata = await _db.GetMetadataForPathsAsync(new List<string> { "C:\\t\\gescannt.jpg" });
+
+        Assert.That(metadata["C:\\t\\gescannt.jpg"].FaceScanned, Is.True);
+        Assert.That(metadata["C:\\t\\gescannt.jpg"].HasDescription, Is.False);
+    }
+
+    [Test]
+    public async Task GetMetadataForPaths_WithDescription_HasDescriptionIsTrue()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\beschrieben.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\t\\beschrieben.jpg", "Ein Sonnenuntergang");
+
+        var metadata = await _db.GetMetadataForPathsAsync(new List<string> { "C:\\t\\beschrieben.jpg" });
+
+        Assert.That(metadata["C:\\t\\beschrieben.jpg"].HasDescription, Is.True);
+        Assert.That(metadata["C:\\t\\beschrieben.jpg"].FaceScanned, Is.False);
+    }
+
+    [Test]
+    public async Task GetMetadataForPaths_EmptyDescription_HasDescriptionIsFalse()
+    {
+        // Empty string counts as "no description" — same as NULL.
+        // Leerer String zählt wie NULL als "keine Beschreibung".
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\leer.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\t\\leer.jpg", "");
+
+        var metadata = await _db.GetMetadataForPathsAsync(new List<string> { "C:\\t\\leer.jpg" });
+
+        Assert.That(metadata["C:\\t\\leer.jpg"].HasDescription, Is.False);
+    }
+
+    [Test]
+    public async Task GetMetadataForPaths_PlainImage_BothFlagsFalse()
+    {
+        await _db.SaveImageAsync(CreateTestImage("C:\\t\\neu.jpg", new[] { "Tag1" }));
+
+        var metadata = await _db.GetMetadataForPathsAsync(new List<string> { "C:\\t\\neu.jpg" });
+
+        Assert.That(metadata["C:\\t\\neu.jpg"].FaceScanned, Is.False);
+        Assert.That(metadata["C:\\t\\neu.jpg"].HasDescription, Is.False);
+    }
+
     // ========================================================================
     // SaveImagesBatchAsync
     // ========================================================================

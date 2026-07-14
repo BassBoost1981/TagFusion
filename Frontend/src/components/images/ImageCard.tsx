@@ -1,5 +1,5 @@
 import { useEffect, memo } from 'react';
-import { Check, Tag } from 'lucide-react';
+import { Check, FileText, ScanFace, Tag } from 'lucide-react';
 import { Card, CardFooter } from '@heroui/react';
 import { useAppStore } from '../../stores/appStore';
 import { useLightboxStore } from '../../stores/lightboxStore';
@@ -103,18 +103,47 @@ export const ImageCard = memo(
             className="absolute inset-0 pointer-events-none"
             style={{ bottom: 'auto', height: thumbnailSize ? `${thumbnailSize}px` : '100%' }}
           >
-            {/* Tag count badge */}
-            {tagCount > 0 && (
-              <div
-                className="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-full bg-cyan-500/95 text-white text-xs font-bold flex items-center gap-1.5 shadow-depth-near"
-                style={{
-                  boxShadow: '0 4px 12px rgba(6,182,212,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
-                }}
-              >
-                <Tag size={11} />
-                {tagCount}
-              </div>
-            )}
+            {/* Top-left badge row: tag count + AI status / Badge-Zeile oben links: Tag-Anzahl + KI-Status */}
+            <div className="absolute top-3 left-3 z-20 flex gap-1.5 items-center">
+              {/* Tag count badge */}
+              {tagCount > 0 && (
+                <div
+                  className="px-2.5 py-1 rounded-full bg-cyan-500/95 text-white text-xs font-bold flex items-center gap-1.5 shadow-depth-near"
+                  style={{
+                    boxShadow: '0 4px 12px rgba(6,182,212,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
+                  }}
+                >
+                  <Tag size={11} />
+                  {tagCount}
+                </div>
+              )}
+
+              {/* Face scan done badge / Badge: Gesichtsscan erledigt */}
+              {image.faceScanned && (
+                <div
+                  title="Gesichter gescannt"
+                  className="p-1.5 rounded-full bg-black/55 text-white flex items-center justify-center"
+                  style={{
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <ScanFace size={11} />
+                </div>
+              )}
+
+              {/* AI description badge / Badge: KI-Beschreibung vorhanden */}
+              {image.hasDescription && (
+                <div
+                  title="Beschreibung vorhanden"
+                  className="p-1.5 rounded-full bg-black/55 text-white flex items-center justify-center"
+                  style={{
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <FileText size={11} />
+                </div>
+              )}
+            </div>
 
             {/* Selection indicator */}
             <div
@@ -148,6 +177,8 @@ export const ImageCard = memo(
     if (
       prev.image.path !== next.image.path ||
       prev.image.rating !== next.image.rating ||
+      prev.image.faceScanned !== next.image.faceScanned ||
+      prev.image.hasDescription !== next.image.hasDescription ||
       prev.isSelected !== next.isSelected ||
       prev.thumbnailSize !== next.thumbnailSize
     ) {

@@ -111,7 +111,13 @@ public class FileSystemHandler : IBridgeHandler
                 {
                     var serializableDbMetadata = dbMetadata.ToDictionary(
                         kvp => kvp.Key,
-                        kvp => new { tags = kvp.Value.Tags, rating = kvp.Value.Rating }
+                        kvp => new
+                        {
+                            tags = kvp.Value.Tags,
+                            rating = kvp.Value.Rating,
+                            faceScanned = kvp.Value.FaceScanned,
+                            hasDescription = kvp.Value.HasDescription
+                        }
                     );
                     _sendEvent("metadataUpdated", new { requestId, metadata = serializableDbMetadata });
                 }
@@ -136,9 +142,17 @@ public class FileSystemHandler : IBridgeHandler
 
                     if (!ct.IsCancellationRequested)
                     {
+                        // Not in DB yet — no face scan or AI description can exist.
+                        // Noch nicht in der DB — Gesichtsscan/KI-Beschreibung kann es nicht geben.
                         var serializableExifMetadata = exifMetadata.ToDictionary(
                             kvp => kvp.Key,
-                            kvp => new { tags = kvp.Value.Tags, rating = kvp.Value.Rating }
+                            kvp => new
+                            {
+                                tags = kvp.Value.Tags,
+                                rating = kvp.Value.Rating,
+                                faceScanned = false,
+                                hasDescription = false
+                            }
                         );
                         _sendEvent("metadataUpdated", new { requestId, metadata = serializableExifMetadata });
                     }

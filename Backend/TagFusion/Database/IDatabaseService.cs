@@ -143,5 +143,9 @@ public record ImageMetadata(
     DateTime LastModified,
     int Width = 0,
     int Height = 0,
-    DateTime? DateTaken = null
+    DateTime? DateTaken = null,
+    // Face scan done (FaceScanAt set, even with 0 faces) / KI-Beschreibung vorhanden.
+    // Gesichtsscan erledigt (FaceScanAt gesetzt, auch bei 0 Gesichtern) / AI description present.
+    bool FaceScanned = false,
+    bool HasDescription = false
 );

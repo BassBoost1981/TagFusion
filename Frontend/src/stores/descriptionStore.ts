@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { bridge } from '../services/bridge';
 import type { AiServerStatusInfo, DescriptionPrecheck } from '../types';
 import { DESCRIPTION_PROMPTS } from '../constants/descriptionPrompts';
+import { useAppStore } from './appStore';
 import { useToastStore } from './toastStore';
 
 let subscriptionsInitialized = false;
@@ -174,6 +175,11 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
         described: number; skipped: number; failed: number; cancelled: boolean; aborted: boolean;
       };
       set({ isScanning: false, progress: null });
+      // Reload the current folder so the status badges appear without re-navigating.
+      // Runs in every completion case — partial results after cancel/abort count too.
+      // Aktuellen Ordner neu laden, damit Status-Badges ohne Ordnerwechsel erscheinen.
+      // Läuft in jedem Abschlussfall — Teilergebnisse nach Abbruch zählen auch.
+      void useAppStore.getState().refreshImages();
       const toast = useToastStore.getState();
       if (cancelled) {
         toast.warning(`Beschreiben abgebrochen — ${described} Bilder beschrieben`);

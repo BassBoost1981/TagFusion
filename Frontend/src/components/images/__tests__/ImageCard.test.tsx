@@ -51,4 +51,25 @@ describe('ImageCard', () => {
     const filledStars = stars.filter((s) => s.classList.contains('text-cyan-400'));
     expect(filledStars).toHaveLength(3);
   });
+
+  it('renders both AI status badges when the flags are true', () => {
+    render(<ImageCard image={{ ...mockImage, faceScanned: true, hasDescription: true }} />);
+
+    expect(screen.getByTitle('Gesichter gescannt')).toBeInTheDocument();
+    expect(screen.getByTitle('Beschreibung vorhanden')).toBeInTheDocument();
+  });
+
+  it('renders no AI status badges when the flags are false', () => {
+    render(<ImageCard image={{ ...mockImage, faceScanned: false, hasDescription: false }} />);
+
+    expect(screen.queryByTitle('Gesichter gescannt')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Beschreibung vorhanden')).not.toBeInTheDocument();
+  });
+
+  it('renders no AI status badges when the flags are undefined', () => {
+    render(<ImageCard image={mockImage} />);
+
+    expect(screen.queryByTitle('Gesichter gescannt')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Beschreibung vorhanden')).not.toBeInTheDocument();
+  });
 });

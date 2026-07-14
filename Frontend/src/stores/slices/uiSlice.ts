@@ -168,14 +168,20 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
     bridge.on('metadataUpdated', (data) => {
       if (!data || typeof data !== 'object') return;
 
+      // Per-path metadata entry. The AI-status flags are optional so legacy
+      // payloads without them keep the current values on merge.
+      // Metadaten pro Pfad. Die KI-Status-Flags sind optional, damit alte
+      // Payloads ohne diese Felder die aktuellen Werte beim Merge behalten.
+      type MetadataEntry = { tags: string[]; rating: number; faceScanned?: boolean; hasDescription?: boolean };
+
       // New envelope shape: { requestId, metadata }. Fall back to the legacy raw
       // dictionary for any handler that hasn't been migrated yet.
       const envelope = data as {
         requestId?: number;
-        metadata?: Record<string, { tags: string[]; rating: number }>;
+        metadata?: Record<string, MetadataEntry>;
       };
       const requestId = typeof envelope.requestId === 'number' ? envelope.requestId : 0;
-      const metadataMap = envelope.metadata ?? (data as Record<string, { tags: string[]; rating: number }>);
+      const metadataMap = envelope.metadata ?? (data as Record<string, MetadataEntry>);
 
       if (requestId > 0) {
         if (requestId < latestMetadataRequestId) return; // stale delivery
@@ -185,7 +191,7 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
       const { images, gridItems } = get();
       let hasChanges = false;
 
-      const normalizedMap = new Map<string, { tags: string[]; rating: number }>();
+      const normalizedMap = new Map<string, MetadataEntry>();
       for (const key in metadataMap) {
         if (Object.prototype.hasOwnProperty.call(metadataMap, key)) {
           normalizedMap.set(key.toLowerCase(), metadataMap[key]);
@@ -196,7 +202,13 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
         const meta = metadataMap[img.path] ?? normalizedMap.get(img.path.toLowerCase());
         if (meta) {
           hasChanges = true;
-          return { ...img, tags: meta.tags || [], rating: meta.rating || 0 };
+          return {
+            ...img,
+            tags: meta.tags || [],
+            rating: meta.rating || 0,
+            faceScanned: meta.faceScanned ?? img.faceScanned,
+            hasDescription: meta.hasDescription ?? img.hasDescription,
+          };
         }
         return img;
       });

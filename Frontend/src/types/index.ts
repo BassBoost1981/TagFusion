@@ -10,6 +10,8 @@ export interface ImageFile {
   height?: number;
   tags: string[];
   rating?: number; // 0-5 star rating
+  faceScanned?: boolean; // Face scan completed / Gesichtsscan bereits gelaufen
+  hasDescription?: boolean; // AI description exists / KI-Beschreibung vorhanden
   thumbnailBase64?: string;
   thumbnailUrl?: string;
   isSelected?: boolean;
