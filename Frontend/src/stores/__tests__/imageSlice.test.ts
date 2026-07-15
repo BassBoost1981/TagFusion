@@ -218,3 +218,53 @@ describe('imageSlice — batch tag updates', () => {
     expect(error).toBe('Tag konnte für 1 von 2 Bildern nicht gespeichert werden');
   });
 });
+
+describe('imageSlice — refreshImages stale guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({
+      images: [],
+      gridItems: [],
+      selectedImages: new Set<string>(),
+      lastSelectedImage: null,
+      error: null,
+    });
+  });
+
+  it('discards a stale response when the folder changed during the refresh', async () => {
+    const imgB = makeImage('C:\\B\\2.jpg');
+    useAppStore.setState({ currentFolder: 'C:\\A' });
+
+    // Refresh for folder A hangs until we resolve it manually.
+    // Refresh für Ordner A hängt, bis wir ihn manuell auflösen.
+    let resolveFetch!: (items: GridItem[]) => void;
+    mockedBridge.getFolderContents.mockReturnValue(
+      new Promise<GridItem[]>((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+    const refreshPromise = useAppStore.getState().refreshImages();
+
+    // User navigates to folder B while the refresh is in flight.
+    // Nutzer wechselt während des Refreshs in Ordner B.
+    useAppStore.setState({ currentFolder: 'C:\\B', images: [imgB], gridItems: [makeGridItem(imgB)] });
+
+    resolveFetch([makeGridItem(makeImage('C:\\A\\1.jpg'))]);
+    await refreshPromise;
+
+    // Folder B's state must survive; the stale folder-A response is discarded.
+    // Ordner-B-Zustand bleibt erhalten; die veraltete Ordner-A-Antwort wird verworfen.
+    expect(useAppStore.getState().images).toEqual([imgB]);
+    expect(useAppStore.getState().gridItems).toEqual([makeGridItem(imgB)]);
+  });
+
+  it('applies the response when the folder is unchanged', async () => {
+    const imgA = makeImage('C:\\A\\1.jpg');
+    useAppStore.setState({ currentFolder: 'C:\\A' });
+    mockedBridge.getFolderContents.mockResolvedValue([makeGridItem(imgA)]);
+
+    await useAppStore.getState().refreshImages();
+
+    expect(useAppStore.getState().images).toEqual([imgA]);
+  });
+});

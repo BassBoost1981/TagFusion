@@ -134,12 +134,20 @@ export const createImageSlice: StateCreator<
   refreshImages: async () => {
     const { currentFolder } = get();
     if (currentFolder) {
-      const selectedPaths = get().selectedImages;
       try {
         const items = await bridge.getFolderContents(currentFolder);
+        // Stale guard: discard the response when the user navigated to another
+        // folder while the refresh was in flight — otherwise a late response
+        // would briefly show the old folder's grid.
+        // Stale-Guard: Antwort verwerfen, wenn während des Refreshs in einen
+        // anderen Ordner gewechselt wurde — sonst zeigt eine späte Antwort
+        // kurz das Grid des alten Ordners.
+        if (get().currentFolder !== currentFolder) return;
         const images = extractImages(items);
         const imagePathSet = new Set(images.map((img) => img.path));
-        const validSelection = new Set(Array.from(selectedPaths).filter((path) => imagePathSet.has(path)));
+        // Read the selection after the await so clicks made during the refresh survive.
+        // Auswahl nach dem Await lesen, damit Klicks während des Refreshs erhalten bleiben.
+        const validSelection = new Set(Array.from(get().selectedImages).filter((path) => imagePathSet.has(path)));
         set({ gridItems: normalizeGridItems(items, images), images, selectedImages: validSelection });
       } catch (error) {
         get().setError((error as Error).message);

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { Lightbox } from './Lightbox';
 import { useLightboxStore } from '../../stores/lightboxStore';
+import { useDescriptionStore } from '../../stores/descriptionStore';
 import { bridge } from '../../services/bridge';
 import i18n from '../../i18n';
 import type { ImageFile } from '../../types';
@@ -61,5 +62,27 @@ describe('Lightbox description row', () => {
 
     await waitFor(() => expect(bridge.getImageDescription).toHaveBeenCalledWith(image.path));
     expect(screen.queryByText(/Beschreibung/)).not.toBeInTheDocument();
+  });
+
+  it('drops the cache and refetches after a completed description scan', async () => {
+    const image = makeImage('C:\\Bilder\\frisch.jpg');
+    // First fetch: no description yet (cached as null).
+    // Erster Abruf: noch keine Beschreibung (als null gecacht).
+    vi.mocked(bridge.getImageDescription).mockResolvedValueOnce(null);
+    useLightboxStore.setState({ isOpen: true, currentImage: image, images: [image], currentIndex: 0 });
+
+    render(<Lightbox />);
+    await waitFor(() => expect(bridge.getImageDescription).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/Beschreibung/)).not.toBeInTheDocument();
+
+    // Scan completes — scanVersion bump must invalidate the cached null.
+    // Scan fertig — die scanVersion-Erhöhung muss das gecachte null invalidieren.
+    vi.mocked(bridge.getImageDescription).mockResolvedValueOnce('Frisch beschrieben.');
+    act(() => {
+      useDescriptionStore.setState({ scanVersion: useDescriptionStore.getState().scanVersion + 1 });
+    });
+
+    expect(await screen.findByText('Frisch beschrieben.')).toBeInTheDocument();
+    expect(bridge.getImageDescription).toHaveBeenCalledTimes(2);
   });
 });

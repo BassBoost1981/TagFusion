@@ -142,4 +142,20 @@ describe('descriptionStore', () => {
     await useDescriptionStore.getState().startServer();
     // resolves without throwing
   });
+
+  it('descriptionScanCompleted bumps scanVersion so description caches invalidate', () => {
+    // setupDescriptionSubscriptions is guarded to run once per module lifetime —
+    // grab the registered handler from the bridge.on mock.
+    // setupDescriptionSubscriptions läuft nur einmal pro Modul-Lebensdauer —
+    // den registrierten Handler aus dem bridge.on-Mock holen.
+    useDescriptionStore.getState().setupDescriptionSubscriptions();
+    const call = mockedBridge.on.mock.calls.find(([event]) => event === 'descriptionScanCompleted');
+    expect(call).toBeDefined();
+    const handler = call![1];
+
+    const before = useDescriptionStore.getState().scanVersion;
+    handler({ described: 3, skipped: 0, failed: 0, cancelled: false, aborted: false });
+
+    expect(useDescriptionStore.getState().scanVersion).toBe(before + 1);
+  });
 });

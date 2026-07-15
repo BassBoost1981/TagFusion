@@ -18,6 +18,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useLightboxStore } from '../../stores/lightboxStore';
 import { useAppStore, useSetError } from '../../stores/appStore';
+import { useDescriptionStore } from '../../stores/descriptionStore';
 import { bridge } from '../../services/bridge';
 import { LIGHTBOX_ZOOM_DEFAULT } from '../../constants/ui';
 import { GlassIconButton as GlassIconButtonBase } from '../ui/glass';
@@ -59,6 +60,10 @@ export function Lightbox() {
   const [description, setDescription] = useState<string | null>(null);
   const descriptionCacheRef = useRef<Map<string, string | null>>(new Map());
   const descriptionPathRef = useRef<string | null>(null);
+  // A completed description scan may have changed any text — drop the cache once per bump.
+  // Ein abgeschlossener Beschreibungs-Scan kann Texte geändert haben — Cache pro Erhöhung einmal leeren.
+  const descriptionScanVersion = useDescriptionStore((s) => s.scanVersion);
+  const seenScanVersionRef = useRef(descriptionScanVersion);
 
   // Pan state
   const [panX, setPanX] = useState(0);
@@ -113,6 +118,11 @@ export function Lightbox() {
     const path = currentImage.path;
     descriptionPathRef.current = path;
 
+    if (seenScanVersionRef.current !== descriptionScanVersion) {
+      seenScanVersionRef.current = descriptionScanVersion;
+      descriptionCacheRef.current.clear();
+    }
+
     const cached = descriptionCacheRef.current.get(path);
     if (cached !== undefined) {
       setDescription(cached);
@@ -133,7 +143,7 @@ export function Lightbox() {
         // Stumm — die Beschreibungszeile bleibt einfach ausgeblendet.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currentImage?.path]);
+  }, [isOpen, currentImage?.path, descriptionScanVersion]);
 
   // Preload adjacent images for instant navigation. With URL-based full images,
   // preloading is essentially free (one HTTP fetch into the WebView2 cache),

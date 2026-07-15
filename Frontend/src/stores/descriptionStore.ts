@@ -34,6 +34,8 @@ interface DescriptionState {
   selectedModel: string;
   promptText: string;
   overwriteExisting: boolean;
+  /** Bumped after every completed scan — consumers drop description caches. / Nach jedem Scan erhöht — Konsumenten leeren ihre Caches. */
+  scanVersion: number;
 
   openDialog: (path: string) => Promise<void>;
   closeDialog: () => void;
@@ -56,6 +58,7 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
   selectedModel: loadLastChoice().model,
   promptText: loadLastChoice().prompt,
   overwriteExisting: false,
+  scanVersion: 0,
 
   openDialog: async (path) => {
     set({ isDialogOpen: true, serverStatus: null, precheck: null });
@@ -174,7 +177,11 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
       const { described, skipped, failed, cancelled, aborted } = data as {
         described: number; skipped: number; failed: number; cancelled: boolean; aborted: boolean;
       };
-      set({ isScanning: false, progress: null });
+      // scanVersion bump invalidates description caches (e.g. the lightbox) —
+      // texts may have changed for any image, partial results included.
+      // scanVersion-Erhöhung invalidiert Beschreibungs-Caches (z.B. Lightbox) —
+      // Texte können sich geändert haben, Teilergebnisse eingeschlossen.
+      set({ isScanning: false, progress: null, scanVersion: get().scanVersion + 1 });
       // Reload the current folder so the status badges appear without re-navigating.
       // Runs in every completion case — partial results after cancel/abort count too.
       // Aktuellen Ordner neu laden, damit Status-Badges ohne Ordnerwechsel erscheinen.
