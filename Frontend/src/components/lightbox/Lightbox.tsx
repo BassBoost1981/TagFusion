@@ -416,7 +416,9 @@ export function Lightbox() {
                   e.stopPropagation();
                   next();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full transition-all hover:scale-110"
+                className={`absolute top-1/2 -translate-y-1/2 p-3 rounded-full transition-all hover:scale-110 ${
+                  showInfo ? 'right-[22rem]' : 'right-4'
+                }`}
                 style={{
                   background: 'rgba(255,255,255,0.1)',
                   backdropFilter: 'blur(10px)',
@@ -465,7 +467,78 @@ export function Lightbox() {
             </motion.div>
           )}
 
-          {/* Bottom Bar - Controls & Info */}
+          {/* Info Drawer — right-side panel, toggled by showInfo ('i' key); clears the top bar and filmstrip */}
+          {/* Info-Panel rechts — per showInfo ('i'-Taste) umschaltbar; hält Abstand zu Top-Bar und Filmstrip */}
+          <AnimatePresence>
+            {showInfo && (
+              <motion.aside
+                initial={{ x: '110%', opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: '110%', opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="absolute top-16 bottom-36 right-4 w-80 max-w-[85vw] z-30 flex flex-col rounded-2xl overflow-hidden"
+                style={{
+                  background: 'rgba(0,0,0,0.6)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+                  <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">{t('lightbox.info')}</h3>
+                  <GlassIconButton onClick={() => setShowInfo(false)} title={t('lightbox.close')}>
+                    <X size={16} />
+                  </GlassIconButton>
+                </div>
+
+                {/* Scrollable content / scrollbarer Inhalt */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
+                  {/* Rating */}
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <Star
+                        key={i}
+                        size={16}
+                        className={i < (currentImage.rating || 0) ? 'text-cyan-400' : 'text-slate-600'}
+                        fill={i < (currentImage.rating || 0) ? 'currentColor' : 'none'}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Dimensions */}
+                  {currentImage.width && currentImage.height && (
+                    <span className="text-slate-400 text-sm">
+                      {currentImage.width} × {currentImage.height}
+                    </span>
+                  )}
+
+                  {/* Tags — full list as chips / vollständige Liste als Chips */}
+                  {currentImage.tags && currentImage.tags.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Tag size={14} className="text-cyan-400 flex-shrink-0" />
+                      {currentImage.tags.map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 rounded-full bg-white/10 text-slate-200 text-xs">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* AI description — display only, hidden when none exists */}
+                  {/* KI-Beschreibung — nur Anzeige, ohne Beschreibung ausgeblendet */}
+                  {description && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-cyan-400 text-sm">{t('lightbox.description')}:</span>
+                      <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{description}</p>
+                    </div>
+                  )}
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+
+          {/* Bottom Bar - Controls */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -476,62 +549,7 @@ export function Lightbox() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              {/* Image Info */}
-              <AnimatePresence>
-                {showInfo && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="flex flex-col items-start gap-2"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Rating */}
-                      <div className="flex items-center gap-1">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <Star
-                            key={i}
-                            size={16}
-                            className={i < (currentImage.rating || 0) ? 'text-cyan-400' : 'text-slate-600'}
-                            fill={i < (currentImage.rating || 0) ? 'currentColor' : 'none'}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Tags */}
-                      {currentImage.tags && currentImage.tags.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <Tag size={14} className="text-cyan-400" />
-                          <span className="text-slate-300 text-sm">
-                            {currentImage.tags.slice(0, 5).join(', ')}
-                            {currentImage.tags.length > 5 && ` +${currentImage.tags.length - 5}`}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Dimensions */}
-                      {currentImage.width && currentImage.height && (
-                        <span className="text-slate-400 text-sm">
-                          {currentImage.width} × {currentImage.height}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* AI description — display only, hidden when none exists */}
-                    {/* KI-Beschreibung — nur Anzeige, ohne Beschreibung ausgeblendet */}
-                    {description && (
-                      <div className="flex items-start gap-2 max-w-xl">
-                        <span className="text-cyan-400 text-sm flex-shrink-0">{t('lightbox.description')}:</span>
-                        <p className="text-slate-300 text-sm max-h-24 overflow-y-auto whitespace-pre-wrap">
-                          {description}
-                        </p>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
+            <div className="flex items-center justify-end">
               {/* Controls */}
               <div className="flex items-center gap-2">
                 <GlassIconButton onClick={() => setShowFilmstrip((p) => !p)} title={t('lightbox.filmstrip')}>
