@@ -8,9 +8,11 @@ Backend/TagFusion/obj/
 Backend/TagFusion.Tests/bin/
 Backend/TagFusion.Tests/obj/
 
-# Hash-named frontend bundles copied into wwwroot by build_release.ps1 / sync:wwwroot.
-# Hashed Dateinamen aendern sich bei jedem Build — in Git nur die unveraendliche index.html tracken.
-Backend/TagFusion/wwwroot/assets/
+# wwwroot is pure build output: sync-wwwroot.mjs deletes and recreates it from Frontend/dist
+# on every sync. Source of truth for fonts/logo is Frontend/public/.
+# wwwroot ist reines Build-Ergebnis — sync-wwwroot.mjs loescht und erzeugt es bei jedem Sync neu.
+# Quelle fuer Fonts/Logo ist Frontend/public/.
+Backend/TagFusion/wwwroot/
 
 # Test outputs
 Frontend/playwright-report/
@@ -78,6 +80,16 @@ TagFusion-v*-win-*.zip
 # Python cache
 __pycache__/
 *.pyc
+
+# AiApiServer: source is tracked, runtime environment and model weights are not.
+# Rebuild the environment with AiApiServer/setup_env.ps1.
+# AiApiServer: Quellcode wird getrackt, Laufzeitumgebung und Modellgewichte nicht.
+# Umgebung mit AiApiServer/setup_env.ps1 neu erzeugen.
+AiApiServer/venv/
+AiApiServer/.venv/
+AiApiServer/llamacpp/
+AiApiServer/llamacpp_models/
+AiApiServer/vips-dev-8.16/
 
 # Credentials
 credentials.json
