@@ -11,7 +11,7 @@
     <ApplicationIcon>..\..\assets\Logo.ico</ApplicationIcon>
     <AssemblyName>TagFusion</AssemblyName>
     <RootNamespace>TagFusion</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Authors>TagFusion</Authors>
     <Description>Windows Bild-Tagging Tool mit modernem UI</Description>
   </PropertyGroup>
