@@ -30,6 +30,7 @@
 - **Zoom-Steuerung** — Flexible Thumbnail-Größe (50% – 200%)
 - **Lightbox** — Vollbildansicht für detaillierte Betrachtung
 - **Ordner-Navigation** — Lokale Laufwerke und NAS-Systeme durchsuchen
+- **Unterordner-Modus** — Schalter für den gesamten Teilbaum: Raster, Gesichter- und Beschreibungs-Scan sowie Duplikatsuche folgen demselben Umfang
 
 ### Tagging-System
 - **Metadaten-konform** — Schreibt in XMP, IPTC und Windows System.Keywords via ExifTool
@@ -243,10 +244,10 @@ TagFusion/
 
 ## Roadmap
 
-- [ ] Export/Import der Tag-Bibliothek
+- [x] Export/Import der Tag-Bibliothek
 - [ ] PDF-Matrix-Export (Kontaktabzug)
 - [ ] Bildvergleich (Side-by-Side)
-- [ ] Gesichtserkennung (AI-basiert)
+- [x] Gesichtserkennung (AI-basiert)
 - [ ] Cloud-Sync (OneDrive, Google Drive)
 
 ---
