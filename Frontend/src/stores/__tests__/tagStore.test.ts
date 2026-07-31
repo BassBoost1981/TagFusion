@@ -124,15 +124,6 @@ describe('tagStore', () => {
     expect(result).toBe(false);
   });
 
-  it('exportLibrary produces valid JSON', async () => {
-    await useTagStore.getState().addCategory('Test');
-    const json = useTagStore.getState().exportLibrary();
-    const parsed = JSON.parse(json);
-    expect(parsed.version).toBe('1.0');
-    expect(parsed.categories).toHaveLength(1);
-    expect(parsed.categories[0].name).toBe('Test');
-  });
-
   it('does not mutate categories when backend persistence fails', async () => {
     mockedBridge.saveTagLibrary.mockResolvedValueOnce(false);
 

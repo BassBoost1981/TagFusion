@@ -60,7 +60,7 @@ public class DescriptionScanServiceTests
     private void SetupFolder(params string[] paths)
     {
         var images = paths.Select(p => new ImageFile { Path = p, FileName = Path.GetFileName(p) }).ToList();
-        _fs.Setup(f => f.GetImagesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(images);
+        _fs.Setup(f => f.GetImagesAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(images);
     }
 
     private async Task<DescriptionScanService.ScanSummary> RunScanAsync(

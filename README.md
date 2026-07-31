@@ -52,6 +52,14 @@
 
 | Kürzel | Aktion |
 |--------|--------|
+| `←` / `→` | Vorheriges / nächstes Element im Raster |
+| `↑` / `↓` | Eine Rasterzeile nach oben / unten |
+| `Pos1` / `Ende` | Erstes / letztes Element |
+| `Shift+←→↑↓` | Auswahl erweitern (ankerbasiert) |
+| `Enter` / `Leertaste` | Bild in der Lightbox öffnen bzw. Ordner betreten |
+| `1` – `5` | Bewertung für die gesamte Auswahl setzen |
+| `0` | Bewertung der Auswahl löschen |
+| `Strg+F` | Suchfeld fokussieren |
 | `Strg+A` | Alle auswählen |
 | `Strg+C` / `Strg+X` / `Strg+V` | Kopieren / Ausschneiden / Einfügen |
 | `F2` | Umbenennen |
@@ -59,6 +67,8 @@
 | `Alt+Enter` | Eigenschaften |
 | `Escape` | Auswahl aufheben |
 | `Strg+` / `Strg-` / `Strg+0` | Zoom: Vergrößern / Verkleinern / Zurücksetzen |
+
+> Die Rasterkürzel greifen nur, wenn der Fokus nicht in einem Textfeld liegt und weder ein Dialog noch die Lightbox geöffnet ist. Die Bewertung wirkt ausschließlich auf Bilder — Ordnerkacheln werden bei der Navigation mit durchlaufen, aber nicht bewertet.
 
 ---
 

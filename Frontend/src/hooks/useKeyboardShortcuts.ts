@@ -1,7 +1,9 @@
 import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { useClipboardStore } from '../stores/clipboardStore';
+import { useLightboxStore } from '../stores/lightboxStore';
 import { useModalStore } from '../stores/modalStore';
+import { TOOLBAR_SEARCH_INPUT_ID } from '../constants/ui';
 import { isTextInputTarget } from '../utils/keyboardTarget';
 
 /**
@@ -75,6 +77,17 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           paste(state.currentFolder).then(() => state.refreshImages());
         }
+        return;
+      }
+      // Ctrl+F: Focus the toolbar search field — stands down while a modal or the
+      // lightbox owns the keyboard.
+      // Strg+F: Suchfeld fokussieren — nicht bei offenem Modal oder offener Lightbox.
+      if (e.key === 'f' || e.key === 'F') {
+        if (useModalStore.getState().type !== null || useLightboxStore.getState().isOpen) {
+          return;
+        }
+        e.preventDefault();
+        document.getElementById(TOOLBAR_SEARCH_INPUT_ID)?.focus();
         return;
       }
       // Ctrl+A: Select all

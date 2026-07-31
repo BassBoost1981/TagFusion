@@ -19,11 +19,20 @@ export interface PropertiesData {
   path: string;
 }
 
+export interface TagLibraryImportConfirmData {
+  /**
+   * Categories in the current library — all of them are replaced by the import.
+   * Kategorien der aktuellen Bibliothek — sie werden vom Import komplett ersetzt.
+   */
+  categoryCount: number;
+}
+
 /** Maps each modal type to its required data shape */
 export interface ModalDataMap {
   rename: RenameData;
   deleteConfirm: DeleteConfirmData;
   properties: PropertiesData;
+  tagLibraryImportConfirm: TagLibraryImportConfirmData;
 }
 
 export type ModalType = keyof ModalDataMap;

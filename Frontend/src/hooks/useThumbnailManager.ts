@@ -20,6 +20,21 @@ const IDB_WARN_ENABLED = import.meta.env.MODE !== 'test';
 let idb: IDBDatabase | null = null;
 let idbReady = false;
 
+/** Guard so a broken/full IndexedDB profile is reported once, not per thumbnail. */
+let idbFailureWarned = false;
+
+/**
+ * Report a failing IndexedDB write once per session. The cache stays best-effort:
+ * the app keeps running on the memory cache, and the user gets no toast.
+ * Meldet einen defekten IndexedDB-Cache einmalig pro Sitzung — die App läuft mit
+ * dem Speicher-Cache weiter, ohne Toast für den Nutzer.
+ */
+function warnIdbFailureOnce(operation: string, error: unknown): void {
+  if (!IDB_WARN_ENABLED || idbFailureWarned) return;
+  idbFailureWarned = true;
+  console.warn(`[ThumbnailManager] IndexedDB ${operation} failed — continuing with memory-only cache:`, error);
+}
+
 function openIDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, IDB_VERSION);
@@ -76,8 +91,9 @@ function evictOldEntries(): void {
         }
       };
     };
-  } catch {
+  } catch (error) {
     // Best-effort eviction
+    warnIdbFailureOnce('eviction', error);
   }
 }
 
@@ -102,8 +118,9 @@ function idbPut(key: string, value: string): void {
     const tx = idb.transaction(IDB_STORE, 'readwrite');
     const store = tx.objectStore(IDB_STORE);
     store.put(value, key);
-  } catch {
-    // Silently ignore — IndexedDB is best-effort
+  } catch (error) {
+    // Best-effort — IndexedDB stays optional, warn once so a broken profile is visible
+    warnIdbFailureOnce('write', error);
   }
 }
 
@@ -113,8 +130,9 @@ function idbDelete(key: string): void {
     const tx = idb.transaction(IDB_STORE, 'readwrite');
     const store = tx.objectStore(IDB_STORE);
     store.delete(key);
-  } catch {
-    // Silently ignore — IndexedDB is best-effort
+  } catch (error) {
+    // Best-effort — IndexedDB stays optional, warn once so a broken profile is visible
+    warnIdbFailureOnce('delete', error);
   }
 }
 

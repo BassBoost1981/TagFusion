@@ -75,8 +75,11 @@ public interface IDatabaseService
     /// <summary>Map path → stored FaceScanFileTime (ISO) for already-scanned images.</summary>
     Task<Dictionary<string, string>> GetFaceScanTimesAsync(List<string> paths, CancellationToken cancellationToken = default);
 
-    /// <summary>Faces of images directly inside the folder (not recursive).</summary>
-    Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Faces of images directly inside the folder; includeSubfolders extends to the whole subtree.
+    /// Gesichter direkt im Ordner; includeSubfolders erweitert auf den gesamten Teilbaum.
+    /// </summary>
+    Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default);
 
     /// <summary>Load specific faces by id. / Lädt Gesichter per Id.</summary>
     Task<List<StoredFace>> GetFacesByIdsAsync(List<long> faceIds, CancellationToken cancellationToken = default);

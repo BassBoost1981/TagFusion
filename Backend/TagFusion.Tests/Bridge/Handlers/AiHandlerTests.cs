@@ -67,7 +67,7 @@ public class AiHandlerTests
     [Test]
     public async Task GetDescriptionPrecheck_CountsExistingDescriptions()
     {
-        _fs.Setup(f => f.GetImagesAsync("C:\\fotos", It.IsAny<CancellationToken>()))
+        _fs.Setup(f => f.GetImagesAsync("C:\\fotos", false, It.IsAny<CancellationToken>()))
            .ReturnsAsync(new List<ImageFile>
            {
                new() { Path = "C:\\fotos\\a.jpg" },

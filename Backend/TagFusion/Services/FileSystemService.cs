@@ -130,8 +130,10 @@ public class FileSystemService : IFileSystemService
     /// <summary>
     /// Get images from a folder (with tags and rating from EXIF).
     /// Runs file I/O on a background thread to avoid blocking the UI.
+    /// With includeSubfolders the whole subtree is enumerated.
+    /// Mit includeSubfolders wird der gesamte Teilbaum durchlaufen.
     /// </summary>
-    public Task<List<ImageFile>> GetImagesAsync(string folderPath, CancellationToken cancellationToken = default)
+    public Task<List<ImageFile>> GetImagesAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             return Task.FromResult(new List<ImageFile>());
@@ -143,9 +145,11 @@ public class FileSystemService : IFileSystemService
             {
                 // HashSet uses OrdinalIgnoreCase, no ToLowerInvariant needed
                 // HashSet nutzt OrdinalIgnoreCase, kein ToLowerInvariant nötig
-                var files = Directory.GetFiles(folderPath)
-                    .Where(f => _supportedExtensions.Contains(Path.GetExtension(f)))
-                    .ToList();
+                var files = includeSubfolders
+                    ? EnumerateImageFilesRecursive(folderPath, cancellationToken)
+                    : Directory.GetFiles(folderPath)
+                        .Where(f => _supportedExtensions.Contains(Path.GetExtension(f)))
+                        .ToList();
 
                 foreach (var file in files)
                 {
@@ -176,14 +180,90 @@ public class FileSystemService : IFileSystemService
                 _logger.LogWarning(ex, "Access denied reading images");
             }
 
-            return images.OrderBy(i => i.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+            // Full path as tie-breaker keeps identical file names from different
+            // subfolders in a stable order.
+            // Voller Pfad als Zweitkriterium hält gleiche Dateinamen aus
+            // verschiedenen Unterordnern stabil sortiert.
+            return images
+                .OrderBy(i => i.FileName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(i => i.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }, cancellationToken);
     }
 
     /// <summary>
-    /// Get folder contents (subfolders with stats and images)
+    /// Enumerate image files of a whole subtree with an iterative stack walk.
+    /// SearchOption.AllDirectories would abort the entire enumeration at the first
+    /// unreadable subfolder, so directories are visited one by one instead.
+    /// Iterativer Stack-Walk statt SearchOption.AllDirectories — letzteres bricht
+    /// beim ersten unlesbaren Unterordner komplett ab.
     /// </summary>
-    public async Task<List<GridItem>> GetFolderContentsAsync(string folderPath, CancellationToken cancellationToken = default)
+    private List<string> EnumerateImageFilesRecursive(string rootPath, CancellationToken cancellationToken)
+    {
+        var files = new List<string>();
+        var pending = new Stack<string>();
+        pending.Push(rootPath);
+
+        while (pending.Count > 0)
+        {
+            // Checked per folder so NAS enumeration stays cancellable.
+            // Pro Ordner geprüft, damit NAS-Enumeration abbrechbar bleibt.
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = pending.Pop();
+
+            try
+            {
+                files.AddRange(Directory.EnumerateFiles(current)
+                    .Where(f => _supportedExtensions.Contains(Path.GetExtension(f))));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping inaccessible folder while enumerating images");
+                continue;
+            }
+
+            try
+            {
+                foreach (var dir in Directory.EnumerateDirectories(current))
+                {
+                    try
+                    {
+                        var dirInfo = new DirectoryInfo(dir);
+
+                        // Same visibility filter as GetFolders; reparse points
+                        // (junctions/symlinks) are skipped to avoid endless loops.
+                        // Gleicher Sichtbarkeitsfilter wie GetFolders; Reparse Points
+                        // (Junctions/Symlinks) werden übersprungen (Endlosschleifen).
+                        if ((dirInfo.Attributes & FileAttributes.Hidden) != 0 ||
+                            (dirInfo.Attributes & FileAttributes.System) != 0 ||
+                            (dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                            continue;
+
+                        pending.Push(dir);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Skipping inaccessible folder while enumerating images");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Skipping inaccessible folder while enumerating subfolders");
+            }
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// Get folder contents (subfolders with stats and images).
+    /// With includeSubfolders no folder tiles are returned — the hierarchy is
+    /// meaningless in that mode, only the images of the whole subtree are shown.
+    /// Mit includeSubfolders keine Ordner-Kacheln — die Hierarchie ist in diesem
+    /// Modus bedeutungslos, es zählen nur die Bilder des gesamten Teilbaums.
+    /// </summary>
+    public async Task<List<GridItem>> GetFolderContentsAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default)
     {
         var items = new List<GridItem>();
 
@@ -192,6 +272,33 @@ public class FileSystemService : IFileSystemService
 
         // 1. Get Folders — parallel I/O for subfolder stats
         // 1. Ordner holen — parallele I/O für Unterordner-Statistiken
+        if (!includeSubfolders)
+            AddFolderItems(items, folderPath, cancellationToken);
+
+        // 2. Get Images using existing logic
+        var images = await GetImagesAsync(folderPath, includeSubfolders, cancellationToken);
+
+        // Add images as GridItems
+        foreach (var img in images)
+        {
+            items.Add(new GridItem
+            {
+                Path = img.Path,
+                Name = img.FileName,
+                IsFolder = false,
+                ImageData = img
+            });
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Collect the direct subfolders of a path as sorted grid items with stats.
+    /// Sammelt die direkten Unterordner als sortierte Grid-Einträge mit Statistik.
+    /// </summary>
+    private void AddFolderItems(List<GridItem> items, string folderPath, CancellationToken cancellationToken)
+    {
         try
         {
             var directories = Directory.GetDirectories(folderPath);
@@ -258,23 +365,6 @@ public class FileSystemService : IFileSystemService
 
         // Sort folders by name / Ordner nach Name sortieren
         items.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-
-        // 2. Get Images using existing logic
-        var images = await GetImagesAsync(folderPath, cancellationToken);
-        
-        // Add images as GridItems
-        foreach (var img in images)
-        {
-            items.Add(new GridItem
-            {
-                Path = img.Path,
-                Name = img.FileName,
-                IsFolder = false,
-                ImageData = img
-            });
-        }
-
-        return items;
     }
 
     private (int Subfolders, int Images, int Videos) GetFolderStats(string path)

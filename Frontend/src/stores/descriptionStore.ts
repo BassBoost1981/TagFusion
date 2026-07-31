@@ -65,7 +65,9 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
     try {
       const [status, precheck] = await Promise.all([
         bridge.getAiServerStatus(),
-        bridge.getDescriptionPrecheck(path),
+        // Precheck counts must cover the same image set the grid shows.
+        // Precheck-Zahlen müssen dieselbe Bildmenge abdecken, die das Grid zeigt.
+        bridge.getDescriptionPrecheck(path, useAppStore.getState().includeSubfolders),
       ]);
       // Preselect the remembered model when still available, else the first.
       // Gemerktes Modell vorwählen, wenn verfügbar — sonst das erste.
@@ -127,7 +129,13 @@ export const useDescriptionStore = create<DescriptionState>((set, get) => ({
     set({ isScanning: true, progress: null });
     get().closeDialog();
     try {
-      await bridge.startDescriptionScan(path, selectedModel, promptText, overwriteExisting);
+      await bridge.startDescriptionScan(
+        path,
+        selectedModel,
+        promptText,
+        overwriteExisting,
+        useAppStore.getState().includeSubfolders
+      );
     } catch (error) {
       set({ isScanning: false });
       useToastStore.getState().warning((error as Error).message);

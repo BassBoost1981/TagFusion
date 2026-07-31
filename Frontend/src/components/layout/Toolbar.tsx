@@ -22,6 +22,7 @@ import {
   Tags,
   ScanFace,
   Sparkles,
+  FolderTree,
 } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 import {
@@ -35,6 +36,7 @@ import {
   useSetError,
   useGlobalSearch,
   useCurrentFolder,
+  useIncludeSubfolders,
 } from '../../stores/appStore';
 import { useFaceStore } from '../../stores/faceStore';
 import { useDescriptionStore } from '../../stores/descriptionStore';
@@ -44,6 +46,7 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 import { SettingsMenu } from './SettingsMenu';
 import { useTranslation } from 'react-i18next';
 import { parseSearchTerms } from '../../utils/searchTerms';
+import { TOOLBAR_SEARCH_INPUT_ID } from '../../constants/ui';
 
 interface SearchSuggestion {
   value: string;
@@ -80,6 +83,7 @@ export function Toolbar() {
   const refreshImages = useRefreshImages();
   const setError = useSetError();
   const { isGlobalSearch, isSearching, executeGlobalSearch, exitGlobalSearch } = useGlobalSearch();
+  const { includeSubfolders, toggleIncludeSubfolders } = useIncludeSubfolders();
   const currentFolderForFaces = useCurrentFolder();
   const { engineAvailable, isScanning, progress, checkEngine, startScan, cancelScan } = useFaceStore();
   const {
@@ -258,6 +262,7 @@ export function Toolbar() {
               <Search size={16} className="text-[var(--color-text-secondary)]" />
             </div>
             <Combobox.Input
+              id={TOOLBAR_SEARCH_INPUT_ID}
               value={searchQuery}
               aria-label={t('toolbar.search')}
               data-testid="toolbar-search-input"
@@ -399,6 +404,24 @@ export function Toolbar() {
           variant={isGlobalSearch ? 'accent' : 'ghost'}
         >
           {isSearching ? <Spinner size="sm" color="secondary" /> : <Globe size={16} />}
+        </GlassIconButton>
+
+        {/* Include Subfolders — recursive folder scope (no folder tiles while active) */}
+        {/* Unterordner einbeziehen — rekursiver Umfang (keine Ordner-Kacheln aktiv) */}
+        <GlassIconButton
+          onClick={toggleIncludeSubfolders}
+          data-testid="toolbar-include-subfolders"
+          aria-pressed={includeSubfolders}
+          title={
+            includeSubfolders
+              ? t('toolbar.includeSubfoldersActive', 'Unterordner werden einbezogen — keine Ordner-Kacheln')
+              : t('toolbar.includeSubfolders', 'Unterordner einbeziehen')
+          }
+          size="sm"
+          variant={includeSubfolders ? 'accent' : 'ghost'}
+          active={includeSubfolders}
+        >
+          <FolderTree size={16} />
         </GlassIconButton>
 
         {/* Face Scan Button */}

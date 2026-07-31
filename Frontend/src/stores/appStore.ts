@@ -91,6 +91,15 @@ export const useFilterSort = () =>
     }))
   );
 
+// Recursive mode selector — "include subfolders" toolbar toggle
+export const useIncludeSubfolders = () =>
+  useAppStore(
+    useShallow((state) => ({
+      includeSubfolders: state.includeSubfolders,
+      toggleIncludeSubfolders: state.toggleIncludeSubfolders,
+    }))
+  );
+
 // Global search selectors
 export const useGlobalSearch = () =>
   useAppStore(

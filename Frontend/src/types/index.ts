@@ -60,6 +60,23 @@ export interface TagLibrary {
   categories: TagCategory[];
 }
 
+// Result of a backend-driven tag library export/import — the file dialogs live in
+// the backend, so no path is passed from the frontend.
+// Ergebnis eines Exports/Imports der Tag-Bibliothek — die Datei-Dialoge liegen im Backend.
+export interface TagLibraryTransferResult {
+  /** True when the file dialog was closed without a selection / Datei-Dialog wurde abgebrochen */
+  cancelled: boolean;
+  /**
+   * Absent on cancel — the backend serializer omits null fields (WhenWritingNull),
+   * so a cancelled transfer arrives without this key, never as an explicit null.
+   * Fehlt bei Abbruch — der Backend-Serializer lässt null-Felder weg, ein
+   * abgebrochener Transfer kommt ohne diesen Schlüssel an, nie als explizites null.
+   */
+  filePath?: string | null;
+  categoryCount: number;
+  tagCount: number;
+}
+
 // Types for raw import data (where IDs might be missing)
 export interface RawImportSubcategory {
   id?: string;

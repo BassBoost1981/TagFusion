@@ -4,6 +4,7 @@ import type { Tag, ImageFile } from '../../types';
 import { bridge } from '../../services/bridge';
 import { NavigationSlice } from './navigationSlice';
 import { useToastStore } from '../toastStore';
+import { invalidateThumbnail } from '../../hooks/useThumbnailManager';
 import {
   GRID_ZOOM_MIN,
   GRID_ZOOM_MAX,
@@ -21,6 +22,21 @@ let subscriptionsInitialized = false;
 // frischere Daten überschreiben.
 let latestMetadataRequestId = 0;
 
+/**
+ * Extract the changed paths from a folderChanged event payload. The watcher also
+ * reports folders and deleted files, so only non-empty strings are kept here and
+ * the caller matches them against the images actually on screen.
+ * Liest die geänderten Pfade aus dem folderChanged-Event. Der Watcher meldet auch
+ * Ordner und gelöschte Dateien — daher nur Strings übernehmen und beim Aufrufer
+ * gegen die tatsächlich angezeigten Bilder abgleichen.
+ */
+const extractChangedPaths = (data: unknown): string[] => {
+  if (!data || typeof data !== 'object') return [];
+  const { paths } = data as { paths?: unknown };
+  if (!Array.isArray(paths)) return [];
+  return paths.filter((path): path is string => typeof path === 'string' && path.length > 0);
+};
+
 export interface UISlice {
   tags: Tag[];
   error: string | null;
@@ -32,6 +48,9 @@ export interface UISlice {
   sortOrder: 'asc' | 'desc';
   filterRating: number | null;
   filterTags: string[];
+  // Recursive mode — the backend enumerates the whole subtree and returns images only.
+  // Rekursiv-Modus — das Backend durchläuft den Teilbaum und liefert nur Bilder.
+  includeSubfolders: boolean;
   // Global search mode — cross-folder DB search
   isGlobalSearch: boolean;
   isSearching: boolean;
@@ -50,6 +69,7 @@ export interface UISlice {
   toggleSortOrder: () => void;
   setFilterRating: (rating: number | null) => void;
   setFilterTags: (tags: string[]) => void;
+  toggleIncludeSubfolders: () => void;
   clearFilters: () => void;
   setupSubscriptions: () => void;
   // Global search: search DB across all folders by terms (tags/filenames) and rating
@@ -68,6 +88,7 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
   sortOrder: 'asc',
   filterRating: null,
   filterTags: [],
+  includeSubfolders: false,
   isGlobalSearch: false,
   isSearching: false,
   searchResults: [],
@@ -102,6 +123,25 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
   toggleSortOrder: () => set((state) => ({ sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc' })),
   setFilterRating: (rating) => set({ filterRating: rating }),
   setFilterTags: (tags) => set({ filterTags: tags }),
+
+  // Reload the current folder so the grid immediately reflects the new scope.
+  // Aktuellen Ordner neu laden, damit das Grid den neuen Umfang sofort zeigt.
+  toggleIncludeSubfolders: () => {
+    set({ includeSubfolders: !get().includeSubfolders });
+    // During global search the grid renders searchResults, not gridItems — leave
+    // the search first, otherwise the toggle flips state with no visible effect.
+    // exitGlobalSearch reloads the folder itself with the flag just set above.
+    // In der globalen Suche zeigt das Grid searchResults — erst die Suche
+    // verlassen, sonst wirkt der Schalter kaputt. exitGlobalSearch lädt den
+    // Ordner selbst neu, mit dem gerade gesetzten Umfang.
+    if (get().isGlobalSearch) {
+      get().exitGlobalSearch();
+      return;
+    }
+    const folder = get().currentFolder;
+    if (folder) get().loadImages(folder);
+  },
+
   clearFilters: () => {
     const wasGlobal = get().isGlobalSearch;
     set({
@@ -142,8 +182,25 @@ export const createUISlice: StateCreator<UISlice & ImageSlice & NavigationSlice,
     subscriptionsInitialized = true;
 
     // FileSystemWatcher: auto-refresh when files change in the watched folder
-    bridge.on('folderChanged', () => {
-      const { currentFolder } = get();
+    bridge.on('folderChanged', (data) => {
+      const { currentFolder, images } = get();
+
+      // Drop the cached thumbnails of the changed files first — otherwise the grid
+      // keeps showing the stale (or already evicted) cached copy after an external
+      // edit, because the frontend cache is keyed by path only. Only paths that are
+      // currently displayed are touched, so folder entries are ignored.
+      // Thumbnails der geänderten Dateien zuerst verwerfen — sonst zeigt das Grid nach
+      // einer externen Bearbeitung weiter die veraltete Kopie. Nur angezeigte Pfade
+      // werden angefasst, Ordner-Einträge bleiben unberührt.
+      const changedPaths = extractChangedPaths(data);
+      if (changedPaths.length > 0 && images.length > 0) {
+        const displayedPaths = new Map(images.map((img) => [img.path.toLowerCase(), img.path]));
+        for (const changedPath of changedPaths) {
+          const displayedPath = displayedPaths.get(changedPath.toLowerCase());
+          if (displayedPath) invalidateThumbnail(displayedPath);
+        }
+      }
+
       if (currentFolder) {
         // Debounced refresh — the backend already debounces, but we add a small guard
         get().loadImages(currentFolder);

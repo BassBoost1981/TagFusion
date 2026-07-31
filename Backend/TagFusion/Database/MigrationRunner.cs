@@ -60,7 +60,10 @@ public class MigrationRunner
             AddFaceScanColumnsToImages),
         new(5, "Description column on Images — AI descriptions searchable (C# step, idempotent)",
             "",
-            AddDescriptionColumnToImages)
+            AddDescriptionColumnToImages),
+        new(6, "Lowercase search columns on Images/Tags + drop redundant idx_images_path (C# step, idempotent)",
+            "",
+            AddLowercaseSearchColumns)
     ];
 
     public MigrationRunner(SQLiteConnection connection, ILogger logger)
@@ -209,6 +212,72 @@ public class MigrationRunner
     {
         if (!TableExists(connection, transaction, "Images")) return;
         AddColumnIfMissing(connection, transaction, "Images", "Description", "TEXT");
+    }
+
+    /// <summary>
+    /// Adds the persisted lowercase search columns and backfills them culture-invariantly,
+    /// then drops idx_images_path (Images.Path is UNIQUE — SQLite already indexes it).
+    /// Skips gracefully when a table or its source column is absent (bare test connections).
+    /// Ergänzt die persistierten Kleinschreib-Spalten und befüllt sie kultur-invariant,
+    /// danach entfällt idx_images_path (Path ist UNIQUE — SQLite indiziert das bereits).
+    /// Tolerant gegenüber fehlenden Tabellen/Spalten (nackte Test-Verbindungen).
+    /// </summary>
+    private static void AddLowercaseSearchColumns(SQLiteConnection connection, SQLiteTransaction transaction)
+    {
+        if (TableExists(connection, transaction, "Images"))
+        {
+            AddColumnIfMissing(connection, transaction, "Images", "FileNameLower", "TEXT NOT NULL DEFAULT ''");
+            AddColumnIfMissing(connection, transaction, "Images", "DescriptionLower", "TEXT");
+            BackfillLowercaseColumn(connection, transaction, "Images", "FileName", "FileNameLower");
+            BackfillLowercaseColumn(connection, transaction, "Images", "Description", "DescriptionLower");
+        }
+
+        if (TableExists(connection, transaction, "Tags"))
+        {
+            AddColumnIfMissing(connection, transaction, "Tags", "NameLower", "TEXT NOT NULL DEFAULT ''");
+            BackfillLowercaseColumn(connection, transaction, "Tags", "Name", "NameLower");
+        }
+
+        using var drop = connection.CreateCommand();
+        drop.Transaction = transaction;
+        drop.CommandText = "DROP INDEX IF EXISTS idx_images_path";
+        drop.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Copies a text column into its lowercase twin using ToLowerInvariant — SQL lower()
+    /// is ASCII-only and would leave umlauts uppercase.
+    /// Kopiert eine Textspalte kleingeschrieben — SQL lower() kann keine Umlaute.
+    /// </summary>
+    private static void BackfillLowercaseColumn(SQLiteConnection connection, SQLiteTransaction transaction,
+        string table, string sourceColumn, string targetColumn)
+    {
+        if (!ColumnExists(connection, transaction, table, sourceColumn)) return;
+
+        var updates = new List<(long Id, object Value)>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = $"SELECT Id, {sourceColumn} FROM {table}";
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+            {
+                updates.Add((reader.GetInt64(0),
+                    reader.IsDBNull(1) ? DBNull.Value : reader.GetString(1).ToLowerInvariant()));
+            }
+        }
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+        update.CommandText = $"UPDATE {table} SET {targetColumn} = @Value WHERE Id = @Id";
+        var valueParam = update.Parameters.Add("@Value", System.Data.DbType.String);
+        var idParam = update.Parameters.Add("@Id", System.Data.DbType.Int64);
+        foreach (var (id, value) in updates)
+        {
+            valueParam.Value = value;
+            idParam.Value = id;
+            update.ExecuteNonQuery();
+        }
     }
 
     private static void AddColumnIfMissing(SQLiteConnection connection, SQLiteTransaction transaction, string table, string column, string type)

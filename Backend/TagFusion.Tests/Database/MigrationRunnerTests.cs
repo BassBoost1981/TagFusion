@@ -182,4 +182,63 @@ public class MigrationRunnerTests
         check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Images') WHERE name = 'Description'";
         Assert.That(Convert.ToInt32(check.ExecuteScalar()), Is.EqualTo(1));
     }
+
+    [Test]
+    public void MigrationV6_OldSchemaWithData_BackfillsLowercaseColumnsAndDropsPathIndex()
+    {
+        // Simulate a pre-v6 database with existing rows and the redundant path index.
+        // Simuliert eine Alt-DB mit Bestandsdaten und dem redundanten Path-Index.
+        using (var cmd = _connection.CreateCommand())
+        {
+            cmd.CommandText = @"
+                CREATE TABLE Images (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Path TEXT NOT NULL UNIQUE,
+                    FileName TEXT NOT NULL DEFAULT '',
+                    Description TEXT,
+                    LastModified TEXT NOT NULL
+                );
+                CREATE TABLE Tags (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL UNIQUE
+                );
+                CREATE INDEX idx_images_path ON Images(Path);
+                INSERT INTO Images (Path, FileName, Description, LastModified)
+                    VALUES ('C:\Fotos\Käfer Übung.jpg', 'Käfer Übung.jpg', 'Ein MÜDER Bär', '2026-01-01T00:00:00.0000000Z');
+                INSERT INTO Images (Path, FileName, LastModified)
+                    VALUES ('D:\a\IMG_0001.JPG', 'IMG_0001.JPG', '2026-01-01T00:00:00.0000000Z');
+                INSERT INTO Tags (Name) VALUES ('Käfer');";
+            cmd.ExecuteNonQuery();
+        }
+
+        new MigrationRunner(_connection, NullLogger.Instance).ApplyMigrations();
+
+        using (var check = _connection.CreateCommand())
+        {
+            check.CommandText = "SELECT FileNameLower, DescriptionLower FROM Images ORDER BY Id";
+            using var reader = check.ExecuteReader();
+
+            Assert.That(reader.Read(), Is.True);
+            Assert.That(reader.GetString(0), Is.EqualTo("käfer übung.jpg"));
+            Assert.That(reader.GetString(1), Is.EqualTo("ein müder bär"));
+
+            // Row without description keeps DescriptionLower NULL.
+            // Zeile ohne Beschreibung behält DescriptionLower auf NULL.
+            Assert.That(reader.Read(), Is.True);
+            Assert.That(reader.GetString(0), Is.EqualTo("img_0001.jpg"));
+            Assert.That(reader.IsDBNull(1), Is.True);
+        }
+
+        using (var tagCheck = _connection.CreateCommand())
+        {
+            tagCheck.CommandText = "SELECT NameLower FROM Tags";
+            Assert.That(tagCheck.ExecuteScalar(), Is.EqualTo("käfer"));
+        }
+
+        using (var indexCheck = _connection.CreateCommand())
+        {
+            indexCheck.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_images_path'";
+            Assert.That(Convert.ToInt32(indexCheck.ExecuteScalar()), Is.EqualTo(0));
+        }
+    }
 }

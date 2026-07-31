@@ -39,6 +39,18 @@ describe('getNextGridIndex', () => {
     expect(getNextGridIndex(2, 'ArrowUp', total, cols)).toBe(2);
   });
 
+  it('Home jumps to the first item', () => {
+    expect(getNextGridIndex(7, 'Home', total, cols)).toBe(0);
+  });
+
+  it('End jumps to the last item', () => {
+    expect(getNextGridIndex(2, 'End', total, cols)).toBe(9);
+  });
+
+  it('End enters an unselected grid at the last item', () => {
+    expect(getNextGridIndex(-1, 'End', total, cols)).toBe(9);
+  });
+
   it('selects the first item when nothing is selected yet', () => {
     expect(getNextGridIndex(-1, 'ArrowRight', total, cols)).toBe(0);
     expect(getNextGridIndex(-1, 'ArrowUp', total, cols)).toBe(0);

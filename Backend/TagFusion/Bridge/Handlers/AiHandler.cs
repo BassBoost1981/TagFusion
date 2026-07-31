@@ -80,7 +80,8 @@ public class AiHandler : IBridgeHandler
     private async Task<object> GetDescriptionPrecheckAsync(Dictionary<string, object>? payload)
     {
         var path = PayloadHelper.GetString(payload ?? new(), "path");
-        var images = await _fileSystemService.GetImagesAsync(path);
+        var includeSubfolders = PayloadHelper.GetBool(payload?.GetValueOrDefault("includeSubfolders"));
+        var images = await _fileSystemService.GetImagesAsync(path, includeSubfolders);
         var paths = images.Select(i => i.Path).ToList();
         var existing = await _exifToolService.ReadDescriptionsBatchAsync(paths);
         return new { total = paths.Count, withDescription = existing.Count };
@@ -101,6 +102,7 @@ public class AiHandler : IBridgeHandler
         var model = PayloadHelper.GetString(p, "model");
         var prompt = PayloadHelper.GetString(p, "prompt");
         var overwrite = PayloadHelper.GetBool(p.GetValueOrDefault("overwriteExisting"), false);
+        var includeSubfolders = PayloadHelper.GetBool(p.GetValueOrDefault("includeSubfolders"));
 
         var status = await _client.GetStatusAsync();
         if (!status.Reachable)
@@ -113,7 +115,7 @@ public class AiHandler : IBridgeHandler
         if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(prompt))
             throw new BridgeException("Modell oder Prompt fehlt.", internalMessage: "startDescriptionScan: empty model/prompt");
 
-        if (!_scanService.StartScan(path, model, prompt, overwrite))
+        if (!_scanService.StartScan(path, model, prompt, overwrite, includeSubfolders))
             throw new BridgeException("Eine Beschreibung läuft bereits.", internalMessage: "Description scan already running");
 
         return true;

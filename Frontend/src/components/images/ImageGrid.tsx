@@ -19,8 +19,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { ImageGridSkeleton } from '../ui/Skeleton';
 import { useLightboxStore } from '../../stores/lightboxStore';
 import { filterAndSortGridItems } from '../../utils/gridItems';
-import { getNextGridIndex } from '../../utils/gridNavigation';
-import { isTextInputTarget } from '../../utils/keyboardTarget';
+import { useGridKeyboardNavigation, type GridNavItem } from '../../hooks/useGridKeyboardNavigation';
 import { canNavigateUpFromFolder } from '../../utils/navigation';
 import type { GridItem } from '../../types';
 
@@ -209,13 +208,6 @@ export function ImageGrid() {
     setLightboxImages(displayImages);
   }, [displayImages, setLightboxImages]);
 
-  // Where the image block starts in the combined grid (navigate-up + folders precede it),
-  // so a navigation index maps to the right VirtuosoGrid scroll position.
-  const imageStartOffset = useMemo(() => {
-    const folderCount = filteredAndSortedItems.reduce((n, i) => (i.isFolder ? n + 1 : n), 0);
-    return (canNavigateUp ? 1 : 0) + folderCount;
-  }, [filteredAndSortedItems, canNavigateUp]);
-
   // Build unified virtual items array (navigate-up + folders + images)
   const virtualItems = useMemo<VirtualItem[]>(() => {
     const result: VirtualItem[] = [];
@@ -239,6 +231,29 @@ export function ImageGrid() {
 
     return result;
   }, [canNavigateUp, filteredAndSortedItems, filterTagsSet]);
+
+  // Flat cell list the keyboard cursor walks — same order as the rendered grid,
+  // so a navigation index is also the VirtuosoGrid scroll index.
+  // Flache Zellenliste fuer die Tastatur-Navigation — gleiche Reihenfolge wie das Raster.
+  const navItems = useMemo<GridNavItem[]>(
+    () =>
+      virtualItems.map((vItem) => {
+        if (vItem.type === 'image') return { kind: 'image', image: vItem.item.imageData! };
+        if (vItem.type === 'folder') return { kind: 'folder', path: vItem.item.path };
+        return { kind: 'navigate-up' };
+      }),
+    [virtualItems]
+  );
+
+  const handleScrollToIndex = useCallback((index: number) => {
+    virtuosoRef.current?.scrollToIndex({ index, behavior: 'smooth' });
+  }, []);
+
+  const focusedIndex = useGridKeyboardNavigation({
+    items: navItems,
+    columnCount,
+    onScrollToIndex: handleScrollToIndex,
+  });
 
   // Reset functions are already available from useFilterSort() above
 
@@ -264,6 +279,12 @@ export function ImageGrid() {
         borderRadius: '0.75rem', // rounded-xl
       };
 
+      // Folder and parent tiles carry no selection ring, so the keyboard cursor
+      // needs its own marker to stay visible while navigating past them.
+      // Ordnerkacheln brauchen eine eigene Fokusmarkierung.
+      const focusRingClass =
+        index === focusedIndex ? 'ring-2 ring-cyan-400/70 ring-offset-2 ring-offset-[var(--color-bg-primary)]' : '';
+
       switch (vItem.type) {
         case 'navigate-up':
           return (
@@ -271,7 +292,7 @@ export function ImageGrid() {
               whileHover={{ scale: 1.03, y: -4 }}
               whileTap={{ scale: 0.98 }}
               onDoubleClick={() => navigateUp()}
-              className="relative group cursor-pointer shadow-lg"
+              className={`relative group cursor-pointer shadow-lg rounded-xl ${focusRingClass}`}
               style={uniformStyle}
             >
               <div className="relative flex flex-col w-full h-full backdrop-blur-glass-sm bg-[var(--glass-bg)] border border-cyan-500/15 rounded-xl overflow-hidden">
@@ -294,7 +315,7 @@ export function ImageGrid() {
 
         case 'folder':
           return (
-            <div style={uniformStyle}>
+            <div style={uniformStyle} className={`rounded-xl ${focusRingClass}`}>
               <FolderCard item={vItem.item} />
             </div>
           );
@@ -312,32 +333,8 @@ export function ImageGrid() {
         }
       }
     },
-    [virtualItems, navigateUp, t, selectedImages]
+    [virtualItems, navigateUp, t, selectedImages, focusedIndex]
   );
-
-  // Arrow-key navigation across the image grid. Left/Right step one, Up/Down step a
-  // full row; the moved-to image becomes the sole selection and is scrolled into view.
-  // Stands down while typing or when the lightbox owns the keyboard.
-  // Pfeiltasten-Navigation im Bildraster — verschiebt die Auswahl und scrollt mit.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      if (isTextInputTarget(e.target) || useLightboxStore.getState().isOpen) return;
-      if (displayImages.length === 0) return;
-      e.preventDefault();
-
-      const { lastSelectedImage, selectImage } = useAppStore.getState();
-      const currentIndex = lastSelectedImage ? displayImages.findIndex((img) => img.path === lastSelectedImage) : -1;
-      const nextIndex = getNextGridIndex(currentIndex, e.key, displayImages.length, columnCount);
-      if (nextIndex < 0 || nextIndex === currentIndex) return;
-
-      selectImage(displayImages[nextIndex].path);
-      virtuosoRef.current?.scrollToIndex({ index: imageStartOffset + nextIndex, behavior: 'smooth' });
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [displayImages, columnCount, imageStartOffset]);
 
   // Global search loading state
   if (isGlobalSearch && isSearching) {

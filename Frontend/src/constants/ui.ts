@@ -30,6 +30,12 @@ export const TAG_PANEL_WIDTH_MIN = 200;
 export const TAG_PANEL_WIDTH_MAX = 600;
 
 // ============================================================================
+// DOM-IDs — Elemente, die per Tastenkürzel fokussiert werden
+// DOM ids for elements that keyboard shortcuts focus directly
+// ============================================================================
+export const TOOLBAR_SEARCH_INPUT_ID = 'toolbar-search-input';
+
+// ============================================================================
 // TOASTS — Anzeigedauer (ms)
 // ============================================================================
 export const TOAST_DURATION_DEFAULT = 4000;

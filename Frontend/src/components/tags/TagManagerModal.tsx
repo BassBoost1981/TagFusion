@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Dialog } from '@base-ui-components/react/dialog';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import type { TagCategory, TagSubcategory } from '../../types';
@@ -22,8 +22,9 @@ import {
 import { useTagStore } from '../../stores/tagStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../../stores/appStore';
+import { useModalStore } from '../../stores/modalStore';
 import { useToastStore } from '../../stores/toastStore';
+import { bridge } from '../../services/bridge';
 import { Button, Input } from '../ui';
 
 export function TagManagerModal() {
@@ -42,8 +43,6 @@ export function TagManagerModal() {
     deleteSubcategory,
     addTag,
     removeTag,
-    importLibrary,
-    exportLibrary,
     reorderCategories,
     reorderSubcategories,
     reorderTags,
@@ -54,33 +53,29 @@ export function TagManagerModal() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubName, setNewSubName] = useState<{ catId: string; value: string } | null>(null);
   const [newTagInput, setNewTagInput] = useState<{ catId: string; subId: string; value: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
-    const json = exportLibrary();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `TagFusion_Tags_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Export/import of the whole tag library — the file dialogs run in the backend.
+  // Export/Import der gesamten Tag-Bibliothek — die Datei-Dialoge laufen im Backend.
+  const handleExport = async () => {
+    try {
+      const result = await bridge.exportTagLibrary();
+      if (result.cancelled) return;
+
+      useToastStore.getState().success(
+        t('tagManager.exportSuccess', {
+          categories: result.categoryCount,
+          tags: result.tagCount,
+        })
+      );
+    } catch (error) {
+      useToastStore.getState().error(error instanceof Error ? error.message : t('tagManager.exportFailed'));
+    }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const json = ev.target?.result as string;
-      if (await importLibrary(json)) {
-        useToastStore.getState().success(t('tagManager.importSuccess', 'Import successful!'));
-      } else {
-        useAppStore.getState().setError(t('tagManager.importFailed', 'Import failed!'));
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+  // The import replaces the existing library, so it always goes through a confirmation.
+  // Der Import ersetzt die bestehende Bibliothek und läuft daher immer über eine Rückfrage.
+  const handleImport = () => {
+    useModalStore.getState().openModal('tagLibraryImportConfirm', { categoryCount: categories.length });
   };
 
   const startEdit = (id: string, currentName: string) => {
@@ -154,8 +149,7 @@ export function TagManagerModal() {
               </Dialog.Title>
             </div>
             <div className="flex items-center gap-2">
-              <input type="file" ref={fileInputRef} accept=".json" onChange={handleImport} className="hidden" />
-              <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button variant="ghost" size="sm" onClick={handleImport}>
                 <Upload size={16} /> {t('tagManager.import')}
               </Button>
               <Button variant="ghost" size="sm" onClick={handleExport}>

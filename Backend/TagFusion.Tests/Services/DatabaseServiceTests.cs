@@ -1,3 +1,4 @@
+using System.Data.SQLite;
 using System.Globalization;
 using NUnit.Framework;
 using TagFusion.Models;
@@ -255,8 +256,10 @@ public class DatabaseServiceTests
     [Test]
     public async Task Search_UmlautTerm_IsCaseInsensitive()
     {
-        // Built-in SQLite LIKE is ASCII-only case-insensitive — this needs lower_inv.
-        // SQLites LIKE kann Umlaute nicht case-insensitiv — dafür gibt es lower_inv.
+        // Built-in SQLite LIKE is ASCII-only case-insensitive — umlauts rely on the
+        // persisted C#-lowered columns (NameLower/FileNameLower/DescriptionLower).
+        // SQLites LIKE kann Umlaute nicht case-insensitiv — dafür gibt es die
+        // persistierten Kleinschreib-Spalten.
         await _db.SaveImageAsync(CreateTestImage("C:\\t\\1.jpg", new[] { "Käfer" }));
 
         var results = await _db.SearchImagesAsync(new List<string> { "KÄFER" }, null);
@@ -435,6 +438,20 @@ public class DatabaseServiceTests
         var faces = await _db.GetFacesForFolderAsync("C:\\fotos");
         Assert.That(faces, Has.Count.EqualTo(1));
         Assert.That(faces[0].ImagePath, Is.EqualTo("C:\\fotos\\a.jpg"));
+    }
+
+    [Test]
+    public async Task GetFacesForFolder_IncludeSubfolders_ReturnsSubtreeFaces()
+    {
+        var mtime = DateTime.UtcNow;
+        await _db.SaveFacesAsync("C:\\fotos\\a.jpg", new[] { TestFace() }, mtime);
+        await _db.SaveFacesAsync("C:\\fotos\\sub\\b.jpg", new[] { TestFace() }, mtime);
+        await _db.SaveFacesAsync("C:\\andere\\c.jpg", new[] { TestFace() }, mtime);
+
+        var faces = await _db.GetFacesForFolderAsync("C:\\fotos", includeSubfolders: true);
+
+        Assert.That(faces.Select(f => f.ImagePath),
+            Is.EquivalentTo(new[] { "C:\\fotos\\a.jpg", "C:\\fotos\\sub\\b.jpg" }));
     }
 
     [Test]
@@ -645,6 +662,20 @@ public class DatabaseServiceTests
     }
 
     [Test]
+    public async Task Search_DescriptionUmlautSubstring_Matches()
+    {
+        // Substring inside a word — a token/prefix search (FTS) would miss this.
+        // Teilstring mitten im Wort — eine Token-/Präfix-Suche würde das verfehlen.
+        await _db.SaveImageAsync(CreateTestImage("C:\\fotos\\a.jpg", Array.Empty<string>()));
+        await _db.SetImageDescriptionAsync("C:\\fotos\\a.jpg", "Ein Käfer auf einem Blatt");
+
+        var results = await _db.SearchImagesAsync(new List<string> { "äfer" }, null);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Path, Is.EqualTo("C:\\fotos\\a.jpg"));
+    }
+
+    [Test]
     public void SetDescription_UnknownPath_DoesNotThrow()
     {
         Assert.DoesNotThrowAsync(() => _db.SetImageDescriptionAsync("C:\\gibtsnicht.jpg", "x"));
@@ -680,6 +711,78 @@ public class DatabaseServiceTests
         var description = await _db.GetImageDescriptionAsync("C:\\gibtsnicht.jpg");
 
         Assert.That(description, Is.Null);
+    }
+
+    // ========================================================================
+    // Migrierte Bestands-DB / migrated legacy database
+    // ========================================================================
+
+    [Test]
+    public async Task Search_OnMigratedDatabase_FindsBackfilledAndNewlySavedImages()
+    {
+        // A migrated database must behave like a fresh one: the lowercase search columns
+        // are backfilled once by the migration and written on every save afterwards.
+        // Eine migrierte DB muss sich wie eine frische verhalten: Die Kleinschreib-Spalten
+        // werden einmal von der Migration befüllt und danach bei jedem Speichern gepflegt.
+        var dbPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"tagfusion_v6_{Guid.NewGuid():N}.db");
+        var connectionString = $"Data Source={dbPath};Version=3;";
+
+        try
+        {
+            using (var raw = new SQLiteConnection(connectionString))
+            {
+                raw.Open();
+                using var cmd = raw.CreateCommand();
+                cmd.CommandText = @"
+                    CREATE TABLE Images (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Path TEXT NOT NULL UNIQUE,
+                        FileName TEXT NOT NULL DEFAULT '',
+                        LastModified TEXT NOT NULL,
+                        Rating INTEGER DEFAULT 0,
+                        Width INTEGER DEFAULT 0,
+                        Height INTEGER DEFAULT 0,
+                        DateTaken TEXT
+                    );
+                    CREATE TABLE Tags (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL UNIQUE
+                    );
+                    CREATE INDEX idx_images_path ON Images(Path);
+                    INSERT INTO Images (Path, FileName, LastModified)
+                        VALUES ('C:\alt\Käfer.jpg', 'Käfer.jpg', '2026-01-01T00:00:00.0000000Z');";
+                cmd.ExecuteNonQuery();
+            }
+
+            // Constructor runs InitializeDatabase + migrations on the legacy file.
+            // Der Konstruktor führt InitializeDatabase + Migrationen auf der Alt-Datei aus.
+            using (var db = new DatabaseService(connectionString))
+            {
+                await db.SaveImageAsync(CreateTestImage("C:\\neu\\Übung.jpg", new[] { "Rätsel" }));
+
+                var backfilled = await db.SearchImagesAsync(new List<string> { "äfer" }, null);
+                Assert.That(backfilled, Has.Count.EqualTo(1));
+                Assert.That(backfilled[0].Path, Is.EqualTo("C:\\alt\\Käfer.jpg"));
+
+                var byNewFileName = await db.SearchImagesAsync(new List<string> { "BUNG" }, null);
+                Assert.That(byNewFileName, Has.Count.EqualTo(1));
+                Assert.That(byNewFileName[0].Path, Is.EqualTo("C:\\neu\\Übung.jpg"));
+
+                var byNewTag = await db.SearchImagesAsync(new List<string> { "ätsel" }, null);
+                Assert.That(byNewTag, Has.Count.EqualTo(1));
+                Assert.That(byNewTag[0].Tags, Is.EquivalentTo(new[] { "Rätsel" }));
+            }
+        }
+        finally
+        {
+            SQLiteConnection.ClearAllPools();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            foreach (var file in new[] { dbPath, dbPath + "-wal", dbPath + "-shm" })
+            {
+                if (System.IO.File.Exists(file)) System.IO.File.Delete(file);
+            }
+        }
     }
 
     // ========================================================================

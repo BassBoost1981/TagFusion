@@ -76,7 +76,7 @@ export interface ImageSlice {
 
   loadImages: (folderPath: string) => Promise<void>;
   refreshImages: () => Promise<void>;
-  selectImage: (path: string, ctrlKey?: boolean, shiftKey?: boolean) => void;
+  selectImage: (path: string, ctrlKey?: boolean, shiftKey?: boolean, displayOrder?: string[]) => void;
   selectAllImages: () => void;
   clearSelection: () => void;
   updateImageTags: (imagePath: string, tags: string[]) => Promise<void>;
@@ -88,6 +88,7 @@ export interface ImageSlice {
 export const createImageSlice: StateCreator<
   ImageSlice & {
     currentFolder: string | null;
+    includeSubfolders: boolean;
     setError: (error: string | null) => void;
     setCurrentFolder: (folder: string | null) => void;
   },
@@ -107,7 +108,7 @@ export const createImageSlice: StateCreator<
     try {
       set({ isLoadingImages: true, currentFolder: folderPath });
       get().setCurrentFolder(folderPath);
-      const items = await bridge.getFolderContents(folderPath);
+      const items = await bridge.getFolderContents(folderPath, get().includeSubfolders);
       const images = extractImages(items);
 
       if (requestId !== latestLoadImagesRequestId || get().currentFolder !== folderPath) {
@@ -135,7 +136,7 @@ export const createImageSlice: StateCreator<
     const { currentFolder } = get();
     if (currentFolder) {
       try {
-        const items = await bridge.getFolderContents(currentFolder);
+        const items = await bridge.getFolderContents(currentFolder, get().includeSubfolders);
         // Stale guard: discard the response when the user navigated to another
         // folder while the refresh was in flight — otherwise a late response
         // would briefly show the old folder's grid.
@@ -155,12 +156,19 @@ export const createImageSlice: StateCreator<
     }
   },
 
-  selectImage: (path, ctrlKey = false, shiftKey = false) => {
+  selectImage: (path, ctrlKey = false, shiftKey = false, displayOrder) => {
     const { selectedImages, lastSelectedImage, images } = get();
 
     if (shiftKey && lastSelectedImage) {
-      const lastIndex = images.findIndex((img) => img.path === lastSelectedImage);
-      const currentIndex = images.findIndex((img) => img.path === path);
+      // Range over the display order when the caller provides it — the raw images
+      // array can differ from what the grid shows (filter/sort active), and ranging
+      // over it would silently select images that are not visible.
+      // Bereich über die Anzeige-Reihenfolge bilden, wenn der Aufrufer sie liefert —
+      // das rohe images-Array kann vom Grid abweichen (Filter/Sortierung) und würde
+      // sonst unsichtbare Bilder still mitselektieren.
+      const order = displayOrder ?? images.map((img) => img.path);
+      const lastIndex = order.indexOf(lastSelectedImage);
+      const currentIndex = order.indexOf(path);
 
       if (lastIndex !== -1 && currentIndex !== -1) {
         const start = Math.min(lastIndex, currentIndex);
@@ -168,7 +176,7 @@ export const createImageSlice: StateCreator<
         const rangeSelection = new Set(ctrlKey ? selectedImages : []);
 
         for (let i = start; i <= end; i++) {
-          rangeSelection.add(images[i].path);
+          rangeSelection.add(order[i]);
         }
 
         set({ selectedImages: rangeSelection });
@@ -225,7 +233,13 @@ export const createImageSlice: StateCreator<
     try {
       await bridge.setRating(imagePath, rating);
     } catch (error) {
-      set({ images: prevImages, gridItems: prevGridItems });
+      // Revert only this image — bulk rating fires one call per selected image, and
+      // a wholesale snapshot restore would clobber the other, successful updates.
+      // Nur dieses Bild zurücksetzen — Bulk-Rating feuert einen Call pro Bild, ein
+      // kompletter Snapshot-Rollback würde die anderen erfolgreichen Updates löschen.
+      const { images, gridItems } = get();
+      const revertedImages = revertFailedPaths(images, prevImages, new Set([imagePath]));
+      set({ images: revertedImages, gridItems: normalizeGridItems(gridItems, revertedImages) });
       get().setError((error as Error).message);
     }
   },

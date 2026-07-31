@@ -66,10 +66,11 @@ public class FaceHandler : IBridgeHandler
                 internalMessage: "Face engine unavailable");
 
         var path = PayloadHelper.GetString(payload ?? new(), "path");
+        var includeSubfolders = PayloadHelper.GetBool(payload?.GetValueOrDefault("includeSubfolders"));
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
             throw new BridgeException("Ordner nicht gefunden.", internalMessage: $"Folder not found: {path}");
 
-        if (!_scanService.StartScan(path))
+        if (!_scanService.StartScan(path, includeSubfolders))
             throw new BridgeException("Ein Gesichter-Scan läuft bereits.", internalMessage: "Scan already running");
 
         return true;
@@ -84,7 +85,8 @@ public class FaceHandler : IBridgeHandler
     private async Task<object> GetFaceReviewAsync(Dictionary<string, object>? payload)
     {
         var path = PayloadHelper.GetString(payload ?? new(), "path");
-        var faces = await _databaseService.GetFacesForFolderAsync(path);
+        var includeSubfolders = PayloadHelper.GetBool(payload?.GetValueOrDefault("includeSubfolders"));
+        var faces = await _databaseService.GetFacesForFolderAsync(path, includeSubfolders);
         var persons = (await _databaseService.GetPersonsAsync()).ToDictionary(p => p.Id, p => p.Name);
 
         // Suggestions grouped by suggested person. / Vorschläge nach Person gruppiert.

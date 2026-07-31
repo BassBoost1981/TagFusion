@@ -49,13 +49,13 @@ public sealed class DescriptionScanService
         _logger = logger;
     }
 
-    public bool StartScan(string folderPath, string model, string prompt, bool overwriteExisting)
+    public bool StartScan(string folderPath, string model, string prompt, bool overwriteExisting, bool includeSubfolders = false)
     {
         if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)
             return false;
 
         _cts = new CancellationTokenSource();
-        _currentScan = Task.Run(() => RunScanAsync(folderPath, model, prompt, overwriteExisting, _cts.Token));
+        _currentScan = Task.Run(() => RunScanAsync(folderPath, model, prompt, overwriteExisting, includeSubfolders, _cts.Token));
         return true;
     }
 
@@ -75,14 +75,14 @@ public sealed class DescriptionScanService
         }
     }
 
-    private async Task RunScanAsync(string folderPath, string model, string prompt, bool overwriteExisting, CancellationToken ct)
+    private async Task RunScanAsync(string folderPath, string model, string prompt, bool overwriteExisting, bool includeSubfolders, CancellationToken ct)
     {
         int described = 0, skipped = 0, failed = 0;
         bool cancelled = false, aborted = false;
 
         try
         {
-            var images = await _fileSystemService.GetImagesAsync(folderPath, ct);
+            var images = await _fileSystemService.GetImagesAsync(folderPath, includeSubfolders, ct);
             var paths = images.Select(i => i.Path).ToList();
 
             var existing = overwriteExisting

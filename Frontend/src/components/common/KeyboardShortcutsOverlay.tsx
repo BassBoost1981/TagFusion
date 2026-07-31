@@ -32,10 +32,31 @@ export function KeyboardShortcutsOverlay() {
   // Hotkey reference (kept in sync with useKeyboardShortcuts.ts and Lightbox.tsx)
   const groups: { title: string; items: { keys: string[]; label: string }[] }[] = [
     {
+      title: t('shortcuts.groupNavigation') ?? 'Navigation im Raster',
+      items: [
+        { keys: ['←', '→'], label: t('shortcuts.gridNavStep') ?? 'Vorheriges/nächstes Element' },
+        { keys: ['↑', '↓'], label: t('shortcuts.gridNavRow') ?? 'Eine Zeile nach oben/unten' },
+        { keys: ['Pos1', 'Ende'], label: t('shortcuts.gridNavEdges') ?? 'Erstes/letztes Element' },
+        {
+          keys: ['Enter', 'Space'],
+          label: t('shortcuts.gridOpen') ?? 'Öffnen (Bild in Lightbox, Ordner betreten)',
+        },
+        { keys: ['Ctrl', 'F'], label: t('shortcuts.focusSearch') ?? 'Suchfeld fokussieren' },
+      ],
+    },
+    {
       title: t('shortcuts.groupSelection') ?? 'Auswahl',
       items: [
         { keys: ['Ctrl', 'A'], label: t('shortcuts.selectAll') ?? 'Alle auswählen' },
+        { keys: ['Shift', '←→↑↓'], label: t('shortcuts.extendSelection') ?? 'Auswahl erweitern' },
         { keys: ['Esc'], label: t('shortcuts.clearSelection') ?? 'Auswahl aufheben' },
+      ],
+    },
+    {
+      title: t('shortcuts.groupRating') ?? 'Bewertung',
+      items: [
+        { keys: ['1 – 5'], label: t('shortcuts.setRating') ?? 'Bewertung für die Auswahl setzen' },
+        { keys: ['0'], label: t('shortcuts.clearRating') ?? 'Bewertung der Auswahl löschen' },
       ],
     },
     {

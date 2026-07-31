@@ -20,7 +20,7 @@ public class FileSystemHandler : IBridgeHandler
     // Vorheriges Hintergrund-Laden wird abgebrochen, sobald ein neuer Ordner geöffnet wird.
     private CancellationTokenSource? _metadataLoadCts;
     private long _metadataLoadId;
-    private readonly object _metadataLock = new();
+    private readonly SemaphoreSlim _metadataLock = new(1, 1);
 
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
@@ -59,7 +59,8 @@ public class FileSystemHandler : IBridgeHandler
     private async Task<List<Models.GridItem>> HandleGetFolderContentsAsync(Dictionary<string, object>? payload)
     {
         var folderPath = PayloadHelper.GetString(payload, "folderPath");
-        var items = await _fileSystemService.GetFolderContentsAsync(folderPath);
+        var includeSubfolders = PayloadHelper.GetBool(payload?.GetValueOrDefault("includeSubfolders"));
+        var items = await _fileSystemService.GetFolderContentsAsync(folderPath, includeSubfolders);
 
         var images = items
             .Where(x => !x.IsFolder && x.ImageData != null)
@@ -77,7 +78,8 @@ public class FileSystemHandler : IBridgeHandler
     private async Task<List<Models.ImageFile>> HandleGetImagesAsync(Dictionary<string, object>? payload)
     {
         var folderPath = PayloadHelper.GetString(payload, "folderPath");
-        var images = await _fileSystemService.GetImagesAsync(folderPath);
+        var includeSubfolders = PayloadHelper.GetBool(payload?.GetValueOrDefault("includeSubfolders"));
+        var images = await _fileSystemService.GetImagesAsync(folderPath, includeSubfolders);
         StartBackgroundMetadataLoad(images);
         return images;
     }
@@ -87,7 +89,8 @@ public class FileSystemHandler : IBridgeHandler
         CancellationToken ct;
         long requestId;
 
-        lock (_metadataLock)
+        _metadataLock.Wait();
+        try
         {
             // Cancel any in-flight load — rapid folder navigation should not produce
             // overlapping metadataUpdated events that overwrite newer results.
@@ -97,6 +100,10 @@ public class FileSystemHandler : IBridgeHandler
             _metadataLoadCts = new CancellationTokenSource();
             ct = _metadataLoadCts.Token;
             requestId = ++_metadataLoadId;
+        }
+        finally
+        {
+            _metadataLock.Release();
         }
 
         _ = Task.Run(async () =>

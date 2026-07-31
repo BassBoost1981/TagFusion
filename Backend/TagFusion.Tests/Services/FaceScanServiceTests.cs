@@ -29,7 +29,7 @@ public class FaceScanServiceTests
         // Default: no prior scans, no confirmed persons, empty folder faces.
         _db.Setup(d => d.GetFaceScanTimesAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new Dictionary<string, string>());
-        _db.Setup(d => d.GetFacesForFolderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _db.Setup(d => d.GetFacesForFolderAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new List<StoredFace>());
         _db.Setup(d => d.GetConfirmedEmbeddingsByPersonAsync(It.IsAny<CancellationToken>()))
            .ReturnsAsync(new Dictionary<long, List<float[]>>());
@@ -55,7 +55,7 @@ public class FaceScanServiceTests
     private void SetupFolder(params string[] paths)
     {
         var images = paths.Select(p => new ImageFile { Path = p, FileName = Path.GetFileName(p) }).ToList();
-        _fs.Setup(f => f.GetImagesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(images);
+        _fs.Setup(f => f.GetImagesAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(images);
     }
 
     private async Task<FaceScanService.ScanSummary> RunScanAsync(string folder)
@@ -165,7 +165,7 @@ public class FaceScanServiceTests
         var emb = new float[512]; emb[0] = 1f;
         _engine.Setup(e => e.AnalyzeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(new List<DetectedFace> { new(1, 2, 3, 4, emb) });
-        _db.Setup(d => d.GetFacesForFolderAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _db.Setup(d => d.GetFacesForFolderAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
            .ReturnsAsync(new List<StoredFace> { new(1, 1, p1, 1, 2, 3, 4, emb, null, null, null, null, FaceStatus.Unnamed) });
         _db.Setup(d => d.GetConfirmedEmbeddingsByPersonAsync(It.IsAny<CancellationToken>()))
            .ReturnsAsync(new Dictionary<long, List<float[]>> { [7] = new() { emb } });

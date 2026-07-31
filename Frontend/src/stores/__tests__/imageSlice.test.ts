@@ -131,6 +131,53 @@ describe('imageSlice — selectImage', () => {
 
     expectSelectedImages('C:\\1.jpg', 'C:\\2.jpg', 'C:\\3.jpg', 'C:\\4.jpg');
   });
+
+  it('shift range follows a provided display order instead of the raw store order', () => {
+    // Display shows only 1 and 3 (2 is filtered out) — the range must skip it.
+    // Anzeige enthält nur 1 und 3 (2 ist weggefiltert) — der Bereich überspringt es.
+    useAppStore.getState().selectImage('C:\\1.jpg');
+    useAppStore.getState().selectImage('C:\\3.jpg', false, true, ['C:\\1.jpg', 'C:\\3.jpg', 'C:\\4.jpg']);
+
+    expectSelectedImages('C:\\1.jpg', 'C:\\3.jpg');
+  });
+});
+
+describe('imageSlice — updateImageRating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const images = [makeImage('C:\\1.jpg'), makeImage('C:\\2.jpg'), makeImage('C:\\3.jpg')];
+    useAppStore.setState({
+      images,
+      gridItems: images.map(makeGridItem),
+      selectedImages: new Set<string>(),
+      lastSelectedImage: null,
+      error: null,
+    });
+  });
+
+  it('reverts only the failed image when a bulk update partially fails', async () => {
+    // One locked file must not roll back the ratings of the other images —
+    // the backend already persisted those successfully.
+    // Eine gesperrte Datei darf die Bewertungen der anderen Bilder nicht
+    // zurückrollen — das Backend hat sie bereits erfolgreich gespeichert.
+    mockedBridge.setRating.mockImplementation((path: string) =>
+      path === 'C:\\2.jpg' ? Promise.reject(new Error('schreibgeschützt')) : Promise.resolve(true)
+    );
+
+    await Promise.all([
+      useAppStore.getState().updateImageRating('C:\\1.jpg', 4),
+      useAppStore.getState().updateImageRating('C:\\2.jpg', 4),
+      useAppStore.getState().updateImageRating('C:\\3.jpg', 4),
+    ]);
+
+    const { images, error } = useAppStore.getState();
+    expect(images.find((img) => img.path === 'C:\\1.jpg')?.rating).toBe(4);
+    expect(images.find((img) => img.path === 'C:\\2.jpg')?.rating).toBe(0);
+    expect(images.find((img) => img.path === 'C:\\3.jpg')?.rating).toBe(4);
+    expect(error).toBe('schreibgeschützt');
+
+    mockedBridge.setRating.mockResolvedValue(true);
+  });
 });
 
 describe('imageSlice — selectAllImages / clearSelection', () => {

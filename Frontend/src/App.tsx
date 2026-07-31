@@ -16,6 +16,9 @@ const Lightbox = lazy(() => import('./components/lightbox/Lightbox').then((m) =>
 const TagManagerModal = lazy(() =>
   import('./components/tags/TagManagerModal').then((m) => ({ default: m.TagManagerModal }))
 );
+const TagLibraryImportConfirmModal = lazy(() =>
+  import('./components/tags/TagLibraryImportConfirmModal').then((m) => ({ default: m.TagLibraryImportConfirmModal }))
+);
 const RenameModal = lazy(() => import('./components/ui/RenameModal').then((m) => ({ default: m.RenameModal })));
 const DeleteConfirmModal = lazy(() =>
   import('./components/ui/DeleteConfirmModal').then((m) => ({ default: m.DeleteConfirmModal }))
@@ -70,6 +73,7 @@ function App() {
       {/* Lazy-loaded Modals — Suspense fallback null da Modals bedingt gerendert werden */}
       <Suspense fallback={null}>
         <TagManagerModal />
+        <TagLibraryImportConfirmModal />
         <Lightbox />
         <RenameModal />
         <DeleteConfirmModal />

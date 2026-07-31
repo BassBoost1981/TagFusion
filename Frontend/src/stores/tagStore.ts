@@ -70,6 +70,20 @@ const tryPersistTagLibrary = async (categories: TagCategory[]) => {
   }
 };
 
+// Normalizes raw library data (IDs may be missing in backup files).
+// Normalisiert rohe Bibliotheksdaten — in Sicherungsdateien können IDs fehlen.
+const mapRawCategories = (rawCategories: RawImportCategory[]): TagCategory[] =>
+  rawCategories.map((cat) => ({
+    id: cat.id || generateId(),
+    name: cat.name || 'Unbenannte Kategorie',
+    isExpanded: true,
+    subcategories: (cat.subcategories || []).map((sub: RawImportSubcategory) => ({
+      id: sub.id || generateId(),
+      name: sub.name || 'Unbenannte Unterkategorie',
+      tags: sub.tags || [],
+    })),
+  }));
+
 const updateCategory = (
   categories: TagCategory[],
   categoryId: string,
@@ -111,7 +125,7 @@ interface TagStore {
   reorderTags: (categoryId: string, subId: string, startIndex: number, endIndex: number) => Promise<void>;
 
   importLibrary: (json: string) => Promise<boolean>;
-  exportLibrary: () => string;
+  reloadLibrary: () => Promise<void>;
 
   initialize: () => Promise<void>;
 }
@@ -280,16 +294,7 @@ export const useTagStore = create<TagStore>((set, get) => ({
       const rawCategories = data.categories || data;
       if (!Array.isArray(rawCategories)) return false;
 
-      const categories: TagCategory[] = (rawCategories as RawImportCategory[]).map((cat: RawImportCategory) => ({
-        id: cat.id || generateId(),
-        name: cat.name || 'Unbenannte Kategorie',
-        isExpanded: true,
-        subcategories: (cat.subcategories || []).map((sub: RawImportSubcategory) => ({
-          id: sub.id || generateId(),
-          name: sub.name || 'Unbenannte Unterkategorie',
-          tags: sub.tags || [],
-        })),
-      }));
+      const categories = mapRawCategories(rawCategories as RawImportCategory[]);
 
       await persistTagLibrary(categories);
       set({ categories });
@@ -300,20 +305,23 @@ export const useTagStore = create<TagStore>((set, get) => ({
     }
   },
 
-  exportLibrary: () => {
-    const { categories } = get();
-    return JSON.stringify(
-      {
-        version: '1.0',
-        exportDate: new Date().toISOString(),
-        categories: categories.map(({ id, name, subcategories }) => ({
-          id,
-          name,
-          subcategories: subcategories.map(({ id, name, tags }) => ({ id, name, tags })),
-        })),
-      },
-      null,
-      2
-    );
+  // Reloads the library from the backend without writing it back — used after a
+  // backend-side import replaced the stored library.
+  // Lädt die Bibliothek vom Backend neu, ohne sie zurückzuschreiben — nach einem
+  // Import, der die gespeicherte Bibliothek im Backend ersetzt hat.
+  reloadLibrary: async () => {
+    try {
+      const library = await bridge.getTagLibrary();
+      const categories = mapRawCategories((library?.categories ?? []) as RawImportCategory[]);
+      set({ categories });
+
+      try {
+        saveTagLibraryToLocalStorage(categories);
+      } catch {
+        // Ignore — localStorage may be unavailable in tests.
+      }
+    } catch (error) {
+      reportTagStoreError(error);
+    }
   },
 }));

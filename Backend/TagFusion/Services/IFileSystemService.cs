@@ -9,7 +9,7 @@ public interface IFileSystemService
 {
     List<FolderItem> GetDrives();
     List<FolderItem> GetFolders(string path);
-    Task<List<ImageFile>> GetImagesAsync(string folderPath, CancellationToken cancellationToken = default);
-    Task<List<GridItem>> GetFolderContentsAsync(string folderPath, CancellationToken cancellationToken = default);
+    Task<List<ImageFile>> GetImagesAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default);
+    Task<List<GridItem>> GetFolderContentsAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default);
     Task<string?> SelectFolderAsync(CancellationToken cancellationToken = default);
 }

@@ -7,6 +7,7 @@ import type {
   Tag,
   GridItem,
   TagLibrary,
+  TagLibraryTransferResult,
   FaceReview,
   Person,
   AiServerStatusInfo,
@@ -86,6 +87,22 @@ class BridgeService {
   /** Base timeout in ms (doubled on each retry) */
   private static readonly BASE_TIMEOUT_MS = 120_000;
 
+  /**
+   * Dialog-driven actions block in the backend until the user closes a native file
+   * dialog — they must never race the timeout. A timed-out import would still
+   * replace the tag library once the user picks a file, while the UI already
+   * reported failure and keeps showing the stale library.
+   * Dialog-gebundene Actions blockieren im Backend, bis der Nutzer den nativen
+   * Datei-Dialog schließt — sie dürfen nicht gegen den Timeout laufen. Ein
+   * Import nach Timeout würde die Bibliothek trotzdem ersetzen, während die UI
+   * bereits einen Fehler gemeldet hat.
+   */
+  private static readonly NO_TIMEOUT_ACTIONS = new Set<BridgeActionName>([
+    BRIDGE_ACTIONS.SELECT_FOLDER,
+    BRIDGE_ACTIONS.EXPORT_TAG_LIBRARY,
+    BRIDGE_ACTIONS.IMPORT_TAG_LIBRARY,
+  ]);
+
   /** Actions that are safe to retry (idempotent reads) */
   private static readonly RETRYABLE_ACTIONS = new Set<BridgeActionName>([
     BRIDGE_ACTIONS.GET_DRIVES,
@@ -164,6 +181,8 @@ class BridgeService {
       log('Posting to WebView:', msgStr);
       window.chrome!.webview!.postMessage(msgStr);
 
+      if (BridgeService.NO_TIMEOUT_ACTIONS.has(action)) return;
+
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
@@ -195,12 +214,16 @@ class BridgeService {
     return this.send<FolderItem[]>(BRIDGE_ACTIONS.GET_FOLDERS, { path });
   }
 
-  async getImages(folderPath: string): Promise<ImageFile[]> {
-    return this.send<ImageFile[]>(BRIDGE_ACTIONS.GET_IMAGES, { folderPath });
+  // includeSubfolders enumerates the whole subtree; the backend then returns
+  // images only (no folder tiles). Default false keeps existing callers unchanged.
+  // includeSubfolders durchläuft den gesamten Teilbaum; das Backend liefert dann
+  // nur Bilder (keine Ordner-Kacheln). Default false für bestehende Aufrufer.
+  async getImages(folderPath: string, includeSubfolders: boolean = false): Promise<ImageFile[]> {
+    return this.send<ImageFile[]>(BRIDGE_ACTIONS.GET_IMAGES, { folderPath, includeSubfolders });
   }
 
-  async getFolderContents(folderPath: string): Promise<GridItem[]> {
-    return this.send<GridItem[]>(BRIDGE_ACTIONS.GET_FOLDER_CONTENTS, { folderPath });
+  async getFolderContents(folderPath: string, includeSubfolders: boolean = false): Promise<GridItem[]> {
+    return this.send<GridItem[]>(BRIDGE_ACTIONS.GET_FOLDER_CONTENTS, { folderPath, includeSubfolders });
   }
 
   async selectFolder(): Promise<string | null> {
@@ -245,6 +268,20 @@ class BridgeService {
 
   async saveTagLibrary(library: TagLibrary): Promise<boolean> {
     return this.send<boolean>(BRIDGE_ACTIONS.SAVE_TAG_LIBRARY, { library });
+  }
+
+  // Tag library backup — save/open dialog runs in the backend, so no path is sent.
+  // A cancelled dialog resolves with cancelled: true and is not an error.
+  // Sicherung der Tag-Bibliothek — der Datei-Dialog läuft im Backend, es wird kein Pfad übergeben.
+  // Ein abgebrochener Dialog liefert cancelled: true und ist kein Fehler.
+  async exportTagLibrary(): Promise<TagLibraryTransferResult> {
+    return this.send<TagLibraryTransferResult>(BRIDGE_ACTIONS.EXPORT_TAG_LIBRARY);
+  }
+
+  // Replaces the stored tag library with the content of the chosen backup file.
+  // Ersetzt die gespeicherte Tag-Bibliothek durch den Inhalt der gewählten Sicherungsdatei.
+  async importTagLibrary(): Promise<TagLibraryTransferResult> {
+    return this.send<TagLibraryTransferResult>(BRIDGE_ACTIONS.IMPORT_TAG_LIBRARY);
   }
 
   // Image Edit Methods
@@ -304,12 +341,28 @@ class BridgeService {
     return this.send<AiServerStatusInfo>(BRIDGE_ACTIONS.GET_AI_SERVER_STATUS);
   }
 
-  async getDescriptionPrecheck(path: string): Promise<DescriptionPrecheck> {
-    return this.send<DescriptionPrecheck>(BRIDGE_ACTIONS.GET_DESCRIPTION_PRECHECK, { path });
+  // includeSubfolders mirrors the toolbar toggle — precheck and scan must cover
+  // the same image set the grid shows.
+  // includeSubfolders spiegelt den Toolbar-Schalter — Precheck und Scan müssen
+  // dieselbe Bildmenge abdecken, die das Grid zeigt.
+  async getDescriptionPrecheck(path: string, includeSubfolders: boolean = false): Promise<DescriptionPrecheck> {
+    return this.send<DescriptionPrecheck>(BRIDGE_ACTIONS.GET_DESCRIPTION_PRECHECK, { path, includeSubfolders });
   }
 
-  async startDescriptionScan(path: string, model: string, prompt: string, overwriteExisting: boolean): Promise<boolean> {
-    return this.send<boolean>(BRIDGE_ACTIONS.START_DESCRIPTION_SCAN, { path, model, prompt, overwriteExisting });
+  async startDescriptionScan(
+    path: string,
+    model: string,
+    prompt: string,
+    overwriteExisting: boolean,
+    includeSubfolders: boolean = false
+  ): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.START_DESCRIPTION_SCAN, {
+      path,
+      model,
+      prompt,
+      overwriteExisting,
+      includeSubfolders,
+    });
   }
 
   async cancelDescriptionScan(): Promise<boolean> {
@@ -337,16 +390,18 @@ class BridgeService {
 
   // Face recognition — manual folder scan, review, confirmation
   // Gesichtserkennung — manueller Ordner-Scan, Review, Bestätigung
-  async scanFacesInFolder(path: string): Promise<boolean> {
-    return this.send<boolean>(BRIDGE_ACTIONS.SCAN_FACES_IN_FOLDER, { path });
+  async scanFacesInFolder(path: string, includeSubfolders: boolean = false): Promise<boolean> {
+    return this.send<boolean>(BRIDGE_ACTIONS.SCAN_FACES_IN_FOLDER, { path, includeSubfolders });
   }
 
   async cancelFaceScan(): Promise<boolean> {
     return this.send<boolean>(BRIDGE_ACTIONS.CANCEL_FACE_SCAN);
   }
 
-  async getFaceReview(path: string): Promise<FaceReview> {
-    return this.send<FaceReview>(BRIDGE_ACTIONS.GET_FACE_REVIEW, { path });
+  // includeSubfolders shows subtree faces too — matches a recursive scan's scope.
+  // includeSubfolders zeigt auch Teilbaum-Gesichter — passend zum rekursiven Scan.
+  async getFaceReview(path: string, includeSubfolders: boolean = false): Promise<FaceReview> {
+    return this.send<FaceReview>(BRIDGE_ACTIONS.GET_FACE_REVIEW, { path, includeSubfolders });
   }
 
   async confirmFaceGroup(faceIds: number[], personName: string): Promise<{ tagged: number; failed: number }> {
@@ -527,6 +582,14 @@ class BridgeService {
       case 'importTagsJson':
       case 'importTagsCsv':
         return {};
+      case 'exportTagLibrary':
+      case 'importTagLibrary':
+        return {
+          cancelled: false,
+          filePath: 'C:\\Users\\Demo\\TagFusion_Tag-Bibliothek.json',
+          categoryCount: 2,
+          tagCount: 5,
+        };
       case 'findDuplicates':
         return [];
       default:

@@ -112,6 +112,9 @@ export function GlassModal({
 
           {/* Modal */}
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             className={`
               relative w-full ${sizeClasses[size]}
               rounded-2xl

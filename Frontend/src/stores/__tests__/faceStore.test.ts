@@ -37,7 +37,7 @@ describe('faceStore', () => {
 
     await useFaceStore.getState().startScan('C:\\fotos');
 
-    expect(mockedBridge.scanFacesInFolder).toHaveBeenCalledWith('C:\\fotos');
+    expect(mockedBridge.scanFacesInFolder).toHaveBeenCalledWith('C:\\fotos', false);
     expect(useFaceStore.getState().isScanning).toBe(true);
   });
 
@@ -61,7 +61,7 @@ describe('faceStore', () => {
     await useFaceStore.getState().confirmGroup([1, 2], 'Max', 'C:\\fotos');
 
     expect(mockedBridge.confirmFaceGroup).toHaveBeenCalledWith([1, 2], 'Max');
-    expect(mockedBridge.getFaceReview).toHaveBeenCalledWith('C:\\fotos');
+    expect(mockedBridge.getFaceReview).toHaveBeenCalledWith('C:\\fotos', false);
   });
 
   it('checkEngine reads faceEngineOk from healthCheck', async () => {

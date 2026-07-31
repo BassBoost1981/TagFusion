@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
+using TagFusion.Bridge;
 using TagFusion.Bridge.Handlers;
 using TagFusion.Database;
 using TagFusion.Models;
@@ -52,6 +53,101 @@ public class TagHandlerTests
         File.WriteAllText(path, "fake image data");
         _tempFiles.Add(path);
         return path;
+    }
+
+    private string CreateTempJsonFile(string content)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"TagFusionLibrary_{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, content);
+        _tempFiles.Add(path);
+        return path;
+    }
+
+    // ========================================================================
+    // importTagLibrary Tests (dialog-free core)
+    // ========================================================================
+
+    [Test]
+    public async Task ImportTagLibrary_ValidFile_ReplacesLibraryAndReportsCounts()
+    {
+        var path = CreateTempJsonFile("""
+            {
+              "version": "1.0",
+              "categories": [
+                {
+                  "id": "a",
+                  "name": "Natur",
+                  "subcategories": [
+                    { "id": "a1", "name": "Bäume", "tags": ["Eiche", "Buche"] },
+                    { "id": "a2", "name": "Blumen", "tags": ["Rose"] }
+                  ]
+                },
+                { "id": "b", "name": "Leer", "subcategories": [] }
+              ]
+            }
+            """);
+
+        object? saved = null;
+        _tagService
+            .Setup(s => s.SaveTagLibraryAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .Callback((object library, CancellationToken _) => saved = library)
+            .ReturnsAsync(true);
+
+        var result = await _handler.ImportTagLibraryFromFileAsync(path);
+
+        Assert.That(result.Cancelled, Is.False);
+        Assert.That(result.FilePath, Is.EqualTo(path));
+        Assert.That(result.CategoryCount, Is.EqualTo(2));
+        Assert.That(result.TagCount, Is.EqualTo(3));
+
+        // The validated library is handed to the normal persistence path unchanged.
+        // Die validierte Bibliothek geht unverändert in den bestehenden Persistenzpfad.
+        _tagService.Verify(s => s.SaveTagLibraryAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.That(saved, Is.InstanceOf<JsonElement>());
+        Assert.That(((JsonElement)saved!).GetProperty("categories").GetArrayLength(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ImportTagLibrary_MalformedJson_ThrowsBridgeExceptionAndKeepsLibrary()
+    {
+        var path = CreateTempJsonFile("{ \"categories\": [ { \"name\": ");
+
+        Assert.ThrowsAsync<BridgeException>(async () =>
+            await _handler.ImportTagLibraryFromFileAsync(path));
+
+        _tagService.Verify(
+            s => s.SaveTagLibraryAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Test]
+    public void ImportTagLibrary_ForeignJsonStructure_ThrowsBridgeExceptionAndKeepsLibrary()
+    {
+        // Valid JSON, but the per-image tag export format — not a tag library.
+        // Gültiges JSON, aber das Bild-Tag-Exportformat — keine Tag-Bibliothek.
+        var path = CreateTempJsonFile("""
+            [ { "path": "C:\\Bilder\\a.jpg", "tags": ["Rose"], "rating": 3 } ]
+            """);
+
+        Assert.ThrowsAsync<BridgeException>(async () =>
+            await _handler.ImportTagLibraryFromFileAsync(path));
+
+        _tagService.Verify(
+            s => s.SaveTagLibraryAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Test]
+    public void ImportTagLibrary_CategoryWithoutName_ThrowsBridgeExceptionAndKeepsLibrary()
+    {
+        var path = CreateTempJsonFile("""{ "categories": [ { "id": "a", "subcategories": [] } ] }""");
+
+        Assert.ThrowsAsync<BridgeException>(async () =>
+            await _handler.ImportTagLibraryFromFileAsync(path));
+
+        _tagService.Verify(
+            s => s.SaveTagLibraryAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // ========================================================================

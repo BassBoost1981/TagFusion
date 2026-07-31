@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using TagFusion.Database;
 using TagFusion.Services;
 
@@ -7,7 +8,7 @@ namespace TagFusion.Bridge.Handlers;
 
 /// <summary>
 /// Handles tag management actions: getAllTags, getTagLibrary, saveTagLibrary,
-/// writeBatchTags, searchImages.
+/// exportTagLibrary, importTagLibrary, writeBatchTags, searchImages.
 /// </summary>
 public class TagHandler : IBridgeHandler
 {
@@ -19,7 +20,8 @@ public class TagHandler : IBridgeHandler
 
     private static readonly HashSet<string> _supported = new(StringComparer.Ordinal)
     {
-        "getAllTags", "getTagLibrary", "saveTagLibrary", "writeBatchTags", "updateBatchTag", "searchImages"
+        "getAllTags", "getTagLibrary", "saveTagLibrary", "exportTagLibrary", "importTagLibrary",
+        "writeBatchTags", "updateBatchTag", "searchImages"
     };
 
     public IReadOnlySet<string> SupportedActions => _supported;
@@ -45,11 +47,171 @@ public class TagHandler : IBridgeHandler
             "getAllTags" => await _tagService.GetAllTagsAsync(),
             "getTagLibrary" => await _tagService.GetTagLibraryAsync(),
             "saveTagLibrary" => await _tagService.SaveTagLibraryAsync(payload?["library"] ?? new object()),
+            "exportTagLibrary" => await ExportTagLibraryAsync(),
+            "importTagLibrary" => await ImportTagLibraryAsync(),
             "writeBatchTags" => await WriteBatchTagsAsync(payload),
             "updateBatchTag" => await UpdateBatchTagAsync(payload),
             "searchImages" => await SearchImagesAsync(payload),
             _ => throw new NotSupportedException($"Unknown action: {action}")
         };
+    }
+
+    /// <summary>
+    /// Asks for a target file and writes the tag library there as indented JSON.
+    /// Cancelling the dialog is a regular result, not an error.
+    /// Fragt nach einer Zieldatei und schreibt die Tag-Bibliothek als eingerücktes JSON.
+    /// Abbruch im Dialog ist ein reguläres Ergebnis, kein Fehler.
+    /// </summary>
+    private async Task<TagLibraryTransferResult> ExportTagLibraryAsync()
+    {
+        var library = await _tagService.GetTagLibraryAsync();
+        if (library == null)
+            throw new BridgeException(
+                "Es ist keine Tag-Bibliothek vorhanden, die exportiert werden könnte.",
+                internalMessage: "Tag library export: GetTagLibraryAsync returned null");
+
+        var targetPath = await ShowSaveDialogAsync(TagLibraryBackup.BuildDefaultFileName(DateTime.Now));
+        if (string.IsNullOrEmpty(targetPath))
+            return new TagLibraryTransferResult(true, null, 0, 0);
+
+        var json = TagLibraryBackup.Serialize(library);
+        var (categoryCount, tagCount) = TagLibraryBackup.Count(json);
+
+        try
+        {
+            await File.WriteAllTextAsync(targetPath, json);
+        }
+        catch (Exception ex)
+        {
+            throw new BridgeException(
+                "Die Tag-Bibliothek konnte nicht gespeichert werden — bitte einen anderen Speicherort wählen.",
+                internalMessage: $"Tag library export failed for {targetPath}",
+                inner: ex);
+        }
+
+        _logger.LogInformation("Tag library exported to {Path} ({Categories} categories, {Tags} tags)",
+            targetPath, categoryCount, tagCount);
+
+        return new TagLibraryTransferResult(false, targetPath, categoryCount, tagCount);
+    }
+
+    /// <summary>
+    /// Asks for a backup file and replaces the current tag library with its content.
+    /// Fragt nach einer Sicherungsdatei und ersetzt die aktuelle Tag-Bibliothek durch deren Inhalt.
+    /// </summary>
+    private async Task<TagLibraryTransferResult> ImportTagLibraryAsync()
+    {
+        var sourcePath = await ShowOpenDialogAsync();
+        if (string.IsNullOrEmpty(sourcePath))
+            return new TagLibraryTransferResult(true, null, 0, 0);
+
+        return await ImportTagLibraryFromFileAsync(sourcePath);
+    }
+
+    /// <summary>
+    /// Dialog-free import core: read, validate strictly, then replace the library.
+    /// Dialogfreier Import-Kern: lesen, streng validieren, dann Bibliothek ersetzen.
+    /// </summary>
+    internal async Task<TagLibraryTransferResult> ImportTagLibraryFromFileAsync(string sourcePath)
+    {
+        string json;
+        try
+        {
+            json = await File.ReadAllTextAsync(sourcePath);
+        }
+        catch (Exception ex)
+        {
+            throw new BridgeException(
+                "Die Datei konnte nicht gelesen werden.",
+                internalMessage: $"Tag library import: read failed for {sourcePath}",
+                inner: ex);
+        }
+
+        // Validation runs before anything is persisted — invalid files leave the
+        // existing library untouched (no partial import).
+        // Validierung läuft vor dem Speichern — ungültige Dateien lassen die
+        // bestehende Bibliothek unangetastet.
+        var (validatedLibrary, categoryCount, tagCount) = TagLibraryBackup.ParseAndValidate(json);
+
+        if (!await _tagService.SaveTagLibraryAsync(validatedLibrary))
+            throw new BridgeException(
+                "Die importierte Tag-Bibliothek konnte nicht übernommen werden.",
+                internalMessage: $"Tag library import: SaveTagLibraryAsync failed for {sourcePath}");
+
+        _logger.LogInformation("Tag library imported from {Path} ({Categories} categories, {Tags} tags)",
+            sourcePath, categoryCount, tagCount);
+
+        return new TagLibraryTransferResult(false, sourcePath, categoryCount, tagCount);
+    }
+
+    /// <summary>
+    /// Windows save dialog on its own STA thread (same pattern as FileSystemService.SelectFolderAsync).
+    /// Windows-Speichern-Dialog auf eigenem STA-Thread — gleiches Muster wie SelectFolderAsync.
+    /// </summary>
+    private static Task<string?> ShowSaveDialogAsync(string defaultFileName)
+    {
+        return Task.Run(() =>
+        {
+            string? selectedPath = null;
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                var dialog = new SaveFileDialog
+                {
+                    Title = "Tag-Bibliothek exportieren",
+                    Filter = "TagFusion Tag-Bibliothek (*.json)|*.json",
+                    DefaultExt = ".json",
+                    AddExtension = true,
+                    FileName = defaultFileName
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    selectedPath = dialog.FileName;
+                }
+            });
+
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            return selectedPath;
+        });
+    }
+
+    /// <summary>
+    /// Windows open dialog on its own STA thread.
+    /// Windows-Öffnen-Dialog auf eigenem STA-Thread.
+    /// </summary>
+    private static Task<string?> ShowOpenDialogAsync()
+    {
+        return Task.Run(() =>
+        {
+            string? selectedPath = null;
+
+            var thread = new System.Threading.Thread(() =>
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Title = "Tag-Bibliothek importieren",
+                    Filter = "TagFusion Tag-Bibliothek (*.json)|*.json",
+                    DefaultExt = ".json",
+                    Multiselect = false,
+                    CheckFileExists = true
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    selectedPath = dialog.FileName;
+                }
+            });
+
+            thread.SetApartmentState(System.Threading.ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            return selectedPath;
+        });
     }
 
     private async Task<Dictionary<string, bool>> WriteBatchTagsAsync(Dictionary<string, object>? payload)

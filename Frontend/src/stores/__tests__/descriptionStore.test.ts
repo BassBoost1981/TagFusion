@@ -88,7 +88,7 @@ describe('descriptionStore', () => {
 
     await useDescriptionStore.getState().startScan('C:\\fotos');
 
-    expect(mockedBridge.startDescriptionScan).toHaveBeenCalledWith('C:\\fotos', 'qwen', 'Beschreibe', true);
+    expect(mockedBridge.startDescriptionScan).toHaveBeenCalledWith('C:\\fotos', 'qwen', 'Beschreibe', true, false);
     const state = useDescriptionStore.getState();
     expect(state.isScanning).toBe(true);
     expect(state.isDialogOpen).toBe(false);

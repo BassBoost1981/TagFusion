@@ -56,7 +56,9 @@ export const useFaceStore = create<FaceState>((set, get) => ({
   startScan: async (path) => {
     try {
       set({ isScanning: true, progress: null });
-      await bridge.scanFacesInFolder(path);
+      // Scan scope follows the toolbar toggle — what the grid shows gets scanned.
+      // Scan-Umfang folgt dem Toolbar-Schalter — gescannt wird, was das Grid zeigt.
+      await bridge.scanFacesInFolder(path, useAppStore.getState().includeSubfolders);
     } catch (error) {
       set({ isScanning: false });
       useToastStore.getState().warning((error as Error).message);
@@ -73,7 +75,10 @@ export const useFaceStore = create<FaceState>((set, get) => ({
 
   loadReview: async (path) => {
     try {
-      const [review, persons] = await Promise.all([bridge.getFaceReview(path), bridge.getPersons()]);
+      const [review, persons] = await Promise.all([
+        bridge.getFaceReview(path, useAppStore.getState().includeSubfolders),
+        bridge.getPersons(),
+      ]);
       set({ review, persons, isPanelOpen: true });
     } catch (error) {
       useToastStore.getState().warning((error as Error).message);

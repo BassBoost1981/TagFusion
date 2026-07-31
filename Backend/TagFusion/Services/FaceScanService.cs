@@ -44,13 +44,13 @@ public sealed class FaceScanService
     }
 
     /// <summary>Start a scan; returns false when one is already running.</summary>
-    public bool StartScan(string folderPath)
+    public bool StartScan(string folderPath, bool includeSubfolders = false)
     {
         if (Interlocked.CompareExchange(ref _running, 1, 0) != 0)
             return false;
 
         _cts = new CancellationTokenSource();
-        _currentScan = Task.Run(() => RunScanAsync(folderPath, _cts.Token));
+        _currentScan = Task.Run(() => RunScanAsync(folderPath, includeSubfolders, _cts.Token));
         return true;
     }
 
@@ -72,14 +72,14 @@ public sealed class FaceScanService
         }
     }
 
-    private async Task RunScanAsync(string folderPath, CancellationToken ct)
+    private async Task RunScanAsync(string folderPath, bool includeSubfolders, CancellationToken ct)
     {
         int scanned = 0, faces = 0, skipped = 0;
         bool cancelled = false;
 
         try
         {
-            var images = await _fileSystemService.GetImagesAsync(folderPath, ct);
+            var images = await _fileSystemService.GetImagesAsync(folderPath, includeSubfolders, ct);
             var paths = images.Select(i => i.Path).ToList();
             var scanTimes = await _databaseService.GetFaceScanTimesAsync(paths, ct);
 
@@ -128,9 +128,11 @@ public sealed class FaceScanService
                 Progress?.Invoke(i + 1, total, faces);
             }
 
-            // Suggestions for everything unnamed in this folder.
-            // Vorschläge für alles Unbenannte in diesem Ordner.
-            var folderFaces = await _databaseService.GetFacesForFolderAsync(folderPath, ct);
+            // Suggestions for everything unnamed in this scan's scope — a recursive
+            // scan must also cover the subtree faces it just saved.
+            // Vorschläge für alles Unbenannte im Scan-Umfang — ein rekursiver Scan
+            // muss auch die gerade gespeicherten Teilbaum-Gesichter abdecken.
+            var folderFaces = await _databaseService.GetFacesForFolderAsync(folderPath, includeSubfolders, ct);
             var unnamed = folderFaces.Where(f => f.Status == FaceStatus.Unnamed).ToList();
             if (unnamed.Count > 0)
             {

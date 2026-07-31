@@ -14,17 +14,16 @@ public class DatabaseService : IDatabaseService, IDisposable
     private readonly SQLiteConnection _connection;
     private readonly SQLiteConnection _readConnection;
     private readonly SemaphoreSlim _writeSemaphore = new(1, 1);
-    private readonly SemaphoreSlim _readSemaphore = new(4, 4);
+    // One command at a time on the shared read connection — a SQLiteConnection
+    // instance is not safe for concurrent use from multiple threads. WAL-parallel
+    // reads would need one connection per reader, not more permits here.
+    // Nur ein Kommando zugleich auf der geteilten Lese-Verbindung — eine
+    // SQLiteConnection ist nicht für parallelen Zugriff aus mehreren Threads
+    // ausgelegt. Parallele WAL-Reads bräuchten eigene Verbindungen pro Leser.
+    private readonly SemaphoreSlim _readSemaphore = new(1, 1);
     private readonly ILogger<DatabaseService> _logger;
     private readonly int _chunkSize;
     private bool _disposed;
-
-    static DatabaseService()
-    {
-        // Bind lower_inv to every connection opened afterwards.
-        // Registriert lower_inv für alle danach geöffneten Verbindungen.
-        SQLiteFunction.RegisterFunction(typeof(LowerInvariantSqliteFunction));
-    }
 
     public DatabaseService(ILogger<DatabaseService> logger, IOptions<DatabaseSettings> options)
     {
@@ -109,6 +108,12 @@ public class DatabaseService : IDatabaseService, IDisposable
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Path TEXT NOT NULL UNIQUE,
                 FileName TEXT NOT NULL DEFAULT '',
+                -- Persisted lowercase twins — the search LIKEs run against these because
+                -- SQLite's built-in lower()/LIKE is ASCII-only case-insensitive (Ä→ä needs C#).
+                -- Persistierte Kleinschreib-Spalten — die Such-LIKEs laufen dagegen, weil
+                -- SQLites lower()/LIKE keine Umlaute case-insensitiv vergleichen kann.
+                FileNameLower TEXT NOT NULL DEFAULT '',
+                DescriptionLower TEXT,
                 LastModified TEXT NOT NULL,
                 Rating INTEGER DEFAULT 0,
                 Width INTEGER DEFAULT 0,
@@ -118,7 +123,8 @@ public class DatabaseService : IDatabaseService, IDisposable
 
             CREATE TABLE IF NOT EXISTS Tags (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT NOT NULL UNIQUE
+                Name TEXT NOT NULL UNIQUE,
+                NameLower TEXT NOT NULL DEFAULT ''
             );
 
             CREATE TABLE IF NOT EXISTS ImageTags (
@@ -129,7 +135,8 @@ public class DatabaseService : IDatabaseService, IDisposable
                 FOREIGN KEY (TagId) REFERENCES Tags(Id) ON DELETE CASCADE
             );
 
-            CREATE INDEX IF NOT EXISTS idx_images_path ON Images(Path);
+            -- No index on Images(Path): the UNIQUE constraint already creates one.
+            -- Kein Index auf Images(Path) — UNIQUE erzeugt bereits einen.
             CREATE INDEX IF NOT EXISTS idx_tags_name ON Tags(Name);
         ";
         command.ExecuteNonQuery();
@@ -205,6 +212,45 @@ public class DatabaseService : IDatabaseService, IDisposable
         return tags;
     }
 
+    /// <summary>
+    /// Load the tags of many images in one query per chunk (avoids N+1 on search results).
+    /// Lädt die Tags vieler Bilder gebündelt pro Chunk (vermeidet N+1 bei Suchtreffern).
+    /// </summary>
+    private async Task<Dictionary<long, List<string>>> GetTagsForImagesAsync(List<long> imageIds, SQLiteConnection connection, CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<long, List<string>>();
+        if (imageIds.Count == 0) return result;
+
+        for (int i = 0; i < imageIds.Count; i += _chunkSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var chunk = imageIds.Skip(i).Take(_chunkSize).ToList();
+            var placeholders = string.Join(",", chunk.Select((_, idx) => $"@p{idx}"));
+
+            using var command = connection.CreateCommand();
+            command.CommandText = $@"
+                SELECT it.ImageId, t.Name
+                FROM ImageTags it
+                JOIN Tags t ON t.Id = it.TagId
+                WHERE it.ImageId IN ({placeholders})";
+            for (int j = 0; j < chunk.Count; j++)
+            {
+                command.Parameters.AddWithValue($"@p{j}", chunk[j]);
+            }
+
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var imageId = reader.GetInt64(0);
+                if (!result.TryGetValue(imageId, out var tags))
+                    result[imageId] = tags = new List<string>();
+                tags.Add(reader.GetString(1));
+            }
+        }
+        return result;
+    }
+
     public async Task SaveImageAsync(ImageFile image, CancellationToken cancellationToken = default)
     {
         await _writeSemaphore.WaitAsync(cancellationToken);
@@ -239,13 +285,16 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     private async Task SaveImageInternalNoTxAsync(ImageFile image, CancellationToken cancellationToken = default)
     {
+        var fileName = string.IsNullOrEmpty(image.FileName) ? Path.GetFileName(image.Path) : image.FileName;
+
         using (var cmd = _connection.CreateCommand())
         {
             cmd.CommandText = @"
-                INSERT INTO Images (Path, FileName, LastModified, Rating, Width, Height, DateTaken)
-                VALUES (@Path, @FileName, @LastModified, @Rating, @Width, @Height, @DateTaken)
+                INSERT INTO Images (Path, FileName, FileNameLower, LastModified, Rating, Width, Height, DateTaken)
+                VALUES (@Path, @FileName, @FileNameLower, @LastModified, @Rating, @Width, @Height, @DateTaken)
                 ON CONFLICT(Path) DO UPDATE SET
                     FileName = @FileName,
+                    FileNameLower = @FileNameLower,
                     LastModified = @LastModified,
                     Rating = @Rating,
                     Width = @Width,
@@ -264,8 +313,8 @@ public class DatabaseService : IDatabaseService, IDisposable
                 RETURNING Id;
             ";
             cmd.Parameters.AddWithValue("@Path", image.Path);
-            cmd.Parameters.AddWithValue("@FileName",
-                string.IsNullOrEmpty(image.FileName) ? Path.GetFileName(image.Path) : image.FileName);
+            cmd.Parameters.AddWithValue("@FileName", fileName);
+            cmd.Parameters.AddWithValue("@FileNameLower", fileName.ToLowerInvariant());
             cmd.Parameters.AddWithValue("@LastModified", image.DateModified.ToString("o"));
             // Always normalized UTC — the scan writer stores UTC ("Z") and DateModified
             // usually comes from FileInfo.LastWriteTime, which is LOCAL kind.
@@ -298,8 +347,9 @@ public class DatabaseService : IDatabaseService, IDisposable
                 long tagId;
                 using (var tagCmd = _connection.CreateCommand())
                 {
-                    tagCmd.CommandText = "INSERT OR IGNORE INTO Tags (Name) VALUES (@Name); SELECT Id FROM Tags WHERE Name = @Name;";
+                    tagCmd.CommandText = "INSERT OR IGNORE INTO Tags (Name, NameLower) VALUES (@Name, @NameLower); SELECT Id FROM Tags WHERE Name = @Name;";
                     tagCmd.Parameters.AddWithValue("@Name", tag);
+                    tagCmd.Parameters.AddWithValue("@NameLower", tag.ToLowerInvariant());
                     var tagResult = await tagCmd.ExecuteScalarAsync(cancellationToken);
                     tagId = tagResult != null ? (long)tagResult : 0;
                 }
@@ -545,15 +595,22 @@ public class DatabaseService : IDatabaseService, IDisposable
             if (terms != null && terms.Count > 0)
             {
                 // Each term must match at least one tag name, filename, or description (substring, case-insensitive).
-                // Terms are AND-combined. / Jeder Begriff muss Tag, Dateinamen oder Beschreibung treffen; UND-verknüpft.
+                // Terms are AND-combined. The LIKEs run against the persisted lowercase columns —
+                // SQLite's own LIKE is ASCII-only case-insensitive, umlauts need the C#-lowered
+                // twins. DescriptionLower may be NULL — NULL LIKE ... yields NULL, which the
+                // surrounding OR/WHERE treats as no match.
+                // Jeder Begriff muss Tag, Dateinamen oder Beschreibung treffen; UND-verknüpft.
+                // Die LIKEs laufen gegen die persistierten Kleinschreib-Spalten — SQLites LIKE
+                // kann Umlaute nicht case-insensitiv. DescriptionLower kann NULL sein —
+                // NULL LIKE ... ergibt NULL und gilt in OR/WHERE als kein Treffer.
                 for (int t = 0; t < terms.Count; t++)
                 {
                     conditions.Add($@"(EXISTS (
                         SELECT 1 FROM ImageTags it
                         JOIN Tags tg ON it.TagId = tg.Id
-                        WHERE it.ImageId = i.Id AND lower_inv(tg.Name) LIKE @term{t} ESCAPE '\')
-                    OR lower_inv(i.FileName) LIKE @term{t} ESCAPE '\'
-                    OR lower_inv(i.Description) LIKE @term{t} ESCAPE '\')");
+                        WHERE it.ImageId = i.Id AND tg.NameLower LIKE @term{t} ESCAPE '\')
+                    OR i.FileNameLower LIKE @term{t} ESCAPE '\'
+                    OR i.DescriptionLower LIKE @term{t} ESCAPE '\')");
                     command.Parameters.AddWithValue($"@term{t}",
                         "%" + EscapeLikePattern(terms[t].ToLowerInvariant()) + "%");
                 }
@@ -595,10 +652,14 @@ public class DatabaseService : IDatabaseService, IDisposable
             }
             reader.Close();
 
-            // Load tags for each image
+            // Load tags for all hits in one query instead of one per hit.
+            // Tags aller Treffer in einer Abfrage statt einzeln pro Treffer.
+            var tagsByImageId = await GetTagsForImagesAsync(
+                imageIds.Select(x => x.id).ToList(), _readConnection, cancellationToken);
             foreach (var (id, image) in imageIds)
             {
-                image.Tags = await GetTagsInternalAsync(id, _readConnection, cancellationToken);
+                if (tagsByImageId.TryGetValue(id, out var tags))
+                    image.Tags = tags;
             }
 
             return results;
@@ -636,8 +697,9 @@ public class DatabaseService : IDatabaseService, IDisposable
         try
         {
             using var cmd = _connection.CreateCommand();
-            cmd.CommandText = "UPDATE Images SET Description = @Desc WHERE Path = @Path";
+            cmd.CommandText = "UPDATE Images SET Description = @Desc, DescriptionLower = @DescLower WHERE Path = @Path";
             cmd.Parameters.AddWithValue("@Desc", description);
+            cmd.Parameters.AddWithValue("@DescLower", description.ToLowerInvariant());
             cmd.Parameters.AddWithValue("@Path", imagePath);
             await cmd.ExecuteNonQueryAsync(cancellationToken);
         }
@@ -689,11 +751,13 @@ public class DatabaseService : IDatabaseService, IDisposable
                 {
                     ensure.Transaction = transaction;
                     ensure.CommandText = @"
-                        INSERT INTO Images (Path, FileName, LastModified) VALUES (@Path, @FileName, @LastModified)
+                        INSERT INTO Images (Path, FileName, FileNameLower, LastModified)
+                        VALUES (@Path, @FileName, @FileNameLower, @LastModified)
                         ON CONFLICT(Path) DO NOTHING;
                         SELECT Id FROM Images WHERE Path = @Path;";
                     ensure.Parameters.AddWithValue("@Path", imagePath);
                     ensure.Parameters.AddWithValue("@FileName", Path.GetFileName(imagePath));
+                    ensure.Parameters.AddWithValue("@FileNameLower", Path.GetFileName(imagePath).ToLowerInvariant());
                     ensure.Parameters.AddWithValue("@LastModified", fileLastWriteUtc.ToString("o"));
                     imageId = (long)(await ensure.ExecuteScalarAsync(cancellationToken))!;
                 }
@@ -807,7 +871,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             reader.GetString(12));
     }
 
-    public async Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, CancellationToken cancellationToken = default)
+    public async Task<List<StoredFace>> GetFacesForFolderAsync(string folderPath, bool includeSubfolders = false, CancellationToken cancellationToken = default)
     {
         var results = new List<StoredFace>();
         var normalized = folderPath.TrimEnd('\\');
@@ -817,9 +881,11 @@ public class DatabaseService : IDatabaseService, IDisposable
         {
             using var cmd = _readConnection.CreateCommand();
             // Load all faces from images whose path starts with the folder prefix.
-            // Exact directory check happens in C# to avoid recursion.
-            // Lädt alle Gesichter, deren Pfad mit dem Ordner-Präfix beginnt,
-            // exakte Verzeichnis-Prüfung in C# (um Rekursion zu vermeiden).
+            // Non-recursive callers get the exact directory check in C#; recursive
+            // callers keep the whole subtree the prefix already matched.
+            // Lädt alle Gesichter, deren Pfad mit dem Ordner-Präfix beginnt.
+            // Ohne Rekursion filtert C# auf das exakte Verzeichnis; mit Rekursion
+            // bleibt der gesamte Teilbaum aus dem Präfix-Match erhalten.
             cmd.CommandText = $@"
                 SELECT {FaceSelectColumns}
                 FROM Faces f JOIN Images i ON f.ImageId = i.Id
@@ -830,7 +896,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             while (await reader.ReadAsync(cancellationToken))
             {
                 var face = ReadStoredFace(reader);
-                if (string.Equals(Path.GetDirectoryName(face.ImagePath), normalized, StringComparison.OrdinalIgnoreCase))
+                if (includeSubfolders || string.Equals(Path.GetDirectoryName(face.ImagePath), normalized, StringComparison.OrdinalIgnoreCase))
                     results.Add(face);
             }
             return results;
