@@ -66,6 +66,7 @@ ehthumbs.db
 .shared/
 .bg-shell/
 .planning/
+.fallowrc.json
 
 # Scratch/temp files
 heroui.txt
